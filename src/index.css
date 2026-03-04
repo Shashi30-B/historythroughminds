@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-[rgba(255,255,255,0.06)] backdrop-blur-[20px] border border-[rgba(255,255,255,0.1)] shadow-lg;
+  }
+  .glass-dark {
+    @apply bg-[#0B1220]/80 backdrop-blur-[20px] border border-[rgba(255,255,255,0.1)] shadow-lg;
+  }
+  .shimmer {
+    @apply relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent;
+  }
+  .glow-blue {
+    @apply shadow-[0_0_20px_rgba(0,198,255,0.6)];
+  }
+  .glow-emerald {
+    @apply shadow-[0_0_20px_rgba(16,185,129,0.5)];
+  }
+  .btn-primary {
+    @apply bg-gradient-to-r from-[#00C6FF] to-[#0072FF] text-white shadow-[0_0_20px_rgba(0,198,255,0.6)] hover:scale-105 transition-all duration-300;
+  }
+  .btn-secondary {
+    @apply bg-[#0B1220] text-white border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.06)] transition-all duration-300;
+  }
+  .text-primary {
+    @apply text-[#FFFFFF];
+  }
+  .text-secondary {
+    @apply text-[#C8D4F0];
+  }
+  .text-muted {
+    @apply text-[#9FB3D9];
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+body {
+  @apply antialiased bg-gradient-to-br from-[#0B1220] via-[#0F1C3F] to-[#142E6E] text-[#FFFFFF] min-h-screen relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80vw;
+  height: 80vw;
+  background: radial-gradient(circle, rgba(0,198,255,0.05) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.markdown-body h1 { @apply text-3xl font-serif font-bold mb-4 mt-6 text-[#FFFFFF]; }
+.markdown-body h2 { @apply text-2xl font-serif font-semibold mb-3 mt-5 border-b border-[rgba(255,255,255,0.1)] pb-1 text-[#FFFFFF]; }
+.markdown-body h3 { @apply text-xl font-serif font-medium mb-2 mt-4 text-[#FFFFFF]; }
+.markdown-body p { @apply mb-4 leading-relaxed text-[#C8D4F0]; }
+.markdown-body ul { @apply list-disc pl-5 mb-4 space-y-2 text-[#C8D4F0]; }
+.markdown-body li { @apply leading-relaxed; }
+.markdown-body strong { @apply text-[#FFFFFF] font-bold; }
+.markdown-body table { @apply w-full border-collapse mb-6 text-sm text-[#C8D4F0]; }
+.markdown-body th { @apply bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.1)] p-3 text-left font-bold text-[#FFFFFF]; }
+.markdown-body td { @apply border border-[rgba(255,255,255,0.1)] p-3; }
+.markdown-body blockquote { @apply border-l-4 border-[#00C6FF] bg-[rgba(255,255,255,0.06)] p-4 italic my-4 rounded-r-lg text-[#9FB3D9]; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
