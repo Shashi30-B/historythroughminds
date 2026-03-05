@@ -717,44 +717,47 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   const renderExplore = () => (
     <div className="space-y-12">
-      {/* Hero Section with Cinematic Background */}
-      <section className="relative min-h-[60vh] md:min-h-[70vh] rounded-[3rem] overflow-hidden shadow-2xl flex flex-col items-center justify-center text-center px-6 bg-gradient-to-br from-[#0B1220] via-[#0F1C3F] to-[#142E6E]">
-        {/* Background Overlay */}
+      {/* Hero Section with Clean Design */}
+      <section className="relative min-h-[40vh] md:min-h-[50vh] rounded-[2.5rem] overflow-hidden flex flex-col items-center justify-center text-center px-6 bg-gray-50">
         <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0B1220]/40 to-[#0B1220]" />
+          <img 
+            src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80" 
+            alt="Travel Background"
+            className="w-full h-full object-cover opacity-20 grayscale"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/0 to-white" />
         </div>
 
-        <div className="relative z-10 space-y-6 max-w-4xl w-full">
+        <div className="relative z-10 space-y-4 max-w-4xl w-full">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
+            className="space-y-2"
           >
-            <h1 className="text-5xl md:text-8xl font-serif text-white font-bold tracking-tight leading-tight">
-              TripGenious
+            <h1 className="text-4xl md:text-6xl font-bold text-[#0A2540] tracking-tight">
+              Where to next?
             </h1>
-            <div className="h-8 flex items-center justify-center">
-              <p className="text-[#C8D4F0] text-lg md:text-xl font-light tracking-wide">
-                Smart Travel. Powered by AI.
-              </p>
-            </div>
+            <p className="text-gray-500 text-lg font-medium">
+              Smart Travel. Powered by AI.
+            </p>
           </motion.div>
 
-          {/* Glassmorphism Search Card */}
+          {/* Premium Search Card */}
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="glass rounded-[2.5rem] p-6 md:p-10 space-y-8"
+            className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-gray-100 space-y-6"
           >
-            {/* From-To Card (MakeMyTrip Style) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+            {/* From-To Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
               {/* From Input */}
               <div className="relative group">
-                <div className="absolute top-3 left-6 z-10">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50 group-focus-within:text-blue-400 transition-colors">From</span>
+                <div className="absolute top-2.5 left-4 z-10">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">From</span>
                 </div>
-                <div className="absolute inset-y-0 left-6 flex items-center pt-4 pointer-events-none">
-                  <MapPinIcon className="text-white/40 group-focus-within:text-white transition-colors" size={20} />
+                <div className="absolute inset-y-0 left-4 flex items-center pt-4 pointer-events-none">
+                  <MapPinIcon className="text-gray-300 group-focus-within:text-[#2A7FFF] transition-colors" size={18} />
                 </div>
                 {isLoaded ? (
                   <Autocomplete
@@ -782,7 +785,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       value={startLocation}
                       onChange={(e) => setStartLocation(e.target.value)}
                       placeholder="Starting City"
-                      className="w-full bg-white/5 border border-white/10 rounded-3xl pl-14 pr-12 pt-8 pb-4 text-xl text-white placeholder:text-white/20 focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 outline-none transition-all shadow-inner"
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-10 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
                     />
                   </Autocomplete>
                 ) : (
@@ -791,43 +794,27 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     value={startLocation}
                     onChange={(e) => setStartLocation(e.target.value)}
                     placeholder="Starting City"
-                    className="w-full bg-white/5 border border-white/10 rounded-3xl pl-14 pr-12 pt-8 pb-4 text-xl text-white placeholder:text-white/20 focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 outline-none transition-all shadow-inner"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-10 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
                   />
                 )}
                 <button 
                   onClick={detectLocation}
                   className={cn(
-                    "absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-white/10 transition-all",
-                    isLocating ? "animate-spin text-blue-400" : "text-white/40 hover:text-white"
+                    "absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-100 transition-all",
+                    isLocating ? "animate-spin text-[#2A7FFF]" : "text-gray-300 hover:text-[#0A2540]"
                   )}
                 >
-                  <Navigation2 size={18} />
+                  <Navigation2 size={16} />
                 </button>
-              </div>
-
-              {/* Swap Button */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 hidden md:flex">
-                <motion.button 
-                  whileHover={{ rotate: 180 }}
-                  transition={{ type: "spring", stiffness: 200 }}
-                  className="bg-blue-600 text-white p-3 rounded-full shadow-xl border-4 border-black/20 cursor-pointer" 
-                  onClick={() => {
-                    const temp = startLocation;
-                    setStartLocation(locationInput);
-                    setLocationInput(temp);
-                  }}
-                >
-                  <ArrowRight size={20} />
-                </motion.button>
               </div>
 
               {/* To Input */}
               <div className="relative group">
-                <div className="absolute top-3 left-6 z-10">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50 group-focus-within:text-blue-400 transition-colors">To</span>
+                <div className="absolute top-2.5 left-4 z-10">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">To</span>
                 </div>
-                <div className="absolute inset-y-0 left-6 flex items-center pt-4 pointer-events-none">
-                  <Search className="text-white/40 group-focus-within:text-white transition-colors" size={20} />
+                <div className="absolute inset-y-0 left-4 flex items-center pt-4 pointer-events-none">
+                  <Search className="text-gray-300 group-focus-within:text-[#2A7FFF] transition-colors" size={18} />
                 </div>
                 {isLoaded ? (
                   <Autocomplete
@@ -855,7 +842,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       value={locationInput}
                       onChange={(e) => setLocationInput(e.target.value)}
                       placeholder="Destination City"
-                      className="w-full bg-white/5 border border-white/10 rounded-3xl pl-14 pr-6 pt-8 pb-4 text-xl text-white placeholder:text-white/20 focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 outline-none transition-all shadow-inner"
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
                     />
                   </Autocomplete>
                 ) : (
@@ -864,216 +851,145 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     value={locationInput}
                     onChange={(e) => setLocationInput(e.target.value)}
                     placeholder="Destination City"
-                    className="w-full bg-white/5 border border-white/10 rounded-3xl pl-14 pr-6 pt-8 pb-4 text-xl text-white placeholder:text-white/20 focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 outline-none transition-all shadow-inner"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
                   />
                 )}
               </div>
             </div>
 
-            {/* Smart Chips & Mini Map Preview */}
-            <AnimatePresence>
-              {startLocation && locationInput && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-6 overflow-hidden"
-                >
-                  {/* Smart Chips */}
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {[
-                      { label: "Distance", value: routeSummary?.distance || "Calculating...", icon: Navigation2, color: "text-blue-400" },
-                      { label: "Est. Time", value: routeSummary?.time || "Calculating...", icon: Clock, color: "text-emerald-400" },
-                      { label: "Best Mode", value: routeSummary?.mode || "Calculating...", icon: Plane, color: "text-purple-400" }
-                    ].map((chip, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="bg-white/5 border border-white/10 px-4 py-2 rounded-full flex items-center gap-2"
-                      >
-                        <chip.icon size={14} className={chip.color} />
-                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{chip.label}</span>
-                        <span className="text-xs font-bold text-white">{chip.value}</span>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* Mini Map Preview */}
-                  <div className="relative h-24 rounded-2xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center">
-                    <div className="absolute inset-0 opacity-20">
-                      <svg className="w-full h-full" viewBox="0 0 400 100">
-                        <path d="M50,50 Q200,10 350,50" fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" />
-                        <circle cx="50" cy="50" r="4" fill="white" />
-                        <circle cx="350" cy="50" r="4" fill="white" />
-                      </svg>
-                    </div>
-                    <div className="relative z-10 flex items-center gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)]" />
-                        <span className="text-[8px] font-bold text-white/60 mt-1 uppercase">{startLocation.split(',')[0]}</span>
-                      </div>
-                      <div className="w-32 h-px bg-gradient-to-r from-blue-400 to-emerald-400 animate-pulse" />
-                      <div className="flex flex-col items-center">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
-                        <span className="text-[8px] font-bold text-white/60 mt-1 uppercase">{locationInput.split(',')[0]}</span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Duration */}
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-4 flex items-center justify-between group hover:bg-white/10 transition-all">
-                <div className="flex items-center gap-3">
-                  <Calendar className="text-white/60 group-hover:text-white transition-colors" size={20} />
-                  <span className="text-white/60 font-medium group-hover:text-white transition-colors">Duration</span>
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
+                <div className="flex items-center gap-2.5">
+                  <Calendar className="text-gray-400" size={18} />
+                  <span className="text-gray-500 text-sm font-medium">Days</span>
                 </div>
-                <div className="flex items-center gap-4">
-                  <button onClick={() => setDuration(Math.max(1, duration - 1))} className="text-white/40 hover:text-white transition-colors">-</button>
-                  <span className="text-white font-bold text-xl w-6 text-center">{duration}</span>
-                  <button onClick={() => setDuration(duration + 1)} className="text-white/40 hover:text-white transition-colors">+</button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setDuration(Math.max(1, duration - 1))} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">-</button>
+                  <span className="text-[#0A2540] font-bold text-base w-4 text-center">{duration}</span>
+                  <button onClick={() => setDuration(duration + 1)} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">+</button>
                 </div>
               </div>
 
               {/* People */}
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-4 flex items-center justify-between group hover:bg-white/10 transition-all">
-                <div className="flex items-center gap-3">
-                  <Users className="text-white/60 group-hover:text-white transition-colors" size={20} />
-                  <span className="text-white/60 font-medium group-hover:text-white transition-colors">Travelers</span>
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
+                <div className="flex items-center gap-2.5">
+                  <Users className="text-gray-400" size={18} />
+                  <span className="text-gray-500 text-sm font-medium">Travelers</span>
                 </div>
-                <div className="flex items-center gap-4">
-                  <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="text-white/40 hover:text-white transition-colors">-</button>
-                  <span className="text-white font-bold text-xl w-6 text-center">{numPeople}</span>
-                  <button onClick={() => setNumPeople(numPeople + 1)} className="text-white/40 hover:text-white transition-colors">+</button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">-</button>
+                  <span className="text-[#0A2540] font-bold text-base w-4 text-center">{numPeople}</span>
+                  <button onClick={() => setNumPeople(numPeople + 1)} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">+</button>
                 </div>
               </div>
 
-              {/* Glowing Gradient CTA Button */}
+              {/* CTA Button */}
               <motion.button
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleGenerate()}
                 disabled={loading}
-                className="btn-primary relative overflow-hidden rounded-3xl py-4 font-bold text-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                className="btn-primary rounded-2xl py-3 font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {loading ? <Loader2 className="animate-spin" /> : <Zap size={20} className="fill-current" />}
-                {loading ? "Planning..." : t.planTrip}
-                {!loading && <Sparkles size={16} className="absolute top-2 right-4 animate-pulse opacity-50" />}
+                {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} className="fill-current" />}
+                {loading ? "Planning..." : "Generate AI Plan"}
               </motion.button>
             </div>
 
-            {/* Travel Styles Grid */}
-            <div className="space-y-4 pt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Travel Style</span>
-                <span className="text-blue-400 text-[10px] font-bold uppercase tracking-widest">{travelStyle}</span>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                {TRAVEL_STYLES.filter(s => ['budget', 'luxury', 'adventure', 'family', 'standard'].includes(s.id)).map(style => {
-                  const Icon = IconMap[style.icon];
-                  const color = StyleColors[style.id];
-                  return (
-                    <button
-                      key={style.id}
-                      onClick={() => setTravelStyle(style.id)}
-                      className={cn(
-                        "flex flex-col items-center gap-3 p-4 rounded-[2rem] border transition-all relative overflow-hidden group",
-                        travelStyle === style.id 
-                          ? `${color.bg} border-white shadow-[0_0_20px_rgba(255,255,255,0.2)] scale-105 text-white` 
-                          : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110",
-                        travelStyle === style.id ? "bg-white/20" : "bg-white/5"
-                      )}>
-                        <Icon size={20} />
-                      </div>
-                      <span className="text-[10px] font-bold uppercase tracking-tight">{style.label}</span>
-                      {travelStyle === style.id && (
-                        <motion.div layoutId="activeStyle" className="absolute inset-0 border-2 border-white rounded-[2rem]" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Transport & Accommodation Selectors */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Transport</span>
-                  <span className="text-blue-400 text-[10px] font-bold uppercase tracking-widest">{transportType}</span>
-                </div>
-                <div className="flex gap-2">
-                  {[
-                    { id: 'public', label: 'Public', icon: Bus },
-                    { id: 'private', label: 'Private', icon: Car },
-                    { id: 'flight', label: 'Flight', icon: Plane }
-                  ].map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => setTransportType(item.id)}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border transition-all",
-                        transportType === item.id 
-                          ? "bg-blue-600 border-white text-white shadow-lg" 
-                          : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
-                      )}
-                    >
-                      <item.icon size={14} />
-                      <span className="text-[10px] font-bold uppercase">{item.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Accommodation</span>
-                  <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">{accommodationType}</span>
-                </div>
-                <div className="flex gap-2">
-                  {[
-                    { id: 'hostel', label: 'Hostel', icon: Home },
-                    { id: 'standard', label: 'Standard', icon: Hotel },
-                    { id: 'luxury', label: 'Luxury', icon: Crown }
-                  ].map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => setAccommodationType(item.id)}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border transition-all",
-                        accommodationType === item.id 
-                          ? "bg-emerald-600 border-white text-white shadow-lg" 
-                          : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
-                      )}
-                    >
-                      <item.icon size={14} />
-                      <span className="text-[10px] font-bold uppercase">{item.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {/* Travel Styles */}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              {TRAVEL_STYLES.filter(s => ['budget', 'luxury', 'adventure', 'family', 'standard'].includes(s.id)).map(style => {
+                const Icon = IconMap[style.icon];
+                return (
+                  <button
+                    key={style.id}
+                    onClick={() => setTravelStyle(style.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold transition-all",
+                      travelStyle === style.id 
+                        ? "bg-[#0A2540] border-[#0A2540] text-white shadow-md" 
+                        : "bg-white border-gray-100 text-gray-500 hover:border-gray-200"
+                    )}
+                  >
+                    <Icon size={14} />
+                    {style.label}
+                  </button>
+                );
+              })}
             </div>
           </motion.div>
         </div>
       </section>
+
+      {/* Transport & Accommodation Selectors */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold text-[#0A2540]">Transport</h4>
+            <span className="text-[#2A7FFF] text-[10px] font-bold uppercase tracking-wider">{transportType}</span>
+          </div>
+          <div className="flex gap-2">
+            {[
+              { id: 'public', label: 'Public', icon: Bus },
+              { id: 'private', label: 'Private', icon: Car },
+              { id: 'flight', label: 'Flight', icon: Plane }
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => setTransportType(item.id)}
+                className={cn(
+                  "flex-1 flex flex-col items-center gap-2 py-3 rounded-2xl border transition-all",
+                  transportType === item.id 
+                    ? "bg-blue-50 border-[#2A7FFF] text-[#2A7FFF] shadow-sm" 
+                    : "bg-gray-50 border-gray-100 text-gray-400 hover:bg-white hover:border-gray-200"
+                )}
+              >
+                <item.icon size={18} />
+                <span className="text-[10px] font-bold uppercase">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold text-[#0A2540]">Accommodation</h4>
+            <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-wider">{accommodationType}</span>
+          </div>
+          <div className="flex gap-2">
+            {[
+              { id: 'hostel', label: 'Hostel', icon: Home },
+              { id: 'standard', label: 'Standard', icon: Hotel },
+              { id: 'luxury', label: 'Luxury', icon: Crown }
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => setAccommodationType(item.id)}
+                className={cn(
+                  "flex-1 flex flex-col items-center gap-2 py-3 rounded-2xl border transition-all",
+                  accommodationType === item.id 
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-500 shadow-sm" 
+                    : "bg-gray-50 border-gray-100 text-gray-400 hover:bg-white hover:border-gray-200"
+                )}
+              >
+                <item.icon size={18} />
+                <span className="text-[10px] font-bold uppercase">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Trending Destinations - Horizontal Scroll */}
       {!itinerary && !loading && (
         <section className="space-y-6">
           <div className="flex justify-between items-end px-2">
             <div className="space-y-1">
-              <h3 className="text-3xl font-serif font-bold text-white">Trending Now</h3>
-              <p className="text-white/50 text-sm">Most loved destinations by fellow travelers</p>
+              <h3 className="text-2xl font-bold text-[#0A2540]">Trending Now</h3>
+              <p className="text-gray-500 text-sm">Most loved destinations by fellow travelers</p>
             </div>
-            <button className="text-blue-400 text-sm font-bold hover:text-white transition-colors flex items-center gap-2">
+            <button className="text-[#2A7FFF] text-sm font-bold hover:underline transition-all flex items-center gap-2">
               View All <ArrowRight size={16} />
             </button>
           </div>
@@ -1082,17 +998,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {TRENDING_DESTINATIONS.map((dest) => (
               <motion.div
                 key={dest.id}
-                whileHover={{ y: -10 }}
+                whileHover={{ y: -8 }}
                 onClick={() => setLocationInput(dest.title)}
-                className="min-w-[280px] md:min-w-[320px] h-[400px] relative rounded-[2.5rem] overflow-hidden shadow-2xl group cursor-pointer snap-start"
+                className="min-w-[280px] md:min-w-[320px] h-[400px] relative rounded-3xl overflow-hidden shadow-lg group cursor-pointer snap-start border border-gray-100"
               >
                 <img 
                   src={dest.img} 
                   alt={dest.title} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                   referrerPolicy="no-referrer" 
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 
                 <button 
                   onClick={(e) => {
@@ -1100,22 +1016,22 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     toggleWishlist(dest);
                   }}
                   className={cn(
-                    "absolute top-6 right-6 w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-2xl z-20",
+                    "absolute top-4 right-4 w-10 h-10 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg z-20",
                     wishlist.some(w => w.dest_id === dest.id) 
                       ? "bg-red-500 border-red-400 text-white" 
-                      : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      : "bg-white/20 border-white/30 text-white hover:bg-white/40"
                   )}
                 >
-                  <Heart size={20} className={wishlist.some(w => w.dest_id === dest.id) ? "fill-current" : ""} />
+                  <Heart size={18} className={wishlist.some(w => w.dest_id === dest.id) ? "fill-current" : ""} />
                 </button>
 
-                <div className="absolute bottom-8 left-8 right-8 space-y-2">
+                <div className="absolute bottom-6 left-6 right-6 space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-blue-600 rounded-full text-[8px] font-bold text-white uppercase tracking-widest">Trending</span>
-                    <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[8px] font-bold text-white uppercase tracking-widest">4.8 ★</span>
+                    <span className="px-2 py-0.5 bg-[#2A7FFF] rounded-full text-[8px] font-bold text-white uppercase tracking-wider">Trending</span>
+                    <span className="px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[8px] font-bold text-white uppercase tracking-wider">4.8 ★</span>
                   </div>
-                  <h4 className="text-white font-serif font-bold text-3xl">{dest.title}</h4>
-                  <p className="text-white/60 text-sm font-light">{dest.desc}</p>
+                  <h4 className="text-white font-bold text-2xl">{dest.title}</h4>
+                  <p className="text-white/80 text-xs font-medium line-clamp-1">{dest.desc}</p>
                 </div>
               </motion.div>
             ))}
@@ -1127,43 +1043,24 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <AnimatePresence mode="wait">
         {loading && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
             className="py-20 flex flex-col items-center justify-center space-y-10"
           >
-            {/* Skeleton Loading State */}
-            <div className="w-full max-w-4xl space-y-8">
-              <div className="h-96 w-full bg-white/5 animate-pulse rounded-[3rem]" />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="h-16 bg-white/5 animate-pulse rounded-3xl" />
-                <div className="h-16 bg-white/5 animate-pulse rounded-3xl" />
-                <div className="h-16 bg-white/5 animate-pulse rounded-3xl" />
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-8 h-[600px] bg-white/5 animate-pulse rounded-[2.5rem]" />
-                <div className="lg:col-span-4 space-y-6">
-                  <div className="h-64 bg-white/5 animate-pulse rounded-[2.5rem]" />
-                  <div className="h-96 bg-white/5 animate-pulse rounded-[2.5rem]" />
-                </div>
+            <div className="relative">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                className="w-24 h-24 border-4 border-gray-100 border-t-[#2A7FFF] rounded-full shadow-xl"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Compass size={32} className="text-[#0A2540] animate-bounce" />
               </div>
             </div>
-            
-            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-              <div className="relative">
-                <motion.div 
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                  className="w-32 h-32 border-4 border-white/10 border-t-blue-500 rounded-full shadow-[0_0_30px_rgba(59,130,246,0.3)]"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Compass size={40} className="text-white animate-bounce" />
-                </div>
-              </div>
-              <div className="text-center mt-8 space-y-3">
-                <h3 className="text-3xl font-serif font-bold text-white tracking-tight">Crafting your adventure...</h3>
-                <p className="text-blue-200/60 font-light tracking-widest uppercase text-xs">AI is finding the best local gems for you</p>
-              </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold text-[#0A2540]">Crafting your adventure...</h3>
+              <p className="text-gray-500 text-sm font-medium">AI is finding the best local gems for you</p>
             </div>
           </motion.div>
         )}
@@ -1200,7 +1097,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       AI Optimized
                     </span>
                   </motion.div>
-                  <h2 className="text-6xl md:text-8xl font-serif font-bold text-white tracking-tighter leading-none">{locationInput}</h2>
+                  <h2 className="text-4xl md:text-6xl font-bold text-[#0A2540] tracking-tight">{locationInput}</h2>
                 </div>
                 <div className="flex gap-4">
                   <motion.button 
@@ -1226,17 +1123,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {/* Quick Actions / Optimization */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { id: "budget", label: "Budget Version", icon: Wallet, color: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500" },
-                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500" },
-                { id: "luxury", label: "Make It Luxury", icon: Crown, color: "bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500" }
+                { id: "budget", label: "Budget Version", icon: Wallet, color: "bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-500 hover:text-white" },
+                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-50 border-blue-100 text-blue-600 hover:bg-blue-500 hover:text-white" },
+                { id: "luxury", label: "Make It Luxury", icon: Crown, color: "bg-purple-50 border-purple-100 text-purple-600 hover:bg-purple-500 hover:text-white" }
               ].map((action) => (
                 <button 
                   key={action.id}
                   onClick={() => handleGenerate(action.id)} 
                   className={cn(
-                    "backdrop-blur-md border p-6 rounded-[2.5rem] font-bold transition-all flex items-center justify-center gap-3 group",
-                    action.color,
-                    "hover:text-white"
+                    "border p-6 rounded-3xl font-bold transition-all flex items-center justify-center gap-3 group shadow-sm",
+                    action.color
                   )}
                 >
                   <action.icon size={20} className="transition-transform group-hover:scale-110" /> 
@@ -1248,9 +1144,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {/* Itinerary Content */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-8 space-y-10">
-                <div className={cn("bg-white rounded-[3rem] p-10 md:p-16 shadow-2xl border relative overflow-hidden", currentColor.border)}>
+                <div className="bg-white rounded-[3rem] p-8 md:p-12 shadow-xl border border-gray-100 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50" />
-                  <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:font-serif prose-headings:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600">
+                  <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:text-[#0A2540] prose-headings:font-bold prose-p:text-gray-600 prose-li:text-gray-600">
                     <Markdown>{itinerary}</Markdown>
                   </div>
                 </div>
@@ -1259,7 +1155,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               {/* Sidebar */}
               <aside className="lg:col-span-4 space-y-8">
                 {/* Budget Summary Card */}
-                <div className={cn("rounded-[3rem] p-10 border shadow-2xl text-white relative overflow-hidden group", currentColor.bg)}>
+                <div className="bg-[#0A2540] rounded-[3rem] p-8 md:p-10 shadow-xl text-white relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 opacity-70">Budget Summary</h4>
                   <div className="space-y-8">
@@ -1287,24 +1183,24 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 </div>
 
                 {/* Quick Info Cards */}
-                <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[3rem] p-10 space-y-10 shadow-2xl">
-                  <h4 className="text-white font-serif font-bold text-2xl tracking-tight">Trip Insights</h4>
+                <div className="bg-white rounded-[3rem] p-8 md:p-10 shadow-xl border border-gray-100 space-y-10">
+                  <h4 className="text-[#0A2540] font-bold text-2xl tracking-tight">Trip Insights</h4>
                   <div className="space-y-8">
                     {[
-                      { label: "Best Time", icon: Clock, value: "Oct - Mar", color: "text-orange-400" },
-                      { label: "Crowd Level", icon: Users, value: "Moderate", color: "text-blue-400" },
-                      { label: "Weather", icon: Thermometer, value: "Pleasant", color: "text-emerald-400" },
-                      { label: "Photo Spots", icon: Camera, value: "12+ Points", color: "text-pink-400" },
-                      { label: "Shopping", icon: ShoppingBag, value: "Local Crafts", color: "text-purple-400" },
-                      { label: "Pro Tip", icon: Lightbulb, value: "Book early!", color: "text-amber-400" }
+                      { label: "Best Time", icon: Clock, value: "Oct - Mar", color: "text-orange-500" },
+                      { label: "Crowd Level", icon: Users, value: "Moderate", color: "text-blue-500" },
+                      { label: "Weather", icon: Thermometer, value: "Pleasant", color: "text-emerald-500" },
+                      { label: "Photo Spots", icon: Camera, value: "12+ Points", color: "text-pink-500" },
+                      { label: "Shopping", icon: ShoppingBag, value: "Local Crafts", color: "text-purple-500" },
+                      { label: "Pro Tip", icon: Lightbulb, value: "Book early!", color: "text-amber-500" }
                     ].map((item, idx) => (
                       <div key={idx} className="flex items-center gap-5 group">
-                        <div className={cn("w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center transition-all group-hover:scale-110 group-hover:bg-white/10", item.color)}>
+                        <div className={cn("w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center transition-all group-hover:scale-110 group-hover:bg-white group-hover:shadow-md", item.color)}>
                           <item.icon size={22} />
                         </div>
-                        <div>
-                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">{item.label}</p>
-                          <p className="text-white font-semibold tracking-wide">{item.value}</p>
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.label}</p>
+                          <p className="text-sm font-bold text-[#0A2540]">{item.value}</p>
                         </div>
                       </div>
                     ))}
@@ -2222,24 +2118,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   return (
     <div className={cn(
-      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-white",
-      "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#142E6E] via-[#0F2A5F] to-[#0B1E3D]"
+      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#0A2540] bg-[#FFFFFF]"
     )}>
       {/* Header */}
-      <header className="pt-8 pb-4 px-6 sticky top-0 z-40 backdrop-blur-md bg-transparent">
+      <header className="pt-6 pb-4 px-6 sticky top-0 z-40 backdrop-blur-md bg-white/80 border-b border-gray-100">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-3 cursor-pointer group"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-2 cursor-pointer group"
             onClick={() => setActiveTab('explore')}
           >
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl group-hover:glow-blue transition-all duration-300">
-              <Compass className="text-blue-600" size={28} />
+            <div className="w-10 h-10 bg-[#0A2540] rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-blue-500/20 transition-all duration-300">
+              <Compass className="text-white" size={24} />
             </div>
-            <span className="text-white font-serif text-2xl font-black tracking-tighter drop-shadow-md">TripGenious</span>
+            <span className="text-[#0A2540] text-xl font-bold tracking-tight">TripGenious</span>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -2248,24 +2143,24 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           >
             {user ? (
               <motion.div 
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/40 cursor-pointer overflow-hidden relative shadow-2xl"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center border border-gray-200 cursor-pointer overflow-hidden relative"
                 onClick={() => setActiveTab('profile')}
               >
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ProfileIcon className="text-white" size={24} />
+                  <ProfileIcon className="text-gray-400" size={20} />
                 )}
-                <div className="absolute bottom-1 right-1 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-10 shadow-lg" />
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-10" />
               </motion.div>
             ) : (
               <motion.button 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveTab('profile')}
-                className="bg-white text-blue-600 px-8 py-3 rounded-full font-black shadow-2xl hover:glow-blue transition-all text-sm uppercase tracking-widest"
+                className="bg-[#0A2540] text-white px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider"
               >
                 Login
               </motion.button>
@@ -2292,37 +2187,36 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       </main>
 
       {/* Sticky Bottom Navigation */}
-      <nav className="fixed bottom-8 left-0 right-0 z-50 px-6">
-        <div className="max-w-md mx-auto bg-[#0B1E3D]/60 backdrop-blur-3xl border border-[#1FD1F9]/20 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-2 flex justify-between items-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-tr from-[#1FD1F9]/10 to-transparent pointer-events-none" />
+      <nav className="fixed bottom-6 left-0 right-0 z-50 px-6">
+        <div className="max-w-md mx-auto bg-white/90 backdrop-blur-xl border border-gray-100 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
           {[
             { id: "explore", icon: Globe, label: "Explore" },
-            { id: "trips", icon: MapIcon, label: "My Trips" },
+            { id: "trips", icon: MapIcon, label: "Trips" },
             { id: "bookings", icon: BookingIcon, label: "Bookings" },
             { id: "profile", icon: ProfileIcon, label: "Profile" }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="flex flex-col items-center gap-1 px-4 py-3 rounded-full transition-all flex-1 relative z-10 group"
+              className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-full transition-all flex-1 relative z-10 group"
             >
               {activeTab === tab.id && (
                 <motion.div 
                   layoutId="activeTab"
-                  className="absolute inset-0 bg-gradient-to-r from-[#00C6FF] to-[#0072FF] rounded-full shadow-[0_0_20px_rgba(0,198,255,0.6)]"
+                  className="absolute inset-0 bg-blue-50 rounded-full"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
               <tab.icon 
-                size={22} 
+                size={20} 
                 className={cn(
                   "transition-all duration-300 relative z-10",
-                  activeTab === tab.id ? "text-[#FFFFFF] scale-110" : "text-[#C8D4F0]/70 group-hover:text-[#FFFFFF]"
+                  activeTab === tab.id ? "text-[#2A7FFF] scale-110" : "text-gray-400 group-hover:text-[#0A2540]"
                 )} 
               />
               <span className={cn(
-                "text-[10px] font-black uppercase tracking-tighter relative z-10 transition-all duration-300",
-                activeTab === tab.id ? "text-[#FFFFFF] opacity-100" : "text-[#C8D4F0]/70 opacity-0 group-hover:opacity-60"
+                "text-[9px] font-bold uppercase tracking-tight relative z-10 transition-all duration-300",
+                activeTab === tab.id ? "text-[#2A7FFF] opacity-100" : "text-gray-400 opacity-0 group-hover:opacity-100"
               )}>
                 {tab.label}
               </span>
