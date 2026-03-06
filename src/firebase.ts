@@ -28,4 +28,6 @@ try {
   console.error("Firebase initialization error:", error);
 }
 
-export { auth, db };
+const isFirebaseAvailable = !!firebaseConfig.apiKey;
+
+export { auth, db, isFirebaseAvailable };

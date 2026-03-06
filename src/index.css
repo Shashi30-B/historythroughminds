@@ -1,37 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", serif;
 }
 
 @layer utilities {
   .glass {
-    @apply bg-white/80 backdrop-blur-[16px] border border-gray-100 shadow-sm;
+    @apply bg-white/90 backdrop-blur-[12px] border border-white/20 shadow-lg;
   }
   .glass-dark {
-    @apply bg-[#0A2540] text-white backdrop-blur-[16px] border border-white/10 shadow-lg;
+    @apply bg-[#0A2540]/95 text-white backdrop-blur-[12px] border border-white/10 shadow-xl;
   }
   .shimmer {
     @apply relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-gray-100/50 before:to-transparent;
   }
   .glow-blue {
-    @apply shadow-[0_4px_20px_rgba(42,127,255,0.3)];
+    @apply shadow-[0_4px_20px_rgba(30,144,255,0.3)];
   }
   .btn-primary {
-    @apply bg-gradient-to-r from-[#2A7FFF] to-[#0A2540] text-white shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300;
+    @apply bg-gradient-to-r from-[#1E90FF] to-[#0A2540] text-white shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300;
   }
   .btn-secondary {
     @apply bg-white text-[#0A2540] border border-gray-200 hover:bg-gray-50 transition-all duration-300 shadow-sm;
   }
   .text-primary {
-    @apply text-[#0A2540];
+    @apply text-[#111111];
   }
   .text-secondary {
-    @apply text-[#4B5563];
+    @apply text-[#555555];
   }
   .text-muted {
     @apply text-[#9CA3AF];
+  }
+  .card-shadow {
+    @apply shadow-[0_8px_30px_rgb(0,0,0,0.04)];
   }
 }
 
@@ -42,20 +46,20 @@
 }
 
 body {
-  @apply antialiased bg-[#FFFFFF] text-[#0A2540] min-h-screen;
+  @apply antialiased bg-[#F5F7FA] text-[#111111] min-h-screen font-sans;
 }
 
 .markdown-body h1 { @apply text-3xl font-bold mb-4 mt-6 text-[#0A2540]; }
 .markdown-body h2 { @apply text-2xl font-semibold mb-3 mt-5 border-b border-gray-100 pb-1 text-[#0A2540]; }
 .markdown-body h3 { @apply text-xl font-medium mb-2 mt-4 text-[#0A2540]; }
-.markdown-body p { @apply mb-4 leading-relaxed text-[#4B5563]; }
-.markdown-body ul { @apply list-disc pl-5 mb-4 space-y-2 text-[#4B5563]; }
+.markdown-body p { @apply mb-4 leading-relaxed text-[#555555]; }
+.markdown-body ul { @apply list-disc pl-5 mb-4 space-y-2 text-[#555555]; }
 .markdown-body li { @apply leading-relaxed; }
 .markdown-body strong { @apply text-[#0A2540] font-bold; }
-.markdown-body table { @apply w-full border-collapse mb-6 text-sm text-[#4B5563]; }
+.markdown-body table { @apply w-full border-collapse mb-6 text-sm text-[#555555]; }
 .markdown-body th { @apply bg-gray-50 border border-gray-100 p-3 text-left font-bold text-[#0A2540]; }
 .markdown-body td { @apply border border-gray-100 p-3; }
-.markdown-body blockquote { @apply border-l-4 border-[#2A7FFF] bg-blue-50 p-4 italic my-4 rounded-r-lg text-[#4B5563]; }
+.markdown-body blockquote { @apply border-l-4 border-[#1E90FF] bg-blue-50 p-4 italic my-4 rounded-r-lg text-[#555555]; }
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;

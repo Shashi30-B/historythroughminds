@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   MapPin, Calendar, Wallet, Search, Map as MapIcon, 
@@ -12,9 +12,9 @@ import {
   Clock, Thermometer, Info, ExternalLink, Compass,
   Mountain, Briefcase, Crown, Wallet as WalletIcon,
   Home, Globe, Briefcase as BookingIcon, User as ProfileIcon,
-  ArrowRight, Camera, ShoppingBag, Lightbulb,
+  ArrowRight, ArrowLeft, Camera, ShoppingBag, Lightbulb,
   Bell, Moon, Sun, Languages, LogOut, Settings, HelpCircle, ShieldCheck, Phone,
-  AlertTriangle,
+  AlertTriangle, Check,
   Mail, Lock, Eye, EyeOff, Github, Share2,
   Plane, TrainFront, Bus, Car, Package,
   GripVertical, MapPin as MapPinIcon, Navigation2, Zap
@@ -57,13 +57,13 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const StyleColors: Record<string, { bg: string; text: string; border: string; light: string }> = {
-  budget: { bg: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-200", light: "bg-emerald-50" },
-  standard: { bg: "bg-blue-500", text: "text-blue-500", border: "border-blue-200", light: "bg-blue-50" },
-  luxury: { bg: "bg-purple-500", text: "text-purple-500", border: "border-purple-200", light: "bg-purple-50" },
-  backpacking: { bg: "bg-orange-500", text: "text-orange-500", border: "border-orange-200", light: "bg-orange-50" },
-  family: { bg: "bg-teal-500", text: "text-teal-500", border: "border-teal-200", light: "bg-teal-50" },
-  honeymoon: { bg: "bg-pink-500", text: "text-pink-500", border: "border-pink-200", light: "bg-pink-50" },
-  adventure: { bg: "bg-red-500", text: "text-red-500", border: "border-red-200", light: "bg-red-50" },
+  budget: { bg: "bg-emerald-600", text: "text-emerald-600", border: "border-emerald-200", light: "bg-emerald-50" },
+  standard: { bg: "bg-[#1E90FF]", text: "text-[#1E90FF]", border: "border-blue-200", light: "bg-blue-50" },
+  luxury: { bg: "bg-purple-600", text: "text-purple-600", border: "border-purple-200", light: "bg-purple-50" },
+  backpacking: { bg: "bg-orange-600", text: "text-orange-600", border: "border-orange-200", light: "bg-orange-50" },
+  family: { bg: "bg-teal-600", text: "text-teal-600", border: "border-teal-200", light: "bg-teal-50" },
+  honeymoon: { bg: "bg-pink-600", text: "text-pink-600", border: "border-pink-200", light: "bg-pink-50" },
+  adventure: { bg: "bg-red-600", text: "text-red-600", border: "border-red-200", light: "bg-red-50" },
   spiritual: { bg: "bg-amber-600", text: "text-amber-600", border: "border-amber-200", light: "bg-amber-50" },
 };
 
@@ -79,20 +79,39 @@ const IconMap: Record<string, any> = {
 };
 
 const BOOKING_SERVICES = [
-  { id: 'hotels', label: 'Hotels', icon: Hotel, color: 'bg-orange-500', link: (loc: string) => `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(loc)}` },
-  { id: 'flights', label: 'Flights', icon: Plane, color: 'bg-blue-500', link: (loc: string) => `https://www.skyscanner.com/transport/flights-from/anywhere/to/${encodeURIComponent(loc)}` },
+  { id: 'hotels', label: 'Hotels', icon: Hotel, color: 'bg-[#1E90FF]', link: (loc: string) => `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(loc)}` },
+  { id: 'flights', label: 'Flights', icon: Plane, color: 'bg-[#0A2540]', link: (loc: string) => `https://www.skyscanner.com/transport/flights-from/anywhere/to/${encodeURIComponent(loc)}` },
   { id: 'trains', label: 'Trains', icon: TrainFront, color: 'bg-red-600', link: (loc: string) => `https://www.irctc.co.in/nget/train-search` },
   { id: 'buses', label: 'Buses', icon: Bus, color: 'bg-rose-500', link: (loc: string) => `https://www.redbus.in/search?toCityName=${encodeURIComponent(loc)}` },
-  { id: 'cabs', label: 'Cabs', icon: Car, color: 'bg-yellow-500', link: (loc: string) => `https://www.uber.com` },
+  { id: 'cabs', label: 'Cabs', icon: Car, color: 'bg-amber-500', link: (loc: string) => `https://www.uber.com` },
   { id: 'packages', label: 'Packages', icon: Package, color: 'bg-purple-600', link: (loc: string) => `https://www.makemytrip.com/holiday-packages/search?dest=${encodeURIComponent(loc)}` },
 ];
 
 const TRENDING_DESTINATIONS = [
   { id: 'goa', title: 'Goa', desc: 'Beaches & Parties', img: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=400&q=80' },
-  { id: 'manali', title: 'Manali', desc: 'Snowy Peaks', img: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=400&q=80' },
   { id: 'dubai', title: 'Dubai', desc: 'Luxury & Desert', img: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=400&q=80' },
   { id: 'bali', title: 'Bali', desc: 'Tropical Paradise', img: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=400&q=80' },
-  { id: 'kashmir', title: 'Kashmir', desc: 'Heaven on Earth', img: 'https://images.unsplash.com/photo-1598305371124-42ad180358ee?auto=format&fit=crop&w=400&q=80' },
+  { id: 'manali', title: 'Manali', desc: 'Snowy Peaks', img: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=400&q=80' },
+  { id: 'ladakh', title: 'Ladakh', desc: 'Mountain Adventure', img: 'https://images.unsplash.com/photo-1581791534721-e599df4417f7?auto=format&fit=crop&w=400&q=80' },
+];
+
+const SPECIAL_DEALS = [
+  { id: 1, title: 'Cheap Flights', desc: 'Up to 30% off on international flights', icon: Plane, color: 'bg-blue-500' },
+  { id: 2, title: 'Hotel Deals', desc: 'Stay 3 nights, pay for 2 in luxury resorts', icon: Hotel, color: 'bg-emerald-500' },
+  { id: 3, title: 'Weekend Trips', desc: 'Exclusive packages for short getaways', icon: Mountain, color: 'bg-orange-500' },
+];
+
+const TRAVEL_INSPIRATION = [
+  { id: 'beach', title: 'Beach Trips', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80' },
+  { id: 'adventure', title: 'Adventure Trips', img: 'https://images.unsplash.com/photo-1533240332313-0db49b459ad6?auto=format&fit=crop&w=400&q=80' },
+  { id: 'family', title: 'Family Trips', img: 'https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=400&q=80' },
+  { id: 'budget', title: 'Budget Trips', img: 'https://images.unsplash.com/photo-1530521954074-e64f6810b32d?auto=format&fit=crop&w=400&q=80' },
+];
+
+const TRAVEL_STATS = [
+  { label: 'Trips Planned', value: '50K+' },
+  { label: 'Destinations', value: '100+' },
+  { label: 'Happy Travelers', value: '20K+' },
 ];
 
 const Skeleton = ({ className }: { className?: string }) => (
@@ -138,13 +157,186 @@ const SkeletonPlan = () => (
   </div>
 );
 
-function AppContent({ isLoaded }: { isLoaded: boolean }) {
+const FALLBACK_CITIES = [
+  { description: 'Mumbai, Maharashtra, India', place_id: 'mumbai', structured_formatting: { main_text: 'Mumbai', secondary_text: 'Maharashtra, India' } },
+  { description: 'Delhi, India', place_id: 'delhi', structured_formatting: { main_text: 'Delhi', secondary_text: 'India' } },
+  { description: 'Bangalore, Karnataka, India', place_id: 'bangalore', structured_formatting: { main_text: 'Bangalore', secondary_text: 'Karnataka, India' } },
+  { description: 'Hyderabad, Telangana, India', place_id: 'hyderabad', structured_formatting: { main_text: 'Hyderabad', secondary_text: 'Telangana, India' } },
+  { description: 'Chennai, Tamil Nadu, India', place_id: 'chennai', structured_formatting: { main_text: 'Chennai', secondary_text: 'Tamil Nadu, India' } },
+  { description: 'Kolkata, West Bengal, India', place_id: 'kolkata', structured_formatting: { main_text: 'Kolkata', secondary_text: 'West Bengal, India' } },
+  { description: 'Goa, India', place_id: 'goa', structured_formatting: { main_text: 'Goa', secondary_text: 'India' } },
+  { description: 'Dubai, United Arab Emirates', place_id: 'dubai', structured_formatting: { main_text: 'Dubai', secondary_text: 'United Arab Emirates' } },
+  { description: 'Bali, Indonesia', place_id: 'bali', structured_formatting: { main_text: 'Bali', secondary_text: 'Indonesia' } },
+  { description: 'London, United Kingdom', place_id: 'london', structured_formatting: { main_text: 'London', secondary_text: 'United Kingdom' } },
+  { description: 'New York, USA', place_id: 'newyork', structured_formatting: { main_text: 'New York', secondary_text: 'USA' } },
+  { description: 'Paris, France', place_id: 'paris', structured_formatting: { main_text: 'Paris', secondary_text: 'France' } },
+];
 
+const LocationInput = ({ 
+  value, 
+  onChange, 
+  onPlaceSelect, 
+  placeholder, 
+  label, 
+  icon: Icon, 
+  isLoaded,
+  showLocationButton,
+  onLocationDetect,
+  isLocating
+}: any) => {
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [service, setService] = useState<any>(null);
+  const [sessionToken, setSessionToken] = useState<any>(null);
+
+  React.useEffect(() => {
+    if (isLoaded && !service && window.google) {
+      setService(new google.maps.places.AutocompleteService());
+      setSessionToken(new google.maps.places.AutocompleteSessionToken());
+    }
+  }, [isLoaded]);
+
+  React.useEffect(() => {
+    if (service && value && value.length > 0 && !value.includes(',')) {
+      const timeoutId = setTimeout(() => {
+        service.getPlacePredictions(
+          { 
+            input: value, 
+            types: ['(cities)'],
+            sessionToken: sessionToken || undefined
+          },
+          (predictions: any, status: any) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+              setSuggestions(predictions);
+              setShowSuggestions(true);
+            } else {
+              // Fallback to local search if API fails or returns no results
+              const filtered = FALLBACK_CITIES.filter(c => 
+                c.description.toLowerCase().includes(value.toLowerCase())
+              );
+              setSuggestions(filtered);
+              setShowSuggestions(filtered.length > 0);
+            }
+          }
+        );
+      }, 200);
+      return () => clearTimeout(timeoutId);
+    } else if (!service && value && value.length > 0 && !value.includes(',')) {
+      // Fallback if service is not available
+      const filtered = FALLBACK_CITIES.filter(c => 
+        c.description.toLowerCase().includes(value.toLowerCase())
+      );
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [value, service, sessionToken]);
+
+  const handleSelect = (suggestion: any) => {
+    onChange(suggestion.description);
+    setShowSuggestions(false);
+    
+    if (isLoaded && window.google) {
+      const placesService = new google.maps.places.PlacesService(document.createElement('div'));
+      placesService.getDetails(
+        { 
+          placeId: suggestion.place_id,
+          fields: ['geometry', 'formatted_address', 'name'],
+          sessionToken: sessionToken || undefined
+        },
+        (place: any, status: any) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+            onPlaceSelect(place);
+            setSessionToken(new google.maps.places.AutocompleteSessionToken());
+          }
+        }
+      );
+    }
+  };
+
+  return (
+    <div className="relative group w-full">
+      <div className="absolute top-3 left-5 z-10">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</span>
+      </div>
+      <div className="absolute inset-y-0 left-5 flex items-center pt-5 pointer-events-none">
+        <Icon className="text-gray-300 group-focus-within:text-[#1E90FF] transition-colors" size={20} />
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => value && suggestions.length > 0 && setShowSuggestions(true)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+        placeholder={placeholder}
+        className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-14 pr-12 pt-8 pb-4 text-lg font-semibold text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
+      />
+      
+      {showLocationButton && (
+        <button 
+          onClick={onLocationDetect}
+          className={cn(
+            "absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-100 transition-all",
+            isLocating ? "animate-spin text-[#1E90FF]" : "text-gray-300 hover:text-[#0A2540]"
+          )}
+        >
+          <Navigation2 size={18} />
+        </button>
+      )}
+
+      <AnimatePresence>
+        {showSuggestions && suggestions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] overflow-hidden max-h-64 overflow-y-auto"
+          >
+            {suggestions.map((s) => (
+              <div
+                key={s.place_id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelect(s);
+                }}
+                className="px-6 py-4 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+              >
+                <MapPin size={16} className="text-gray-400" />
+                <div className="flex flex-col">
+                  <span className="text-[#0A2540] font-bold text-sm">{s.structured_formatting.main_text}</span>
+                  <span className="text-gray-400 text-[10px] font-medium">{s.structured_formatting.secondary_text}</span>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+function AppContent({ isLoaded }: { isLoaded: boolean }) {
+  const [activeTab, setActiveTab] = useState("explore");
   const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string} | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [headlineIndex, setHeadlineIndex] = useState(0);
+
+  const headlines = ["Explore the World with Travora", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
+
+  useEffect(() => {
+    if (activeTab === 'explore') {
+      const interval = setInterval(() => {
+        setHeadlineIndex((prev) => (prev + 1) % headlines.length);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab]);
 
   const [locationInput, setLocationInput] = useState("");
   const [startLocation, setStartLocation] = useState("");
@@ -154,7 +346,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [loading, setLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
   const [routeSummary, setRouteSummary] = useState<{distance: string, time: string, mode: string} | null>(null);
-  const [activeTab, setActiveTab] = useState("explore");
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('tripgenious_theme');
     return saved === 'dark';
@@ -268,14 +459,33 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
-            const data = await response.json();
-            const city = data.address.city || data.address.town || data.address.village || data.address.suburb;
-            const state = data.address.state || data.address.country;
-            if (city) setStartLocation(`${city}, ${state}`);
+            const { latitude, longitude } = position.coords;
+            if (isLoaded && window.google) {
+              const geocoder = new google.maps.Geocoder();
+              geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+                if (status === 'OK' && results && results[0]) {
+                  const cityComponent = results[0].address_components.find(
+                    (c: any) => c.types.includes('locality') || c.types.includes('administrative_area_level_2')
+                  );
+                  const stateComponent = results[0].address_components.find(
+                    (c: any) => c.types.includes('administrative_area_level_1') || c.types.includes('country')
+                  );
+                  if (cityComponent) {
+                    setStartLocation(`${cityComponent.long_name}${stateComponent ? ', ' + stateComponent.long_name : ''}`);
+                  }
+                }
+                setIsLocating(false);
+              });
+            } else {
+              const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+              const data = await response.json();
+              const city = data.address.city || data.address.town || data.address.village || data.address.suburb;
+              const state = data.address.state || data.address.country;
+              if (city) setStartLocation(`${city}, ${state}`);
+              setIsLocating(false);
+            }
           } catch (error) {
             console.error("Error detecting location:", error);
-          } finally {
             setIsLocating(false);
           }
         },
@@ -291,19 +501,40 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const calculateRoute = async () => {
       if (startLocation && locationInput && startLocation !== locationInput) {
         try {
-          // Fetch coordinates for both cities
-          const [res1, res2] = await Promise.all([
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(startLocation)}&limit=1`),
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput)}&limit=1`)
-          ]);
-          const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+          let lat1, lon1, lat2, lon2;
 
-          if (data1[0] && data2[0]) {
-            const lat1 = parseFloat(data1[0].lat);
-            const lon1 = parseFloat(data1[0].lon);
-            const lat2 = parseFloat(data2[0].lat);
-            const lon2 = parseFloat(data2[0].lon);
+          if (isLoaded && window.google) {
+            const geocoder = new google.maps.Geocoder();
+            const [res1, res2] = await Promise.all([
+              new Promise<any>((resolve) => geocoder.geocode({ address: startLocation }, (r) => resolve(r))),
+              new Promise<any>((resolve) => geocoder.geocode({ address: locationInput }, (r) => resolve(r)))
+            ]);
+            
+            if (res1 && res1[0] && res2 && res2[0]) {
+              lat1 = res1[0].geometry.location.lat();
+              lon1 = res1[0].geometry.location.lng();
+              lat2 = res2[0].geometry.location.lat();
+              lon2 = res2[0].geometry.location.lng();
+            }
+          }
 
+          if (!lat1) {
+            // Fetch coordinates for both cities using Nominatim
+            const [res1, res2] = await Promise.all([
+              fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(startLocation)}&limit=1`),
+              fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput)}&limit=1`)
+            ]);
+            const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+
+            if (data1[0] && data2[0]) {
+              lat1 = parseFloat(data1[0].lat);
+              lon1 = parseFloat(data1[0].lon);
+              lat2 = parseFloat(data2[0].lat);
+              lon2 = parseFloat(data2[0].lon);
+            }
+          }
+
+          if (lat1 && lat2) {
             // Haversine distance
             const R = 6371; // km
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -342,7 +573,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     const timer = setTimeout(calculateRoute, 1000);
     return () => clearTimeout(timer);
-  }, [startLocation, locationInput]);
+  }, [startLocation, locationInput, isLoaded]);
 
   // Translations
   const t = useMemo(() => {
@@ -715,271 +946,325 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   const currentColor = StyleColors[travelStyle] || StyleColors.standard;
 
-  const renderExplore = () => (
-    <div className="space-y-12">
-      {/* Hero Section with Clean Design */}
-      <section className="relative min-h-[40vh] md:min-h-[50vh] rounded-[2.5rem] overflow-hidden flex flex-col items-center justify-center text-center px-6 bg-gray-50">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80" 
-            alt="Travel Background"
-            className="w-full h-full object-cover opacity-20 grayscale"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-white/0 to-white" />
-        </div>
+  const renderExplore = () => {
+    return (
+      <div className="space-y-16 pb-24">
+        {/* Hero Section with Banner Background */}
+        <section className="relative min-h-[60vh] md:min-h-[70vh] rounded-[3rem] overflow-hidden flex flex-col items-center justify-center text-center px-4 md:px-6">
+          <div className="absolute inset-0 z-0">
+            <AnimatePresence mode="wait">
+              <motion.img 
+                key={headlineIndex}
+                initial={{ opacity: 0, scale: 1.1 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 1.5 }}
+                src={[
+                  "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80",
+                  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80",
+                  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80",
+                  "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80"
+                ][headlineIndex]} 
+                alt="Travel Background"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </AnimatePresence>
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+          </div>
 
-        <div className="relative z-10 space-y-4 max-w-4xl w-full">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-2"
-          >
-            <h1 className="text-4xl md:text-6xl font-bold text-[#0A2540] tracking-tight">
-              Where to next?
-            </h1>
-            <p className="text-gray-500 text-lg font-medium">
-              Smart Travel. Powered by AI.
-            </p>
-          </motion.div>
+          <div className="relative z-10 space-y-10 max-w-5xl w-full">
+            <div className="space-y-4">
+              <motion.div
+                key={headlineIndex}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="h-20 md:h-24 flex items-center justify-center"
+              >
+                <h1 className="text-4xl md:text-7xl font-serif font-black text-white tracking-tight drop-shadow-2xl">
+                  {headlines[headlineIndex]}
+                </h1>
+              </motion.div>
+              <p className="text-white/90 text-lg md:text-xl font-medium max-w-2xl mx-auto drop-shadow-lg">
+                Your AI-powered companion for seamless travel planning and unforgettable experiences.
+              </p>
+            </div>
 
-          {/* Premium Search Card */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-gray-100 space-y-6"
-          >
-            {/* From-To Inputs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
-              {/* From Input */}
-              <div className="relative group">
-                <div className="absolute top-2.5 left-4 z-10">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">From</span>
+            {/* Category Bar */}
+            <div className="flex flex-wrap justify-center gap-4 px-4">
+              {BOOKING_SERVICES.map((service) => (
+                <motion.button
+                  key={service.id}
+                  whileHover={{ y: -5, scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-white/10 backdrop-blur-md border border-white/20 px-6 py-3 rounded-2xl flex items-center gap-3 text-white hover:bg-white hover:text-[#0A2540] transition-all shadow-lg"
+                >
+                  <service.icon size={20} />
+                  <span className="font-bold text-sm">{service.label}</span>
+                </motion.button>
+              ))}
+            </div>
+
+            {/* Premium Search Card */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/95 backdrop-blur-xl rounded-[3rem] p-6 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 space-y-8 mx-auto"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <LocationInput
+                  value={startLocation}
+                  onChange={setStartLocation}
+                  onPlaceSelect={(place: any) => {
+                    if (place.formatted_address) setStartLocation(place.formatted_address);
+                    else if (place.name) setStartLocation(place.name);
+                    if (place.geometry?.location) {
+                      setStartCoords({
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng()
+                      });
+                    }
+                  }}
+                  placeholder="Starting City"
+                  label="From"
+                  icon={MapPinIcon}
+                  isLoaded={isLoaded}
+                  showLocationButton={true}
+                  onLocationDetect={detectLocation}
+                  isLocating={isLocating}
+                />
+
+                <LocationInput
+                  value={locationInput}
+                  onChange={setLocationInput}
+                  onPlaceSelect={(place: any) => {
+                    if (place.formatted_address) setLocationInput(place.formatted_address);
+                    else if (place.name) setLocationInput(place.name);
+                    if (place.geometry?.location) {
+                      setEndCoords({
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng()
+                      });
+                    }
+                  }}
+                  placeholder="Destination City"
+                  label="To"
+                  icon={Search}
+                  isLoaded={isLoaded}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="text-gray-400" size={20} />
+                    <div className="flex flex-col text-left">
+                      <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Duration</span>
+                      <span className="text-[#0A2540] font-bold">Days</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setDuration(Math.max(1, duration - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
+                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{duration}</span>
+                    <button onClick={() => setDuration(duration + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
+                  </div>
                 </div>
-                <div className="absolute inset-y-0 left-4 flex items-center pt-4 pointer-events-none">
-                  <MapPinIcon className="text-gray-300 group-focus-within:text-[#2A7FFF] transition-colors" size={18} />
+
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3">
+                    <Users className="text-gray-400" size={20} />
+                    <div className="flex flex-col text-left">
+                      <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Travelers</span>
+                      <span className="text-[#0A2540] font-bold">People</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
+                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{numPeople}</span>
+                    <button onClick={() => setNumPeople(numPeople + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
+                  </div>
                 </div>
-                {isLoaded ? (
-                  <Autocomplete
-                    onLoad={(autocomplete) => setStartAutocomplete(autocomplete)}
-                    onPlaceChanged={() => {
-                      if (startAutocomplete !== null) {
-                        const place = startAutocomplete.getPlace();
-                        if (place.formatted_address) {
-                          setStartLocation(place.formatted_address);
-                        } else if (place.name) {
-                          setStartLocation(place.name);
-                        }
-                        if (place.geometry?.location) {
-                          setStartCoords({
-                            lat: place.geometry.location.lat(),
-                            lng: place.geometry.location.lng()
-                          });
-                        }
-                      }
-                    }}
-                    options={{ types: ['(cities)'] }}
-                  >
-                    <input
-                      type="text"
-                      value={startLocation}
-                      onChange={(e) => setStartLocation(e.target.value)}
-                      placeholder="Starting City"
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-10 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
-                    />
-                  </Autocomplete>
-                ) : (
-                  <input
-                    type="text"
-                    value={startLocation}
-                    onChange={(e) => setStartLocation(e.target.value)}
-                    placeholder="Starting City"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-10 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
-                  />
-                )}
+
+                <motion.button
+                  whileHover={{ scale: 1.02, backgroundColor: '#FF6B00' }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleGenerate()}
+                  disabled={loading}
+                  className="bg-[#FF8A00] text-white rounded-2xl py-4 font-black text-lg flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-orange-500/20 transition-colors"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={22} /> : <Zap size={22} className="fill-current" />}
+                  {loading ? "Planning..." : "Start Journey"}
+                </motion.button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                {TRAVEL_STYLES.filter(s => ['budget', 'luxury', 'adventure', 'family', 'standard'].includes(s.id)).map(style => {
+                  const Icon = IconMap[style.icon];
+                  return (
+                    <button
+                      key={style.id}
+                      onClick={() => setTravelStyle(style.id)}
+                      className={cn(
+                        "flex items-center gap-2.5 px-6 py-3 rounded-full border text-sm font-bold transition-all",
+                        travelStyle === style.id 
+                          ? "bg-[#0A2540] border-[#0A2540] text-white shadow-lg" 
+                          : "bg-white border-gray-100 text-gray-500 hover:border-[#FF8A00] hover:text-[#FF8A00]"
+                      )}
+                    >
+                      <Icon size={16} />
+                      {style.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Travel Stats Section */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
+          {TRAVEL_STATS.map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-white/50 backdrop-blur-sm border border-white/20 p-8 rounded-[2.5rem] text-center space-y-2 shadow-sm"
+            >
+              <h4 className="text-4xl font-black text-[#0A2540] tracking-tighter">{stat.value}</h4>
+              <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">{stat.label}</p>
+            </motion.div>
+          ))}
+        </section>
+
+        {/* Special Deals Slider */}
+        <section className="space-y-8 px-4">
+          <div className="flex justify-between items-end">
+            <div className="space-y-1">
+              <h3 className="text-3xl font-serif font-black text-[#0A2540]">Special Deals</h3>
+              <p className="text-gray-500 font-medium">Exclusive offers for your next adventure</p>
+            </div>
+          </div>
+          <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
+            {SPECIAL_DEALS.map((deal) => (
+              <motion.div
+                key={deal.id}
+                whileHover={{ y: -5 }}
+                className="min-w-[300px] bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl flex flex-col gap-6 group cursor-pointer"
+              >
+                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg", deal.color)}>
+                  <deal.icon size={28} />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-xl font-bold text-[#0A2540]">{deal.title}</h4>
+                  <p className="text-gray-500 text-sm leading-relaxed">{deal.desc}</p>
+                </div>
+                <button className="text-[#FF8A00] font-black text-xs uppercase tracking-widest flex items-center gap-2 group-hover:gap-3 transition-all">
+                  Claim Offer <ArrowRight size={16} />
+                </button>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* Trending Destinations */}
+        <section className="space-y-8 px-4">
+          <div className="flex justify-between items-end">
+            <div className="space-y-1">
+              <h3 className="text-3xl font-serif font-black text-[#0A2540]">Trending Destinations</h3>
+              <p className="text-gray-500 font-medium">Most loved places by fellow travelers</p>
+            </div>
+            <button className="text-[#1E90FF] text-sm font-bold hover:underline transition-all flex items-center gap-2">
+              View All <ArrowRight size={16} />
+            </button>
+          </div>
+          
+          <div className="flex gap-6 overflow-x-auto pb-8 px-2 scrollbar-hide snap-x">
+            {TRENDING_DESTINATIONS.map((dest) => (
+              <motion.div
+                key={dest.id}
+                whileHover={{ y: -10 }}
+                onClick={() => setLocationInput(dest.title)}
+                className="min-w-[280px] md:min-w-[320px] h-[450px] relative rounded-[3rem] overflow-hidden shadow-2xl group cursor-pointer snap-start border border-white/20"
+              >
+                <img 
+                  src={dest.img} 
+                  alt={dest.title} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                  referrerPolicy="no-referrer" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                
+                <div className="absolute bottom-0 left-0 right-0 p-8 space-y-2">
+                  <h4 className="text-2xl font-bold text-white">{dest.title}</h4>
+                  <p className="text-white/70 text-sm">{dest.desc}</p>
+                </div>
+
                 <button 
-                  onClick={detectLocation}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleWishlist(dest);
+                  }}
                   className={cn(
-                    "absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-100 transition-all",
-                    isLocating ? "animate-spin text-[#2A7FFF]" : "text-gray-300 hover:text-[#0A2540]"
+                    "absolute top-6 right-6 w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg z-20",
+                    wishlist.some(w => w.dest_id === dest.id) 
+                      ? "bg-red-500 border-red-400 text-white" 
+                      : "bg-white/20 border-white/30 text-white hover:bg-white/40"
                   )}
                 >
-                  <Navigation2 size={16} />
+                  <Heart size={20} className={wishlist.some(w => w.dest_id === dest.id) ? "fill-current" : ""} />
                 </button>
-              </div>
-
-              {/* To Input */}
-              <div className="relative group">
-                <div className="absolute top-2.5 left-4 z-10">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">To</span>
-                </div>
-                <div className="absolute inset-y-0 left-4 flex items-center pt-4 pointer-events-none">
-                  <Search className="text-gray-300 group-focus-within:text-[#2A7FFF] transition-colors" size={18} />
-                </div>
-                {isLoaded ? (
-                  <Autocomplete
-                    onLoad={(autocomplete) => setEndAutocomplete(autocomplete)}
-                    onPlaceChanged={() => {
-                      if (endAutocomplete !== null) {
-                        const place = endAutocomplete.getPlace();
-                        if (place.formatted_address) {
-                          setLocationInput(place.formatted_address);
-                        } else if (place.name) {
-                          setLocationInput(place.name);
-                        }
-                        if (place.geometry?.location) {
-                          setEndCoords({
-                            lat: place.geometry.location.lat(),
-                            lng: place.geometry.location.lng()
-                          });
-                        }
-                      }
-                    }}
-                    options={{ types: ['(cities)'] }}
-                  >
-                    <input
-                      type="text"
-                      value={locationInput}
-                      onChange={(e) => setLocationInput(e.target.value)}
-                      placeholder="Destination City"
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
-                    />
-                  </Autocomplete>
-                ) : (
-                  <input
-                    type="text"
-                    value={locationInput}
-                    onChange={(e) => setLocationInput(e.target.value)}
-                    placeholder="Destination City"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 pt-7 pb-3 text-lg text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
-                  />
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Duration */}
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
-                <div className="flex items-center gap-2.5">
-                  <Calendar className="text-gray-400" size={18} />
-                  <span className="text-gray-500 text-sm font-medium">Days</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setDuration(Math.max(1, duration - 1))} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">-</button>
-                  <span className="text-[#0A2540] font-bold text-base w-4 text-center">{duration}</span>
-                  <button onClick={() => setDuration(duration + 1)} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">+</button>
-                </div>
-              </div>
-
-              {/* People */}
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
-                <div className="flex items-center gap-2.5">
-                  <Users className="text-gray-400" size={18} />
-                  <span className="text-gray-500 text-sm font-medium">Travelers</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">-</button>
-                  <span className="text-[#0A2540] font-bold text-base w-4 text-center">{numPeople}</span>
-                  <button onClick={() => setNumPeople(numPeople + 1)} className="text-gray-300 hover:text-[#0A2540] transition-colors font-bold">+</button>
-                </div>
-              </div>
-
-              {/* CTA Button */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleGenerate()}
-                disabled={loading}
-                className="btn-primary rounded-2xl py-3 font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} className="fill-current" />}
-                {loading ? "Planning..." : "Generate AI Plan"}
-              </motion.button>
-            </div>
-
-            {/* Travel Styles */}
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              {TRAVEL_STYLES.filter(s => ['budget', 'luxury', 'adventure', 'family', 'standard'].includes(s.id)).map(style => {
-                const Icon = IconMap[style.icon];
-                return (
-                  <button
-                    key={style.id}
-                    onClick={() => setTravelStyle(style.id)}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold transition-all",
-                      travelStyle === style.id 
-                        ? "bg-[#0A2540] border-[#0A2540] text-white shadow-md" 
-                        : "bg-white border-gray-100 text-gray-500 hover:border-gray-200"
-                    )}
-                  >
-                    <Icon size={14} />
-                    {style.label}
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Transport & Accommodation Selectors */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-[#0A2540]">Transport</h4>
-            <span className="text-[#2A7FFF] text-[10px] font-bold uppercase tracking-wider">{transportType}</span>
-          </div>
-          <div className="flex gap-2">
-            {[
-              { id: 'public', label: 'Public', icon: Bus },
-              { id: 'private', label: 'Private', icon: Car },
-              { id: 'flight', label: 'Flight', icon: Plane }
-            ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => setTransportType(item.id)}
-                className={cn(
-                  "flex-1 flex flex-col items-center gap-2 py-3 rounded-2xl border transition-all",
-                  transportType === item.id 
-                    ? "bg-blue-50 border-[#2A7FFF] text-[#2A7FFF] shadow-sm" 
-                    : "bg-gray-50 border-gray-100 text-gray-400 hover:bg-white hover:border-gray-200"
-                )}
-              >
-                <item.icon size={18} />
-                <span className="text-[10px] font-bold uppercase">{item.label}</span>
-              </button>
+              </motion.div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-[#0A2540]">Accommodation</h4>
-            <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-wider">{accommodationType}</span>
+        {/* Travel Inspiration */}
+        <section className="space-y-8 px-4">
+          <div className="space-y-1">
+            <h3 className="text-3xl font-serif font-black text-[#0A2540]">Travel Inspiration</h3>
+            <p className="text-gray-500 font-medium">Find your next perfect getaway</p>
           </div>
-          <div className="flex gap-2">
-            {[
-              { id: 'hostel', label: 'Hostel', icon: Home },
-              { id: 'standard', label: 'Standard', icon: Hotel },
-              { id: 'luxury', label: 'Luxury', icon: Crown }
-            ].map(item => (
-              <button
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {TRAVEL_INSPIRATION.map((item) => (
+              <motion.div
                 key={item.id}
-                onClick={() => setAccommodationType(item.id)}
-                className={cn(
-                  "flex-1 flex flex-col items-center gap-2 py-3 rounded-2xl border transition-all",
-                  accommodationType === item.id 
-                    ? "bg-emerald-50 border-emerald-500 text-emerald-500 shadow-sm" 
-                    : "bg-gray-50 border-gray-100 text-gray-400 hover:bg-white hover:border-gray-200"
-                )}
+                whileHover={{ scale: 1.05 }}
+                className="relative h-64 rounded-[2.5rem] overflow-hidden shadow-xl cursor-pointer group"
               >
-                <item.icon size={18} />
-                <span className="text-[10px] font-bold uppercase">{item.label}</span>
-              </button>
+                <img src={item.img} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <span className="text-white font-black text-lg text-center px-4">{item.title}</span>
+                </div>
+              </motion.div>
             ))}
           </div>
-        </div>
-      </div>
+        </section>
+
+        {/* Popular Right Now */}
+        <section className="bg-[#0A2540] rounded-[4rem] p-12 md:p-20 text-white space-y-12">
+          <div className="text-center space-y-4">
+            <h3 className="text-4xl md:text-6xl font-serif font-black tracking-tight">Popular Right Now</h3>
+            <p className="text-white/60 text-lg max-w-2xl mx-auto">Discover the most trending spots across the globe this season.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { title: 'Swiss Alps', category: 'Nature', img: 'https://images.unsplash.com/photo-1531310197839-ccf54634509e?auto=format&fit=crop&w=400&q=80' },
+              { title: 'Tokyo Streets', category: 'Urban', img: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=400&q=80' },
+              { title: 'Santorini', category: 'Coastal', img: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=400&q=80' }
+            ].map((item, i) => (
+              <div key={i} className="space-y-4 group cursor-pointer">
+                <div className="h-80 rounded-[3rem] overflow-hidden">
+                  <img src={item.img} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
+                </div>
+                <div className="px-4">
+                  <span className="text-[#FF8A00] text-[10px] font-black uppercase tracking-widest">{item.category}</span>
+                  <h4 className="text-2xl font-bold">{item.title}</h4>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
       {/* Trending Destinations - Horizontal Scroll */}
       {!itinerary && !loading && (
@@ -989,7 +1274,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <h3 className="text-2xl font-bold text-[#0A2540]">Trending Now</h3>
               <p className="text-gray-500 text-sm">Most loved destinations by fellow travelers</p>
             </div>
-            <button className="text-[#2A7FFF] text-sm font-bold hover:underline transition-all flex items-center gap-2">
+            <button className="text-[#1E90FF] text-sm font-bold hover:underline transition-all flex items-center gap-2">
               View All <ArrowRight size={16} />
             </button>
           </div>
@@ -1027,7 +1312,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
                 <div className="absolute bottom-6 left-6 right-6 space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-[#2A7FFF] rounded-full text-[8px] font-bold text-white uppercase tracking-wider">Trending</span>
+                    <span className="px-2 py-0.5 bg-[#1E90FF] rounded-full text-[8px] font-bold text-white uppercase tracking-wider">Trending</span>
                     <span className="px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[8px] font-bold text-white uppercase tracking-wider">4.8 ★</span>
                   </div>
                   <h4 className="text-white font-bold text-2xl">{dest.title}</h4>
@@ -1052,7 +1337,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <motion.div 
                 animate={{ rotate: 360 }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                className="w-24 h-24 border-4 border-gray-100 border-t-[#2A7FFF] rounded-full shadow-xl"
+                className="w-24 h-24 border-4 border-gray-100 border-t-[#1E90FF] rounded-full shadow-xl"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <Compass size={32} className="text-[#0A2540] animate-bounce" />
@@ -1104,7 +1389,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={saveTrip}
-                    className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-blue-600 transition-all shadow-2xl border border-white/20"
+                    className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-[#1E90FF] transition-all shadow-2xl border border-white/20"
                   >
                     <Heart size={20} /> {t.saveTrip}
                   </motion.button>
@@ -1112,7 +1397,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => openInMaps(locationInput)}
-                    className="bg-blue-600 text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-blue-700 transition-all shadow-2xl"
+                    className="bg-[#1E90FF] text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-[#1E90FF]/90 transition-all shadow-2xl"
                   >
                     <MapIcon size={20} /> {t.viewMaps}
                   </motion.button>
@@ -1124,7 +1409,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { id: "budget", label: "Budget Version", icon: Wallet, color: "bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-500 hover:text-white" },
-                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-50 border-blue-100 text-blue-600 hover:bg-blue-500 hover:text-white" },
+                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-50 border-blue-100 text-[#1E90FF] hover:bg-[#1E90FF] hover:text-white" },
                 { id: "luxury", label: "Make It Luxury", icon: Crown, color: "bg-purple-50 border-purple-100 text-purple-600 hover:bg-purple-500 hover:text-white" }
               ].map((action) => (
                 <button 
@@ -1188,7 +1473,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="space-y-8">
                     {[
                       { label: "Best Time", icon: Clock, value: "Oct - Mar", color: "text-orange-500" },
-                      { label: "Crowd Level", icon: Users, value: "Moderate", color: "text-blue-500" },
+                      { label: "Crowd Level", icon: Users, value: "Moderate", color: "text-[#1E90FF]" },
                       { label: "Weather", icon: Thermometer, value: "Pleasant", color: "text-emerald-500" },
                       { label: "Photo Spots", icon: Camera, value: "12+ Points", color: "text-pink-500" },
                       { label: "Shopping", icon: ShoppingBag, value: "Local Crafts", color: "text-purple-500" },
@@ -1213,23 +1498,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[3rem] p-8 md:p-12 shadow-2xl space-y-10"
+              className="bg-white border border-gray-100 rounded-[3rem] p-8 md:p-12 shadow-2xl space-y-10"
             >
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                  <div className="w-14 h-14 rounded-2xl bg-[#0A2540] flex items-center justify-center shadow-xl">
                     <Wallet className="text-white" size={28} />
                   </div>
                   <div>
-                    <h3 className="text-3xl font-serif font-bold text-white tracking-tight">Trip Budget Tracker</h3>
-                    <p className="text-white/40 text-sm font-medium uppercase tracking-widest">Real-time cost analysis</p>
+                    <h3 className="text-3xl font-bold text-[#0A2540] tracking-tight">Trip Budget Tracker</h3>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Real-time cost analysis</p>
                   </div>
                 </div>
                 
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 group hover:bg-white/10 transition-all">
-                  <span className="text-white/60 text-xs font-bold uppercase tracking-widest">Your Budget</span>
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4 group hover:bg-white hover:shadow-md transition-all">
+                  <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Your Budget</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-white/40">₹</span>
+                    <span className="text-gray-400">₹</span>
                     <input 
                       type="number" 
                       value={userTotalBudget}
@@ -1244,7 +1529,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           }
                         }
                       }}
-                      className="bg-transparent text-white font-bold text-xl w-32 outline-none focus:text-blue-400 transition-colors"
+                      className="bg-transparent text-[#0A2540] font-bold text-xl w-32 outline-none focus:text-[#1E90FF] transition-colors"
                     />
                   </div>
                 </div>
@@ -1267,23 +1552,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="space-y-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                       <div className="space-y-2">
-                        <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Total Estimate</p>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total Estimate</p>
                         <motion.p 
                           key={totalEstimate}
-                          initial={{ scale: 1.1, color: "#60a5fa" }}
-                          animate={{ scale: 1, color: "#ffffff" }}
+                          initial={{ scale: 1.1, color: "#1E90FF" }}
+                          animate={{ scale: 1, color: "#0A2540" }}
                           className="text-4xl font-bold tracking-tighter"
                         >
                           {formatPrice(totalEstimate)}
                         </motion.p>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Remaining</p>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Remaining</p>
                         <motion.p 
                           key={remaining}
                           initial={{ scale: 1.1 }}
                           animate={{ scale: 1 }}
-                          className={cn("text-4xl font-bold tracking-tighter", isOverBudget ? "text-rose-400" : "text-emerald-400")}
+                          className={cn("text-4xl font-bold tracking-tighter", isOverBudget ? "text-rose-500" : "text-emerald-600")}
                         >
                           {formatPrice(Math.abs(remaining))}
                           <span className="text-sm ml-2 opacity-60">{isOverBudget ? "Over" : "Left"}</span>
@@ -1291,14 +1576,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       </div>
                       <div className="flex items-center">
                         {isOverBudget ? (
-                          <div className="bg-rose-500/20 border border-rose-500/30 rounded-2xl p-4 flex items-center gap-3 text-rose-200">
+                          <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center gap-3 text-rose-600">
                             <AlertTriangle size={20} className="shrink-0" />
                             <p className="text-xs font-medium leading-relaxed">
                               ⚠ You are over budget by {formatPrice(Math.abs(remaining))}. Consider switching to budget hotels or public transport.
                             </p>
                           </div>
                         ) : (
-                          <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-2xl p-4 flex items-center gap-3 text-emerald-200">
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 text-emerald-600">
                             <Sparkles size={20} className="shrink-0" />
                             <p className="text-xs font-medium leading-relaxed">
                               🎉 You are within budget! Your plan is perfectly optimized for your wallet.
@@ -1311,17 +1596,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     {/* Progress Bar */}
                     <div className="space-y-4">
                       <div className="flex justify-between items-end">
-                        <span className="text-white/60 text-xs font-bold uppercase tracking-widest">Budget Utilization</span>
-                        <span className={cn("text-sm font-bold", isOverBudget ? "text-rose-400" : "text-emerald-400")}>
+                        <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Budget Utilization</span>
+                        <span className={cn("text-sm font-bold", isOverBudget ? "text-rose-500" : "text-emerald-600")}>
                           {percentage.toFixed(1)}%
                         </span>
                       </div>
-                      <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 p-1">
+                      <div className="h-4 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-1">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${percentage}%` }}
                           className={cn(
-                            "h-full rounded-full shadow-[0_0_15px_rgba(0,0,0,0.2)]",
+                            "h-full rounded-full shadow-sm",
                             isOverBudget ? "bg-gradient-to-r from-rose-600 to-rose-400" : "bg-gradient-to-r from-emerald-600 to-emerald-400"
                           )}
                         />
@@ -1331,13 +1616,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     {/* Breakdown Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                       {breakdown.map((item, i) => (
-                        <div key={i} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4 group hover:bg-white/10 transition-all">
+                        <div key={i} className="bg-gray-50 border border-gray-100 rounded-[2rem] p-6 space-y-4 group hover:bg-white hover:shadow-xl transition-all">
                           <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg", item.color)}>
                             <item.icon size={18} />
                           </div>
                           <div>
-                            <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{item.label}</p>
-                            <p className="text-white font-bold">{formatPrice(item.amount)}</p>
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{item.label}</p>
+                            <p className="text-[#0A2540] font-bold">{formatPrice(item.amount)}</p>
                           </div>
                         </div>
                       ))}
@@ -1351,12 +1636,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <div className="space-y-8">
               <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-2xl">
+                  <div className="w-12 h-12 rounded-2xl bg-[#0A2540] flex items-center justify-center shadow-xl">
                     <BookingIcon className="text-white" size={24} />
                   </div>
-                  <h3 className="text-3xl font-serif font-bold text-white tracking-tight">Complete Your Booking</h3>
+                  <h3 className="text-3xl font-bold text-[#0A2540] tracking-tight">Complete Your Booking</h3>
                 </div>
-                <p className="text-white/40 text-xs font-bold uppercase tracking-widest hidden md:block">Best prices guaranteed</p>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest hidden md:block">Best prices guaranteed</p>
               </div>
               
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
@@ -1366,13 +1651,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     whileHover={{ y: -10, scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => window.open(service.link(locationInput), '_blank')}
-                    className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 flex flex-col items-center gap-6 hover:bg-white/10 transition-all group relative overflow-hidden"
+                    className="bg-white border border-gray-100 rounded-[2.5rem] p-8 flex flex-col items-center gap-6 hover:shadow-2xl transition-all group relative overflow-hidden"
                   >
                     <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 group-hover:rotate-6", service.color)}>
                       <service.icon className="text-white" size={28} />
                     </div>
-                    <span className="text-white font-bold text-xs uppercase tracking-[0.2em]">{service.label}</span>
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full -mr-8 -mt-8" />
+                    <span className="text-[#0A2540] font-bold text-xs uppercase tracking-[0.2em]">{service.label}</span>
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-full -mr-8 -mt-8" />
                   </motion.button>
                 ))}
               </div>
@@ -1381,122 +1666,165 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         )}
       </AnimatePresence>
     </div>
-  );
+    );
+  };
 
   const renderAuth = () => (
-    <div className="min-h-[80vh] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-b from-white via-sky-50 to-white flex items-center justify-center px-6 py-12">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-white/20 backdrop-blur-2xl border border-white/30 rounded-[3rem] p-8 md:p-12 shadow-2xl space-y-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md space-y-10"
       >
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl mx-auto mb-6">
-            <Compass className="text-blue-600" size={32} />
+        {/* Top Section: Logo & Tagline */}
+        <div className="text-center space-y-4">
+          <motion.div 
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#0A1F44] to-[#1E90FF] opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity" />
+            <Plane className="text-[#0A1F44] -rotate-45 group-hover:rotate-0 transition-transform duration-500" size={40} />
+          </motion.div>
+          <div className="space-y-1">
+            <h1 className="text-4xl font-serif font-black text-[#0A1F44] tracking-tight">TripGenious</h1>
+            <p className="text-gray-400 font-medium text-sm tracking-wide">Plan Your Perfect Trip</p>
           </div>
-          <h2 className="text-3xl font-serif font-bold text-white">
-            {authMode === 'login' ? 'Welcome Back' : 'Create Account'}
-          </h2>
-          <p className="text-white/70">
-            {authMode === 'login' ? 'Login to access your trips' : 'Join our community of travelers'}
-          </p>
         </div>
 
         {authError && (
           <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-rose-500/20 border border-rose-500/30 text-rose-100 p-4 rounded-2xl text-sm text-center font-medium"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-rose-50 border border-rose-100 text-rose-600 p-4 rounded-2xl text-sm text-center font-bold shadow-sm"
           >
             {authError}
           </motion.div>
         )}
 
-        <div className="space-y-4">
-          <button 
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full bg-white text-slate-900 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-blue-50 transition-all shadow-lg disabled:opacity-50"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Continue with Google
-          </button>
-
-          <div className="relative flex items-center py-2">
-            <div className="flex-grow border-t border-white/10"></div>
-            <span className="flex-shrink mx-4 text-white/40 text-xs font-bold uppercase tracking-widest">Or with Email</span>
-            <div className="flex-grow border-t border-white/10"></div>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-4">
+        <div className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-8 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.05)] space-y-8">
+          <form onSubmit={handleAuth} className="space-y-6">
             {authMode === 'signup' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
+                <div className="relative group">
+                  <ProfileIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="John Doe"
+                    value={authForm.name}
+                    onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Email or Mobile Number</label>
               <div className="relative group">
-                <ProfileIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-white transition-colors" size={20} />
+                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
                 <input 
                   type="text" 
                   required
-                  placeholder="Full Name"
-                  value={authForm.name}
-                  onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
-                  className="w-full bg-white/10 border border-white/20 rounded-2xl pl-12 pr-4 py-4 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                  placeholder="name@example.com"
+                  value={authForm.email}
+                  onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                 />
               </div>
-            )}
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-white transition-colors" size={20} />
-              <input 
-                type="email" 
-                required
-                placeholder="Email Address"
-                value={authForm.email}
-                onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
-                className="w-full bg-white/10 border border-white/20 rounded-2xl pl-12 pr-4 py-4 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-white/20 transition-all"
-              />
             </div>
-            <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-white transition-colors" size={20} />
-              <input 
-                type={showPassword ? "text" : "password"} 
-                required
-                placeholder="Password"
-                value={authForm.password}
-                onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                className="w-full bg-white/10 border border-white/20 rounded-2xl pl-12 pr-12 py-4 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-white/20 transition-all"
-              />
-              <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Password</label>
+              <div className="relative group">
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  required
+                  placeholder="••••••••"
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-14 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0A1F44] transition-colors"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
+
+            <div className="flex items-center justify-between px-2">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div 
+                  onClick={() => setRememberMe(!rememberMe)}
+                  className={cn(
+                    "w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center",
+                    rememberMe ? "bg-[#0A1F44] border-[#0A1F44]" : "border-gray-200 group-hover:border-gray-300"
+                  )}
+                >
+                  {rememberMe && <Check size={14} className="text-white" />}
+                </div>
+                <span className="text-xs font-bold text-gray-500">Remember me</span>
+              </label>
+              <button type="button" className="text-xs font-bold text-orange-500 hover:underline">Forgot Password?</button>
+            </div>
+
             <motion.button
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.02, backgroundColor: '#0A1F44' }}
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-[#0A1F44] text-white py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-900/20 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
             >
-              {loading ? <Loader2 className="animate-spin" /> : (authMode === 'login' ? 'Login' : 'Sign Up')}
+              {loading ? <Loader2 className="animate-spin" /> : 'Start Your Journey'}
+              {!loading && <Plane size={18} className="rotate-45" />}
             </motion.button>
           </form>
 
-          <p className="text-center text-white/60 text-sm">
-            {authMode === 'login' ? "Don't have an account?" : "Already have an account?"}
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-gray-100"></div>
+            <span className="flex-shrink mx-4 text-gray-300 text-[10px] font-black uppercase tracking-widest">OR</span>
+            <div className="flex-grow border-t border-gray-100"></div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
             <button 
-              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-              className="ml-2 text-white font-bold hover:underline"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full bg-white border border-gray-100 text-[#0A1F44] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
             >
-              {authMode === 'login' ? 'Sign Up' : 'Login'}
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Continue with Google
             </button>
-          </p>
+            <button 
+              disabled={loading}
+              className="w-full bg-white border border-gray-100 text-[#0A1F44] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+            >
+              <Phone size={18} className="text-emerald-500" />
+              Continue with Phone OTP
+            </button>
+          </div>
         </div>
+
+        <p className="text-center text-gray-500 text-sm font-medium">
+          {authMode === 'login' ? "New user?" : "Already have an account?"}
+          <button 
+            onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+            className="ml-2 text-[#0A1F44] font-black hover:text-orange-500 transition-colors"
+          >
+            {authMode === 'login' ? 'Sign Up' : 'Login'}
+          </button>
+        </p>
       </motion.div>
     </div>
   );
@@ -1505,14 +1833,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     <div className="space-y-10 pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
         <div className="space-y-2">
-          <h2 className="text-5xl font-serif font-black text-white tracking-tighter">{t.myTrips}</h2>
-          <p className="text-white/50 font-medium tracking-wide tracking-widest uppercase text-[10px]">Your curated collection of adventures</p>
+          <h2 className="text-5xl font-serif font-black text-[#0A2540] tracking-tighter">{t.myTrips}</h2>
+          <p className="text-gray-500 font-medium tracking-wide tracking-widest uppercase text-[10px]">Your curated collection of adventures</p>
         </div>
         <div className="flex gap-3">
-          <div className="px-6 py-3 bg-white/5 backdrop-blur-xl rounded-full border border-white/10 flex items-center gap-3 shadow-xl">
-            <Globe size={16} className="text-blue-400" />
-            <span className="text-white font-black text-lg tracking-tighter">{savedTrips.length}</span>
-            <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Total</span>
+          <div className="px-6 py-3 bg-white rounded-full border border-gray-100 flex items-center gap-3 shadow-xl">
+            <Globe size={16} className="text-[#1E90FF]" />
+            <span className="text-[#0A2540] font-black text-lg tracking-tighter">{savedTrips.length}</span>
+            <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Total</span>
           </div>
         </div>
       </div>
@@ -1521,21 +1849,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
+          className="bg-white border border-gray-100 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-blue-600/20 transition-all duration-700" />
-          <div className="w-32 h-32 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-full flex items-center justify-center mx-auto border border-white/10 shadow-2xl relative z-10">
-            <Lock size={56} className="text-white/40" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#1E90FF]/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-[#1E90FF]/10 transition-all duration-700" />
+          <div className="w-32 h-32 bg-gray-50 rounded-full flex items-center justify-center mx-auto border border-gray-100 shadow-2xl relative z-10">
+            <Lock size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-white tracking-tight">{t.loginRequired}</h3>
-            <p className="text-white/50 max-w-sm mx-auto leading-relaxed font-medium">{t.loginToAccess}</p>
+            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{t.loginRequired}</h3>
+            <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">{t.loginToAccess}</p>
           </div>
           <motion.button 
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setActiveTab('profile')}
-            className="bg-white text-blue-600 px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-[0_20px_40px_rgba(255,255,255,0.2)] hover:glow-blue transition-all relative z-10"
+            className="bg-[#1E90FF] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
           >
             Login to Continue
           </motion.button>
@@ -1544,21 +1872,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
+          className="bg-white border border-gray-100 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-emerald-600/20 transition-all duration-700" />
-          <div className="w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center mx-auto border border-white/10 shadow-2xl relative z-10">
-            <MapIcon size={56} className="text-white/40" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-emerald-600/10 transition-all duration-700" />
+          <div className="w-32 h-32 bg-gray-50 rounded-full flex items-center justify-center mx-auto border border-gray-100 shadow-2xl relative z-10">
+            <MapIcon size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-white tracking-tight">Your map is empty</h3>
-            <p className="text-white/50 max-w-sm mx-auto leading-relaxed font-medium">Start planning your journey and save your dream destinations here. ✈</p>
+            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">Your map is empty</h3>
+            <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">Start planning your journey and save your dream destinations here. ✈</p>
           </div>
           <motion.button 
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setActiveTab('explore')}
-            className="bg-white text-blue-600 px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-[0_20px_40px_rgba(255,255,255,0.2)] hover:glow-blue transition-all relative z-10"
+            className="bg-[#1E90FF] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
           >
             Start Planning
           </motion.button>
@@ -1578,11 +1906,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-blue-600">
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-[#1E90FF]">
                   {trip.style}
                 </div>
                 {trip.budget && (
-                  <div className="absolute bottom-4 left-4 bg-blue-600/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-white">
+                  <div className="absolute bottom-4 left-4 bg-[#1E90FF]/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-white">
                     {trip.budget}
                   </div>
                 )}
@@ -1645,7 +1973,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       setItinerary(trip.itinerary);
                       setActiveTab('explore');
                     }}
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all"
+                    className="flex-1 bg-[#1E90FF] text-white py-3 rounded-xl font-bold text-sm hover:bg-[#1E90FF]/90 transition-all"
                   >
                     View Details
                   </button>
@@ -1668,14 +1996,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     <div className="space-y-10 pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
         <div className="space-y-2">
-          <h2 className="text-5xl font-serif font-black text-white tracking-tighter">{t.bookings}</h2>
-          <p className="text-white/50 font-medium tracking-wide tracking-widest uppercase text-[10px]">Manage your travel arrangements in one place</p>
+          <h2 className="text-5xl font-serif font-black text-[#0A2540] tracking-tighter">{t.bookings}</h2>
+          <p className="text-gray-500 font-medium tracking-wide tracking-widest uppercase text-[10px]">Manage your travel arrangements in one place</p>
         </div>
         <div className="flex gap-3">
-          <div className="px-6 py-3 bg-white/5 backdrop-blur-xl rounded-full border border-white/10 flex items-center gap-3 shadow-xl">
-            <BookingIcon size={16} className="text-emerald-400" />
-            <span className="text-white font-black text-lg tracking-tighter">{bookings.length}</span>
-            <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Active</span>
+          <div className="px-6 py-3 bg-white rounded-full border border-gray-100 flex items-center gap-3 shadow-xl">
+            <BookingIcon size={16} className="text-[#1E90FF]" />
+            <span className="text-[#0A2540] font-black text-lg tracking-tighter">{bookings.length}</span>
+            <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Active</span>
           </div>
         </div>
       </div>
@@ -1684,21 +2012,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
+          className="bg-white border border-gray-100 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-blue-600/20 transition-all duration-700" />
-          <div className="w-32 h-32 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-full flex items-center justify-center mx-auto border border-white/10 shadow-2xl relative z-10">
-            <Lock size={56} className="text-white/40" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#1E90FF]/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-[#1E90FF]/10 transition-all duration-700" />
+          <div className="w-32 h-32 bg-gray-50 rounded-full flex items-center justify-center mx-auto border border-gray-100 shadow-2xl relative z-10">
+            <Lock size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-white tracking-tight">{t.loginRequired}</h3>
-            <p className="text-white/50 max-w-sm mx-auto leading-relaxed font-medium">{t.loginToAccess}</p>
+            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{t.loginRequired}</h3>
+            <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">{t.loginToAccess}</p>
           </div>
           <motion.button 
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setActiveTab('profile')}
-            className="bg-white text-blue-600 px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-[0_20px_40px_rgba(255,255,255,0.2)] hover:glow-blue transition-all relative z-10"
+            className="bg-[#1E90FF] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
           >
             Login to Continue
           </motion.button>
@@ -1707,21 +2035,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
+          className="bg-white border border-gray-100 rounded-[4rem] p-20 text-center space-y-8 shadow-2xl relative overflow-hidden group"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-emerald-600/20 transition-all duration-700" />
-          <div className="w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center mx-auto border border-white/10 shadow-2xl relative z-10">
-            <BookingIcon size={56} className="text-white/40" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-emerald-600/10 transition-all duration-700" />
+          <div className="w-32 h-32 bg-gray-50 rounded-full flex items-center justify-center mx-auto border border-gray-100 shadow-2xl relative z-10">
+            <BookingIcon size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-white tracking-tight">No bookings found</h3>
-            <p className="text-white/50 max-w-sm mx-auto leading-relaxed font-medium">You haven't made any bookings yet. Start planning your next trip!</p>
+            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">No bookings found</h3>
+            <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">You haven't made any bookings yet. Start planning your next trip!</p>
           </div>
           <motion.button 
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setActiveTab('explore')}
-            className="bg-white text-blue-600 px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-[0_20px_40px_rgba(255,255,255,0.2)] hover:glow-blue transition-all relative z-10"
+            className="bg-[#1E90FF] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
           >
             Book Now
           </motion.button>
@@ -1735,21 +2063,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.1 }}
               whileHover={{ scale: 1.02 }}
-              className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2.5rem] p-8 shadow-2xl flex items-center gap-6 group relative overflow-hidden"
+              className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-xl flex items-center gap-6 group relative overflow-hidden"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 rounded-full -mr-16 -mt-16 blur-2xl" />
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform relative z-10">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#1E90FF]/5 rounded-full -mr-16 -mt-16 blur-2xl" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1E90FF] to-indigo-600 flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform relative z-10">
                 <BookingIcon size={32} />
               </div>
               <div className="flex-1 space-y-1 relative z-10">
-                <h4 className="font-black text-white text-xl tracking-tight">{booking.title}</h4>
+                <h4 className="font-black text-[#0A2540] text-xl tracking-tight">{booking.title}</h4>
                 <div className="flex items-center gap-3">
-                  <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">{booking.date}</span>
-                  <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest">{booking.status}</span>
+                  <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">{booking.date}</span>
+                  <span className="w-1 h-1 rounded-full bg-gray-200" />
+                  <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">{booking.status}</span>
                 </div>
               </div>
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 bg-blue-400/10 px-4 py-2 rounded-full border border-blue-400/20 relative z-10">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#1E90FF] bg-[#1E90FF]/5 px-4 py-2 rounded-full border border-[#1E90FF]/10 relative z-10">
                 {booking.type}
               </div>
             </motion.div>
@@ -1760,7 +2088,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {[
           { label: "Hotels", icon: Hotel, color: "bg-orange-500", desc: "Find the best stays", url: "https://www.makemytrip.com/hotels/" },
-          { label: "Flights", icon: Navigation, color: "bg-blue-500", rotate: "-rotate-45", desc: "Fly anywhere in the world", url: "https://www.makemytrip.com/flights/" },
+          { label: "Flights", icon: Navigation, color: "bg-[#1E90FF]", rotate: "-rotate-45", desc: "Fly anywhere in the world", url: "https://www.makemytrip.com/flights/" },
           { label: "Trains", icon: Navigation, color: "bg-emerald-500", rotate: "rotate-90", desc: "Scenic rail journeys", url: "https://www.confirmtkt.com/" },
           { label: "Buses", icon: Navigation, color: "bg-rose-500", desc: "Affordable road travel", url: "https://www.redbus.in/" },
           { label: "Cabs", icon: Navigation, color: "bg-amber-500", desc: "Local & outstation rides", url: "https://www.savaari.com/" },
@@ -1772,17 +2100,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ y: -10 }}
-            className="group bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[3rem] p-8 shadow-2xl hover:bg-white/20 transition-all flex items-center gap-6 relative overflow-hidden"
+            className="group bg-white border border-gray-100 rounded-[3rem] p-8 shadow-xl hover:shadow-2xl transition-all flex items-center gap-6 relative overflow-hidden"
           >
-            <div className={cn("absolute top-0 right-0 w-24 h-24 opacity-10 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110", item.color)} />
+            <div className={cn("absolute top-0 right-0 w-24 h-24 opacity-5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110", item.color)} />
             <div className={cn("w-20 h-20 rounded-3xl flex items-center justify-center text-white shadow-2xl transition-transform group-hover:scale-110 relative z-10", item.color)}>
               <item.icon size={36} className={item.rotate} />
             </div>
             <div className="flex-1 relative z-10">
-              <h3 className="text-2xl font-serif font-black text-white tracking-tight">{item.label}</h3>
-              <p className="text-white/40 text-xs font-medium">{item.desc}</p>
+              <h3 className="text-2xl font-serif font-black text-[#0A2540] tracking-tight">{item.label}</h3>
+              <p className="text-gray-400 text-xs font-medium">{item.desc}</p>
             </div>
-            <ArrowRight className="text-white/20 group-hover:text-white transition-all relative z-10" />
+            <ArrowRight className="text-gray-200 group-hover:text-[#0A2540] transition-all relative z-10" />
           </motion.a>
         ))}
       </div>
@@ -1790,15 +2118,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         whileInView={{ opacity: 1, scale: 1 }}
-        className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 backdrop-blur-3xl border border-white/20 rounded-[3rem] p-12 text-center relative overflow-hidden group"
+        className="bg-white border border-gray-100 rounded-[3rem] p-12 text-center relative overflow-hidden group shadow-xl"
       >
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(37,99,235,0.1),transparent_70%)]" />
-        <h4 className="text-3xl font-serif font-black text-white mb-3 tracking-tight relative z-10">Need help with booking?</h4>
-        <p className="text-white/50 text-lg mb-8 max-w-md mx-auto relative z-10">Our travel experts are available 24/7 to assist you with your journey.</p>
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#1E90FF]/5 to-indigo-600/5 opacity-50" />
+        <h4 className="text-3xl font-serif font-black text-[#0A2540] mb-3 tracking-tight relative z-10">Need help with booking?</h4>
+        <p className="text-gray-500 text-lg mb-8 max-w-md mx-auto relative z-10 font-medium">Our travel experts are available 24/7 to assist you with your journey.</p>
         <motion.button 
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
-          className="bg-white text-blue-600 px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-2xl hover:glow-blue transition-all relative z-10"
+          className="bg-[#0A2540] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
         >
           Contact Support
         </motion.button>
@@ -1842,286 +2170,323 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         photo: editForm.photo
       });
       setIsEditingProfile(false);
-      alert("Profile updated successfully!");
     } catch (err) {
       console.error(err);
-      alert("Failed to update profile.");
     } finally {
       setLoading(false);
     }
   };
 
-  const renderProfile = () => {
-    if (!user) return renderAuth();
-    
+  const renderEditProfile = () => {
+    if (!user) return null;
     return (
-      <div className="space-y-10 pb-12">
-        {/* Premium Profile Header */}
-        <div className="relative bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[3.5rem] overflow-hidden shadow-2xl group">
-          {/* Animated Gradient Banner */}
-          <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x relative overflow-hidden">
-            <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
-            <motion.div 
-              animate={{ 
-                scale: [1, 1.2, 1],
-                rotate: [0, 5, 0]
-              }}
-              transition={{ duration: 10, repeat: Infinity }}
-              className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl" 
-            />
-          </div>
-
-          <div className="relative z-10 px-8 md:px-12 pb-12 -mt-20">
-            <div className="flex flex-col md:flex-row items-end gap-8">
-              {/* Circular Avatar with Glow Ring */}
-              <div className="relative group/avatar">
-                <motion.div 
-                  whileHover={{ scale: 1.05 }}
-                  className="w-40 h-40 rounded-full p-1.5 bg-gradient-to-tr from-blue-500 via-emerald-500 to-purple-500 shadow-[0_0_30px_rgba(59,130,246,0.5)] relative z-10"
-                >
-                  <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden border-4 border-slate-900">
-                    {user.photo ? (
-                      <img src={user.photo} alt={user.name} className="w-full h-full object-cover transition-transform duration-500 group-hover/avatar:scale-110" />
-                    ) : (
-                      <ProfileIcon size={80} className="text-white/20" />
-                    )}
-                  </div>
-                </motion.div>
-                <label className="absolute bottom-2 right-2 bg-white text-blue-600 p-3 rounded-full shadow-2xl border border-blue-100 hover:scale-110 transition-all cursor-pointer z-20 hover:glow-blue">
-                  <Camera size={20} />
-                  <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
-                </label>
-              </div>
-
-              <div className="flex-1 text-center md:text-left space-y-4 pb-2">
-                {isEditingProfile ? (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="space-y-4 max-w-sm"
-                  >
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-2">Full Name</label>
-                        <input 
-                          type="text" 
-                          value={editForm.name}
-                          onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:ring-4 focus:ring-blue-500/20 transition-all"
-                          placeholder="Full Name"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-2">Mobile Number</label>
-                        <input 
-                          type="text" 
-                          value={editForm.phone}
-                          onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:ring-4 focus:ring-blue-500/20 transition-all"
-                          placeholder="Mobile Number"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={updateProfile} className="flex-1 bg-white text-blue-600 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:bg-blue-50 transition-all">
-                        {t.saveChanges}
-                      </button>
-                      <button onClick={() => setIsEditingProfile(false)} className="flex-1 bg-white/10 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest border border-white/20 hover:bg-white/20 transition-all">
-                        {t.cancel}
-                      </button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <div className="flex flex-col md:flex-row md:items-center gap-6 justify-between">
-                    <div className="space-y-2">
-                      <h2 className="text-5xl font-serif font-black text-white tracking-tighter">{user.name}</h2>
-                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
-                          <Mail size={14} className="text-blue-400" />
-                          <span className="text-white/60 text-xs font-bold">{user.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
-                          <Phone size={14} className="text-emerald-400" />
-                          <span className="text-white/60 text-xs font-bold">
-                            {user.phone || (
-                              <button onClick={startEditing} className="text-white underline hover:text-blue-400 transition-colors">
-                                {t.addPhone}
-                              </button>
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <motion.button 
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={startEditing}
-                      className="bg-white text-blue-600 px-10 py-4 rounded-full font-black text-sm uppercase tracking-widest shadow-2xl hover:glow-blue transition-all flex items-center gap-3 mx-auto md:mx-0"
-                    >
-                      <Settings size={18} /> {t.editProfile}
-                    </motion.button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Travel Stats in Premium Glass Pills */}
-            {!isEditingProfile && (
-              <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-8">
-                {[
-                  { label: t.tripsPlanned, count: savedTrips.length, icon: Globe, color: 'text-blue-400' },
-                  { label: t.upcoming, count: bookings.length, icon: Calendar, color: 'text-emerald-400' },
-                  { label: t.saved, count: wishlist.length, icon: Heart, color: 'text-rose-400' }
-                ].map((stat, i) => (
-                  <motion.div 
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="px-6 py-3 bg-white/5 backdrop-blur-xl rounded-full border border-white/10 flex items-center gap-3 shadow-xl hover:bg-white/10 transition-all cursor-default"
-                  >
-                    <stat.icon size={16} className={stat.color} />
-                    <span className="text-white font-black text-lg tracking-tighter">{stat.count}</span>
-                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">{stat.label}</span>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="space-y-8 pb-24 px-4 md:px-0">
+        <div className="flex items-center gap-4 pt-8">
+          <button onClick={() => setIsEditingProfile(false)} className="p-2 hover:bg-gray-100 rounded-full transition-all">
+            <ArrowLeft size={24} className="text-[#0A2540]" />
+          </button>
+          <h2 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">Edit Profile</h2>
         </div>
 
-        {/* Section Cards with Icons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          {/* Settings Section */}
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 px-4">
-              <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center shadow-[0_10px_30px_rgba(37,99,235,0.4)]">
-                <Settings className="text-white" size={28} />
+        <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
+          {/* Photo Upload */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-xl">
+                {editForm.photo ? (
+                  <img src={editForm.photo} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <ProfileIcon size={48} className="text-[#1E90FF]" />
+                )}
               </div>
-              <h3 className="text-3xl font-serif font-black text-white tracking-tight">{t.settings}</h3>
+              <label className="absolute bottom-0 right-0 bg-[#1E90FF] text-white p-2.5 rounded-full shadow-lg border-2 border-white hover:scale-110 transition-all cursor-pointer">
+                <Camera size={18} />
+                <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+              </label>
             </div>
-            <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[3rem] overflow-hidden shadow-2xl">
-              {[
-                { label: t.language, icon: Languages, color: 'text-blue-400', value: language, onChange: setLanguage, options: ["English", "Marathi", "Hindi"] },
-                { label: t.currency, icon: WalletIcon, color: 'text-emerald-400', value: currency, onChange: setCurrency, options: ["INR (₹)", "USD ($)", "EUR (€)"] }
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between p-8 border-b border-white/10 hover:bg-white/5 transition-all group">
-                  <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-all">
-                      <item.icon size={24} className={item.color} />
-                    </div>
-                    <span className="text-white font-black text-lg tracking-tight">{item.label}</span>
-                  </div>
-                  <select 
-                    value={item.value}
-                    onChange={(e) => item.onChange(e.target.value)}
-                    className="bg-white/5 text-white font-black px-6 py-3 rounded-2xl outline-none cursor-pointer text-sm border border-white/10 focus:border-white/30 transition-all"
-                  >
-                    {item.options.map(opt => (
-                      <option key={opt} className="text-slate-900" value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Tap to change photo</p>
+          </div>
 
-              {/* Notifications Toggle */}
-              <div className="flex items-center justify-between p-8 border-b border-white/10 hover:bg-white/5 transition-all group">
-                <div className="flex items-center gap-5">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-all">
-                    <Bell size={24} className="text-amber-400" />
-                  </div>
-                  <span className="text-white font-black text-lg tracking-tight">{t.notifications}</span>
-                </div>
-                <button 
-                  onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-                  className={cn(
-                    "w-16 h-8 rounded-full transition-all relative p-1",
-                    notificationsEnabled ? "bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]" : "bg-white/10"
-                  )}
-                >
-                  <motion.div 
-                    animate={{ x: notificationsEnabled ? 32 : 0 }}
-                    className="w-6 h-6 bg-white rounded-full shadow-lg" 
-                  />
-                </button>
+          {/* Form Fields */}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <input 
+                  type="text" 
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
+                  placeholder="Your Name"
+                />
               </div>
+            </div>
 
-              {/* Dark Mode Toggle */}
-              <div className="flex items-center justify-between p-8 hover:bg-white/5 transition-all group">
-                <div className="flex items-center gap-5">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-all">
-                    {isDarkMode ? <Moon size={24} className="text-indigo-400" /> : <Sun size={24} className="text-orange-400" />}
-                  </div>
-                  <span className="text-white font-black text-lg tracking-tight">{t.theme}</span>
-                </div>
-                <button 
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="bg-white/10 px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/20 transition-all border border-white/10"
-                >
-                  {isDarkMode ? "Dark" : "Light"}
-                </button>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Phone Number</label>
+              <div className="relative">
+                <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <input 
+                  type="text" 
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
+                  placeholder="Your Phone"
+                />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <input 
+                  type="email" 
+                  value={user.email}
+                  disabled
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-gray-400 font-bold outline-none cursor-not-allowed"
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 ml-4 italic">Email cannot be changed</p>
             </div>
           </div>
 
-          {/* Support Section */}
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 px-4">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-[0_10px_30px_rgba(16,185,129,0.4)]">
-                <HelpCircle className="text-white" size={28} />
-              </div>
-              <h3 className="text-3xl font-serif font-black text-white tracking-tight">{t.support}</h3>
-            </div>
-            <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[3rem] overflow-hidden shadow-2xl">
-              {[
-                { label: "Call Support", icon: Phone, color: 'text-blue-400', href: "tel:+919876543210" },
-                { label: "WhatsApp Support", icon: Phone, color: 'text-emerald-400', href: "https://wa.me/919876543210" },
-                { label: "Email Support", icon: Mail, color: 'text-rose-400', href: "mailto:support@tripgenious.com" },
-                { label: "Help & FAQ", icon: HelpCircle, color: 'text-purple-400' },
-                { label: "About Us", icon: Info, color: 'text-sky-400' },
-                { label: "Privacy Policy", icon: ShieldCheck, color: 'text-slate-400' }
-              ].map((item, idx) => (
-                <motion.a 
-                  key={idx}
-                  href={item.href}
-                  target={item.href?.startsWith('http') ? "_blank" : undefined}
-                  rel={item.href?.startsWith('http') ? "noreferrer" : undefined}
-                  whileHover={{ x: 10 }}
-                  className="w-full flex items-center justify-between p-8 text-white hover:bg-white/5 transition-all border-b border-white/10 last:border-0 group cursor-pointer"
-                >
-                  <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-all">
-                      <item.icon size={24} className={item.color} />
-                    </div>
-                    <span className="text-white font-black text-lg tracking-tight">{item.label}</span>
-                  </div>
-                  <ArrowRight size={20} className="text-white/20 group-hover:text-white transition-all" />
-                </motion.a>
-              ))}
-            </div>
-
-            {/* Logout Button */}
+          <div className="pt-4 space-y-4">
             <motion.button 
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={handleLogout}
-              className="w-full bg-rose-500/10 border border-rose-500/30 text-rose-100 py-6 rounded-[2.5rem] font-black uppercase tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-rose-500 hover:text-white transition-all shadow-2xl group"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={updateProfile}
+              disabled={loading}
+              className="w-full bg-[#0A2540] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:glow-blue transition-all disabled:opacity-50"
             >
-              <LogOut size={24} className="group-hover:-translate-x-2 transition-transform" />
-              Logout Account
+              {loading ? "Saving..." : "Save Changes"}
             </motion.button>
+            <button 
+              onClick={() => setIsEditingProfile(false)}
+              className="w-full bg-white text-gray-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] border border-gray-100 hover:bg-gray-50 transition-all"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </div>
     );
   };
 
+  const renderProfile = () => {
+    if (!user) return renderAuth();
+    if (isEditingProfile) return renderEditProfile();
+    
+    return (
+      <div className="space-y-12 pb-24 px-4 md:px-0">
+        {/* Header Section */}
+        <div className="text-center space-y-2 pt-8">
+          <h2 className="text-4xl font-serif font-black text-[#0A2540] tracking-tight">Settings</h2>
+          <p className="text-gray-400 text-sm font-medium">Manage your account and preferences</p>
+        </div>
+
+        {/* Account Section */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 px-4">
+            <User className="text-[#0A2540]" size={20} />
+            <h3 className="text-lg font-bold text-[#0A2540]">Account</h3>
+          </div>
+          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            {/* Profile Summary */}
+            <div className="p-6 flex items-center gap-4 border-b border-gray-50 bg-gray-50/30">
+              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+                {user.photo ? (
+                  <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  <ProfileIcon size={32} className="text-[#1E90FF]" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h4 className="text-lg font-bold text-[#0A2540]">{user.name}</h4>
+                <p className="text-gray-400 text-xs font-medium">{user.email}</p>
+              </div>
+              <button 
+                onClick={startEditing}
+                className="text-[#1E90FF] font-black text-[10px] uppercase tracking-widest px-4 py-2 bg-white rounded-full border border-blue-50 hover:bg-blue-50 transition-all"
+              >
+                Edit
+              </button>
+            </div>
+
+            {[
+              { label: "Change Password", icon: Lock, color: "text-amber-500" },
+              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone" }
+            ].map((item, idx) => (
+              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
+                    <item.icon size={20} className={item.color} />
+                  </div>
+                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {item.detail && <span className="text-gray-400 text-xs font-medium">{item.detail}</span>}
+                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Preferences Section */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 px-4">
+            <Settings className="text-[#0A2540]" size={20} />
+            <h3 className="text-lg font-bold text-[#0A2540]">Preferences</h3>
+          </div>
+          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            {[
+              { label: "Language", icon: Languages, color: "text-blue-500", value: language, options: ["English", "Marathi", "Hindi"], onChange: setLanguage },
+              { label: "Currency", icon: WalletIcon, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)"], onChange: setCurrency }
+            ].map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
+                    <item.icon size={20} className={item.color} />
+                  </div>
+                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                </div>
+                <select 
+                  value={item.value}
+                  onChange={(e) => item.onChange(e.target.value)}
+                  className="bg-gray-50 text-[#0A2540] font-bold px-4 py-2 rounded-xl outline-none cursor-pointer text-xs border border-gray-100 focus:border-[#1E90FF] transition-all"
+                >
+                  {item.options.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+
+            {/* Notification Settings */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
+                  <Bell size={20} className="text-amber-500" />
+                </div>
+                <span className="text-[#0A2540] font-bold text-sm">Notifications</span>
+              </div>
+              <button 
+                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                className={cn(
+                  "w-12 h-6 rounded-full transition-all relative p-1",
+                  notificationsEnabled ? "bg-emerald-500" : "bg-gray-200"
+                )}
+              >
+                <motion.div 
+                  animate={{ x: notificationsEnabled ? 24 : 0 }}
+                  className="w-4 h-4 bg-white rounded-full shadow-sm" 
+                />
+              </button>
+            </div>
+
+            {/* Theme Toggle */}
+            <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-all group">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
+                  {isDarkMode ? <Moon size={20} className="text-indigo-500" /> : <Sun size={20} className="text-orange-500" />}
+                </div>
+                <span className="text-[#0A2540] font-bold text-sm">Theme</span>
+              </div>
+              <button 
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="bg-gray-50 px-4 py-2 rounded-xl text-[#0A2540] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all border border-gray-100"
+              >
+                {isDarkMode ? "Dark" : "Light"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Travel Section */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 px-4">
+            <MapIcon className="text-[#0A2540]" size={20} />
+            <h3 className="text-lg font-bold text-[#0A2540]">Travel</h3>
+          </div>
+          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            {[
+              { label: "Saved Trips", icon: Globe, color: "text-blue-500", count: savedTrips.length, tab: 'trips' },
+              { label: "Booking History", icon: BookingIcon, color: "text-emerald-500", count: bookings.length, tab: 'bookings' },
+              { label: "Payment Methods", icon: WalletIcon, color: "text-purple-500" }
+            ].map((item, idx) => (
+              <button 
+                key={idx} 
+                onClick={() => item.tab && setActiveTab(item.tab)}
+                className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
+                    <item.icon size={20} className={item.color} />
+                  </div>
+                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {item.count !== undefined && <span className="bg-blue-50 text-[#1E90FF] text-[10px] font-black px-2 py-0.5 rounded-full">{item.count}</span>}
+                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Support Section */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 px-4">
+            <HelpCircle className="text-[#0A2540]" size={20} />
+            <h3 className="text-lg font-bold text-[#0A2540]">Support</h3>
+          </div>
+          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            {[
+              { label: "Help Center", icon: HelpCircle, color: "text-blue-500" },
+              { label: "Contact Support", icon: Phone, color: "text-emerald-500" },
+              { label: "Terms & Privacy", icon: ShieldCheck, color: "text-slate-500" }
+            ].map((item, idx) => (
+              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
+                    <item.icon size={20} className={item.color} />
+                  </div>
+                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                </div>
+                <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Logout Button */}
+        <motion.button 
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleLogout}
+          className="w-full bg-rose-50 border border-rose-100 text-rose-600 py-5 rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-rose-600 hover:text-white transition-all shadow-sm group"
+        >
+          <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
+          Logout Account
+        </motion.button>
+      </div>
+    );
+  };
+
   return (
     <div className={cn(
-      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#0A2540] bg-[#FFFFFF]"
+      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#0A2540]",
+      activeTab === 'explore' ? "bg-white" : "bg-[#F5F7FA]"
     )}>
       {/* Header */}
-      <header className="pt-6 pb-4 px-6 sticky top-0 z-40 backdrop-blur-md bg-white/80 border-b border-gray-100">
+      <header className={cn(
+        "pt-6 pb-4 px-6 sticky top-0 z-40 transition-all duration-500",
+        activeTab === 'explore' 
+          ? "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm" 
+          : "bg-[#0A2540] border-b border-white/10"
+      )}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
@@ -2131,10 +2496,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             className="flex items-center gap-2 cursor-pointer group"
             onClick={() => setActiveTab('explore')}
           >
-            <div className="w-10 h-10 bg-[#0A2540] rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-blue-500/20 transition-all duration-300">
-              <Compass className="text-white" size={24} />
+            <div className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300",
+              activeTab === 'explore' ? "bg-[#0A2540]" : "bg-white"
+            )}>
+              <Compass className={activeTab === 'explore' ? "text-white" : "text-[#0A2540]"} size={24} />
             </div>
-            <span className="text-[#0A2540] text-xl font-bold tracking-tight">TripGenious</span>
+            <span className={cn(
+              "text-xl font-bold tracking-tight transition-colors duration-300",
+              activeTab === 'explore' ? "text-[#0A2540]" : "text-white"
+            )}>Travora</span>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -2145,13 +2516,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <motion.div 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center border border-gray-200 cursor-pointer overflow-hidden relative"
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center border cursor-pointer overflow-hidden relative transition-all duration-300",
+                  activeTab === 'explore' ? "bg-gray-100 border-gray-200" : "bg-white/10 border-white/20"
+                )}
                 onClick={() => setActiveTab('profile')}
               >
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ProfileIcon className="text-gray-400" size={20} />
+                  <ProfileIcon className={activeTab === 'explore' ? "text-[#0A2540]" : "text-white"} size={20} />
                 )}
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-10" />
               </motion.div>
@@ -2160,7 +2534,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveTab('profile')}
-                className="bg-[#0A2540] text-white px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider"
+                className={cn(
+                  "px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider",
+                  activeTab === 'explore' ? "bg-[#FF8A00] text-white" : "bg-white text-[#0A2540]"
+                )}
               >
                 Login
               </motion.button>
@@ -2169,7 +2546,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 pt-6">
+      <main className={cn(
+        "max-w-6xl mx-auto px-4",
+        activeTab === 'explore' ? "pt-0" : "pt-6"
+      )}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -2193,7 +2573,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             { id: "explore", icon: Globe, label: "Explore" },
             { id: "trips", icon: MapIcon, label: "Trips" },
             { id: "bookings", icon: BookingIcon, label: "Bookings" },
-            { id: "profile", icon: ProfileIcon, label: "Profile" }
+            { id: "profile", icon: Settings, label: "Settings" }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -2211,12 +2591,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 size={20} 
                 className={cn(
                   "transition-all duration-300 relative z-10",
-                  activeTab === tab.id ? "text-[#2A7FFF] scale-110" : "text-gray-400 group-hover:text-[#0A2540]"
+                  activeTab === tab.id ? "text-[#1E90FF] scale-110" : "text-gray-400 group-hover:text-[#0A2540]"
                 )} 
               />
               <span className={cn(
                 "text-[9px] font-bold uppercase tracking-tight relative z-10 transition-all duration-300",
-                activeTab === tab.id ? "text-[#2A7FFF] opacity-100" : "text-gray-400 opacity-0 group-hover:opacity-100"
+                activeTab === tab.id ? "text-[#1E90FF] opacity-100" : "text-gray-400 opacity-0 group-hover:opacity-100"
               )}>
                 {tab.label}
               </span>
@@ -2229,7 +2609,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 }
 
 export default function App() {
-  const mapsKey = import.meta.env.VITE_MAPS_API_KEY;
+  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY;
   if (mapsKey) {
     return <AppWithMaps mapsKey={mapsKey} />;
   }
