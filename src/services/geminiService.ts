@@ -9,10 +9,27 @@ export interface ItineraryRequest {
   numPeople: number;
   travelStyle: string;
   language?: string;
+  budgetData?: any;
 }
 
 export async function generateItinerary(request: ItineraryRequest) {
-  const { location, startLocation, duration, numPeople, travelStyle, language = "en" } = request;
+  const { location, startLocation, duration, numPeople, travelStyle, language = "en", budgetData } = request;
+
+  let budgetInstructions = "";
+  if (budgetData) {
+    budgetInstructions = `
+    CRITICAL: For the budget section, you MUST use the following pre-calculated data to ensure consistency:
+    - Total Trip Cost: ${budgetData.totalCost}
+    - Travel Cost from ${startLocation}: ${budgetData.travelCost}
+    - Hotel Cost: ${budgetData.hotelCost}
+    - Food Cost: ${budgetData.foodCost}
+    - Local Transport Cost: ${budgetData.localTransport}
+    - Distance: ${budgetData.distance} km
+    - Duration: ${budgetData.tripDays} days
+    - Travelers: ${budgetData.travelers}
+    Do not recalculate these values. Use them exactly as provided.
+    `;
+  }
 
   const prompt = `You are BHATKANTIMITRA – a smart AI Global Travel Planner.
   Your role is to create a complete, AUTO-BUDGETED travel plan for any destination in the world, including travel options from the user's starting location.
@@ -23,6 +40,8 @@ export async function generateItinerary(request: ItineraryRequest) {
   - Duration: ${duration} days
   - Number of People: ${numPeople}
   - Travel Style: ${travelStyle}
+  
+  ${budgetInstructions}
   
   Language Rule:
   - If the user input is in Marathi or the requested language is Marathi, reply in Marathi.

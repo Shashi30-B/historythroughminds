@@ -25,8 +25,9 @@ import { twMerge } from 'tailwind-merge';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 import { generateItinerary } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
+import { BUDGET_DESTINATIONS, type Destination } from './data/destinations';
 
-const libraries: ("places")[] = ["places"];
+const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
 import { auth, db } from './firebase';
 import { 
@@ -49,8 +50,109 @@ import {
   onSnapshot,
   deleteDoc,
   updateDoc,
-  orderBy
+  orderBy,
+  getDocFromServer
 } from 'firebase/firestore';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let errorMessage = "Something went wrong.";
+      try {
+        const parsedError = JSON.parse(this.state.error?.message || "{}");
+        if (parsedError.error) {
+          errorMessage = `Database Error: ${parsedError.error}. Please check your permissions.`;
+        }
+      } catch (e) {
+        errorMessage = this.state.error?.message || errorMessage;
+      }
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl max-w-md w-full text-center space-y-6">
+            <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle size={40} className="text-rose-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-[#0A2540]">Application Error</h2>
+            <p className="text-gray-500 leading-relaxed">{errorMessage}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-[#0A2540] text-white py-4 rounded-2xl font-bold hover:bg-[#1E90FF] transition-all"
+            >
+              Reload Application
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -266,7 +368,7 @@ const LocationInput = ({
       </div>
       <input
         type="text"
-        value={value}
+        value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => value && suggestions.length > 0 && setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
@@ -330,6 +432,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const headlines = ["Explore the World with Travora", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
 
   useEffect(() => {
+    async function testConnection() {
+      if (!db) return;
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration. ");
+        }
+        // Skip logging for other errors, as this is simply a connection test.
+      }
+    }
+    testConnection();
+  }, []);
+
+  useEffect(() => {
     if (activeTab === 'explore') {
       const interval = setInterval(() => {
         setHeadlineIndex((prev) => (prev + 1) % headlines.length);
@@ -367,6 +484,29 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [userTotalBudget, setUserTotalBudget] = useState<number>(50000);
   const [transportType, setTransportType] = useState("public"); // public, private, flight
   const [accommodationType, setAccommodationType] = useState("standard"); // hostel, standard, luxury
+
+  // Budget Finder State
+  const [budgetFinderInput, setBudgetFinderInput] = useState({
+    startLocation: "",
+    totalBudget: 20000,
+    travelType: "Solo", // Solo, Couple, Family, Friends
+    duration: "2-3 days" // 1 day, 2-3 days, 4-5 days
+  });
+  const [budgetResults, setBudgetResults] = useState<any[]>([]);
+  const [isFindingDestinations, setIsFindingDestinations] = useState(false);
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+  };
+  const [selectedBudgetTrip, setSelectedBudgetTrip] = useState<any | null>(null);
 
   const liveBudget = useMemo(() => {
     const transportRates: Record<string, number> = { public: 500, private: 2000, flight: 5000 };
@@ -681,16 +821,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Fetch additional profile data from Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        const userData = userDoc.exists() ? userDoc.data() : {};
-        
-        setUser({
-          id: firebaseUser.uid,
-          name: userData.name || firebaseUser.displayName || 'Traveler',
-          email: firebaseUser.email || '',
-          photo: userData.photo || firebaseUser.photoURL || '',
-          phone: userData.phone || ''
-        });
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userData = userDoc.exists() ? userDoc.data() : {};
+          
+          setUser({
+            id: firebaseUser.uid,
+            name: userData.name || firebaseUser.displayName || 'Traveler',
+            email: firebaseUser.email || '',
+            photo: userData.photo || firebaseUser.photoURL || '',
+            phone: userData.phone || ''
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
+        }
       } else {
         setUser(null);
       }
@@ -715,6 +859,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribeTrips = onSnapshot(tripsQuery, (snapshot) => {
       const trips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       setSavedTrips(trips);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'trips');
     });
 
     // Listen to Bookings
@@ -725,6 +871,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribeBookings = onSnapshot(bookingsQuery, (snapshot) => {
       const bks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       setBookings(bks);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'bookings');
     });
 
     // Listen to Wishlist
@@ -735,6 +883,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribeWishlist = onSnapshot(wishlistQuery, (snapshot) => {
       const wsh = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       setWishlist(wsh);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'wishlist');
     });
 
     // Listen to User Budget
@@ -744,6 +894,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         const data = doc.data();
         if (data.totalBudget) setUserTotalBudget(data.totalBudget);
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${user.id}`);
     });
 
     setEditForm({ name: user.name, phone: user.phone || '', photo: user.photo || '' });
@@ -785,12 +937,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         const newUser = userCredential.user;
         
         // Initialize user profile in Firestore
-        await setDoc(doc(db, 'users', newUser.uid), {
-          name: authForm.name,
-          email: authForm.email,
-          totalBudget: 50000,
-          created_at: new Date().toISOString()
-        });
+        try {
+          await setDoc(doc(db, 'users', newUser.uid), {
+            name: authForm.name,
+            email: authForm.email,
+            totalBudget: 50000,
+            created_at: new Date().toISOString()
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, `users/${newUser.uid}`);
+        }
 
         await firebaseUpdateProfile(newUser, {
           displayName: authForm.name
@@ -799,7 +955,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       setActiveTab('explore');
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || "Authentication failed.");
+      if (err.code === 'auth/operation-not-allowed') {
+        setAuthError("Email/Password sign-in is not enabled in Firebase Console. Please go to Authentication > Sign-in method and enable it.");
+      } else if (err.code === 'auth/invalid-credential') {
+        setAuthError("Invalid email or password. Please check your credentials and try again.");
+      } else {
+        setAuthError(err.message || "Authentication failed.");
+      }
     } finally {
       setLoading(false);
     }
@@ -817,20 +979,30 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       const user = result.user;
       
       // Check if user exists in Firestore, if not create
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName || 'Traveler',
-          email: user.email,
-          photo: user.photoURL,
-          totalBudget: 50000,
-          created_at: new Date().toISOString()
-        });
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists()) {
+          await setDoc(doc(db, 'users', user.uid), {
+            name: user.displayName || 'Traveler',
+            email: user.email,
+            photo: user.photoURL,
+            totalBudget: 50000,
+            created_at: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
       }
       setActiveTab('explore');
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || "Google login failed.");
+      if (err.code === 'auth/operation-not-allowed') {
+        setAuthError("Google sign-in is not enabled in Firebase Console. Please go to Authentication > Sign-in method and enable it.");
+      } else if (err.code === 'auth/invalid-credential') {
+        setAuthError("Google login failed. Please ensure your App URL is added to 'Authorized domains' in Firebase Console > Authentication > Settings.");
+      } else {
+        setAuthError(err.message || "Google login failed.");
+      }
     } finally {
       setLoading(false);
     }
@@ -843,13 +1015,163 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     setActiveTab('explore');
   };
 
-  const handleGenerate = async (overrideStyle?: string) => {
+  const findBudgetDestinations = async () => {
+    if (!budgetFinderInput.startLocation.trim()) {
+      showToast("Please enter a starting location.", "error");
+      return;
+    }
+
+    setIsFindingDestinations(true);
+    setBudgetResults([]);
+
+    try {
+      // 1. Get coordinates for start location
+      let startLat = 19.0760; // Default Mumbai
+      let startLng = 72.8777;
+
+      const CITY_COORDS: Record<string, {lat: number, lng: number}> = {
+        'mumbai': { lat: 19.0760, lng: 72.8777 },
+        'delhi': { lat: 28.6139, lng: 77.2090 },
+        'bangalore': { lat: 12.9716, lng: 77.5946 },
+        'hyderabad': { lat: 17.3850, lng: 78.4867 },
+        'chennai': { lat: 13.0827, lng: 80.2707 },
+        'kolkata': { lat: 22.5726, lng: 88.3639 },
+        'pune': { lat: 18.5204, lng: 73.8567 },
+        'ahmedabad': { lat: 23.0225, lng: 72.5714 },
+        'jaipur': { lat: 26.9124, lng: 75.7873 },
+        'lucknow': { lat: 26.8467, lng: 80.9462 },
+        'chandigarh': { lat: 30.7333, lng: 76.7794 },
+        'kochi': { lat: 9.9312, lng: 76.2673 },
+        'goa': { lat: 15.2993, lng: 74.1240 },
+      };
+
+      const lowerStart = budgetFinderInput.startLocation.toLowerCase().trim();
+      if (CITY_COORDS[lowerStart]) {
+        startLat = CITY_COORDS[lowerStart].lat;
+        startLng = CITY_COORDS[lowerStart].lng;
+      } else if (isLoaded && window.google) {
+        const geocoder = new google.maps.Geocoder();
+        const res = await new Promise<any>((resolve) => 
+          geocoder.geocode({ address: budgetFinderInput.startLocation }, (r) => resolve(r))
+        );
+        if (res && res[0]) {
+          startLat = res[0].geometry.location.lat();
+          startLng = res[0].geometry.location.lng();
+        }
+      }
+
+      // 2. Calculate distances
+      const distances: Record<string, number> = {};
+      
+      // Default: Haversine fallback
+      BUDGET_DESTINATIONS.forEach(dest => {
+        const R = 6371;
+        const dLat = (dest.lat - startLat) * Math.PI / 180;
+        const dLon = (dest.lng - startLng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(startLat * Math.PI / 180) * Math.cos(dest.lat * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        distances[dest.id] = Math.round(R * c);
+      });
+
+      // Try Google Distance Matrix API for more realistic road distance
+      if (isLoaded && window.google) {
+        try {
+          const service = new google.maps.DistanceMatrixService();
+          const chunks = [];
+          for (let i = 0; i < BUDGET_DESTINATIONS.length; i += 25) {
+            chunks.push(BUDGET_DESTINATIONS.slice(i, i + 25));
+          }
+
+          await Promise.all(chunks.map(async (chunk) => {
+            return new Promise<void>((resolve) => {
+              service.getDistanceMatrix({
+                origins: [{ lat: startLat, lng: startLng }],
+                destinations: chunk.map(d => ({ lat: d.lat, lng: d.lng })),
+                travelMode: google.maps.TravelMode.DRIVING,
+              }, (response, status) => {
+                if (status === 'OK' && response && response.rows[0]) {
+                  response.rows[0].elements.forEach((element, idx) => {
+                    if (element.status === 'OK' && element.distance) {
+                      distances[chunk[idx].id] = Math.round(element.distance.value / 1000);
+                    }
+                  });
+                }
+                resolve();
+              });
+            });
+          }));
+        } catch (apiErr) {
+          console.warn("Distance Matrix API failed, using Haversine fallback:", apiErr);
+        }
+      }
+
+      // 3. Calculate costs for each destination using the new realistic algorithm
+      const results = BUDGET_DESTINATIONS.map(dest => {
+        const distance = distances[dest.id];
+
+        // Travelers count
+        let travelers = 1;
+        if (budgetFinderInput.travelType === "Couple") travelers = 2;
+        if (budgetFinderInput.travelType === "Family") travelers = 4;
+        if (budgetFinderInput.travelType === "Friends") travelers = 3;
+
+        // Trip Days (based on destination's ideal duration)
+        const tripDays = dest.ideal_trip_duration_days;
+        const nights = Math.max(0, tripDays - 1);
+
+        // 1. Travel Cost = distance_km * 3 * 2
+        const travelCost = distance * 3 * 2;
+
+        // 2. Hotel Cost = average_hotel_price * nights
+        const hotelCost = dest.average_hotel_price_per_night * nights;
+
+        // 3. Food Cost = days * 500 * travelers
+        const foodCost = tripDays * 500 * travelers;
+
+        // 4. Local Transport = 600
+        const localTransport = 600;
+
+        // Total trip cost: total_trip_cost = travel_cost + hotel_cost + food_cost + local_transport
+        const totalCost = Math.round(travelCost + hotelCost + foodCost + localTransport);
+
+        return {
+          ...dest,
+          distance,
+          travelCost,
+          hotelCost,
+          foodCost,
+          localTransport,
+          totalCost,
+          tripDays,
+          travelers
+        };
+      });
+
+      // 4. Strict Budget Filter & Sort by nearest distance
+      const filtered = results.filter(r => r.totalCost <= budgetFinderInput.totalBudget)
+                              .sort((a, b) => a.distance - b.distance);
+
+      setBudgetResults(filtered);
+      if (filtered.length === 0) {
+        showToast("No destinations found within this budget. Try increasing your budget or changing the duration.", "info");
+      }
+    } catch (error) {
+      console.error(error);
+      showToast("Error finding destinations.", "error");
+    } finally {
+      setIsFindingDestinations(false);
+    }
+  };
+
+  const handleGenerate = async (overrideStyle?: string, budgetData?: any) => {
     if (!locationInput.trim()) {
-      alert("Please enter a destination.");
+      showToast("Please enter a destination.", "error");
       return;
     }
     if (!startLocation.trim()) {
-      alert("Please enter your starting location.");
+      showToast("Please enter your starting location.", "error");
       return;
     }
     const styleToUse = overrideStyle || travelStyle;
@@ -864,7 +1186,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         duration,
         numPeople,
         travelStyle: styleToUse,
-        language: language
+        language: language,
+        budgetData: budgetData || selectedBudgetTrip
       });
       setItinerary(result);
       // Simple heuristic to extract some info for the route card if possible
@@ -876,7 +1199,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       });
     } catch (error) {
       console.error(error);
-      alert("Failed to generate itinerary. Please try again.");
+      showToast("Failed to generate itinerary. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -884,7 +1207,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   const toggleWishlist = async (dest: any) => {
     if (!user) {
-      alert("Please login to save to wishlist!");
+      showToast("Please login to save to wishlist!", "info");
       setActiveTab('profile');
       return;
     }
@@ -894,20 +1217,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       try {
         await deleteDoc(doc(db, 'wishlist', existing.id));
       } catch (err) {
-        console.error(err);
+        handleFirestoreError(err, OperationType.DELETE, `wishlist/${existing.id}`);
       }
     } else {
       try {
         await addDoc(collection(db, 'wishlist'), {
           user_id: user.id,
           dest_id: dest.id,
-          title: dest.title,
-          img: dest.img,
+          title: dest.destination_name || dest.title,
+          img: dest.destination_image || dest.img,
           desc: dest.desc,
           created_at: new Date().toISOString()
         });
       } catch (err) {
-        console.error(err);
+        handleFirestoreError(err, OperationType.CREATE, 'wishlist');
       }
     }
   };
@@ -915,7 +1238,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const saveTrip = async () => {
     if (!itinerary) return;
     if (!user) {
-      alert("Please login to save your trips!");
+      showToast("Please login to save your trips!", "info");
       setActiveTab('profile');
       return;
     }
@@ -933,10 +1256,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     try {
       await addDoc(collection(db, 'trips'), tripData);
-      alert("Trip saved to My Trips!");
     } catch (err) {
-      console.error(err);
-      alert("Failed to save trip.");
+      handleFirestoreError(err, OperationType.CREATE, 'trips');
     }
   };
 
@@ -1013,7 +1334,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 <LocationInput
-                  value={startLocation}
+                  value={startLocation || ''}
                   onChange={setStartLocation}
                   onPlaceSelect={(place: any) => {
                     if (place.formatted_address) setStartLocation(place.formatted_address);
@@ -1035,7 +1356,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 />
 
                 <LocationInput
-                  value={locationInput}
+                  value={locationInput || ''}
                   onChange={setLocationInput}
                   onPlaceSelect={(place: any) => {
                     if (place.formatted_address) setLocationInput(place.formatted_address);
@@ -1065,7 +1386,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </div>
                   <div className="flex items-center gap-4">
                     <button onClick={() => setDuration(Math.max(1, duration - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
-                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{duration}</span>
+                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{duration || 0}</span>
                     <button onClick={() => setDuration(duration + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
                   </div>
                 </div>
@@ -1080,7 +1401,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </div>
                   <div className="flex items-center gap-4">
                     <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
-                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{numPeople}</span>
+                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{numPeople || 0}</span>
                     <button onClick={() => setNumPeople(numPeople + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
                   </div>
                 </div>
@@ -1165,6 +1486,157 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               </motion.div>
             ))}
           </div>
+        </section>
+
+        {/* Budget Based Destination Finder */}
+        <section className="space-y-8 px-4">
+          <div className="bg-[#0A2540] rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl -ml-32 -mb-32" />
+            
+            <div className="relative space-y-8">
+              <div className="text-center space-y-2">
+                <h3 className="text-3xl md:text-4xl font-serif font-black text-white">Find Trips in Your Budget</h3>
+                <p className="text-blue-200 font-medium">Tell us your budget, we'll find the perfect escape</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Starting From</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
+                    <input 
+                      type="text"
+                      value={budgetFinderInput.startLocation || ''}
+                      onChange={(e) => setBudgetFinderInput({...budgetFinderInput, startLocation: e.target.value})}
+                      placeholder="e.g. Mumbai"
+                      className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-blue-300/50 focus:bg-white/20 transition-all outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Total Budget (₹)</label>
+                  <div className="relative">
+                    <WalletIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
+                    <input 
+                      type="number"
+                      value={budgetFinderInput.totalBudget || 0}
+                      onChange={(e) => setBudgetFinderInput({...budgetFinderInput, totalBudget: parseInt(e.target.value) || 0})}
+                      className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:bg-white/20 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Travel Type</label>
+                  <select 
+                    value={budgetFinderInput.travelType || 'Solo'}
+                    onChange={(e) => setBudgetFinderInput({...budgetFinderInput, travelType: e.target.value})}
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 px-4 text-white outline-none focus:bg-white/20 transition-all appearance-none"
+                  >
+                    {["Solo", "Couple", "Family", "Friends"].map(t => <option key={t} value={t} className="bg-[#0A2540]">{t}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Duration</label>
+                  <select 
+                    value={budgetFinderInput.duration || '2-3 days'}
+                    onChange={(e) => setBudgetFinderInput({...budgetFinderInput, duration: e.target.value})}
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 px-4 text-white outline-none focus:bg-white/20 transition-all appearance-none"
+                  >
+                    {["1 day", "2-3 days", "4-5 days"].map(d => <option key={d} value={d} className="bg-[#0A2540]">{d}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={findBudgetDestinations}
+                  disabled={isFindingDestinations}
+                  className="bg-[#FF8A00] text-white px-12 py-4 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20 flex items-center gap-3 disabled:opacity-50"
+                >
+                  {isFindingDestinations ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+                  Find Destinations
+                </motion.button>
+              </div>
+            </div>
+          </div>
+
+          {/* Budget Results */}
+          <AnimatePresence>
+            {budgetResults.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              >
+                {budgetResults.map((result) => (
+                  <motion.div
+                    key={result.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-xl group"
+                  >
+                    <div className="h-48 relative overflow-hidden">
+                      <img src={result.destination_image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
+                        <span className="text-[#0A2540] font-black text-sm">{currency} {result.totalCost.toLocaleString()}</span>
+                      </div>
+                      <div className="absolute top-4 left-4 bg-blue-600/90 backdrop-blur-md px-3 py-1 rounded-full shadow-lg">
+                        <span className="text-white font-bold text-[10px] uppercase tracking-wider">{result.state}</span>
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <div className="space-y-1">
+                        <h4 className="text-xl font-bold text-[#0A2540]">{result.destination_name}</h4>
+                        <p className="text-gray-500 text-xs line-clamp-2">{result.desc}</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-blue-50 p-3 rounded-xl space-y-1">
+                          <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tight">Travel Cost</span>
+                          <p className="text-[#1E90FF] font-black text-sm">{currency} {result.travelCost.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-emerald-50 p-3 rounded-xl space-y-1">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight">Stay & Food</span>
+                          <p className="text-emerald-600 font-black text-sm">{currency} {(result.hotelCost + result.foodCost).toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs font-bold text-gray-400 px-1">
+                        <div className="flex items-center gap-1">
+                          <Clock size={12} />
+                          <span>{(result.tripDays || 0).toString()} Days</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Navigation size={12} />
+                          <span>{(result.distance || 0).toString()} km</span>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => {
+                          setLocationInput(result.destination_name);
+                          setTravelStyle(budgetFinderInput.travelType);
+                          setDuration(Number(result.tripDays) || 3);
+                          setSelectedBudgetTrip(result);
+                          handleGenerate(undefined, result);
+                        }}
+                        className="w-full py-4 bg-[#0A2540] text-white rounded-2xl font-black text-sm hover:bg-blue-600 transition-all shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2"
+                      >
+                        View Trip Plan
+                        <ArrowRight size={18} />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
 
         {/* Trending Destinations */}
@@ -1517,15 +1989,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <span className="text-gray-400">₹</span>
                     <input 
                       type="number" 
-                      value={userTotalBudget}
+                      value={userTotalBudget || 0}
                       onChange={async (e) => {
-                        const val = Number(e.target.value);
+                        const val = parseInt(e.target.value) || 0;
                         setUserTotalBudget(val);
                         if (user) {
                           try {
                             await updateDoc(doc(db, 'users', user.id), { totalBudget: val });
                           } catch (err) {
-                            console.error(err);
+                            handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
                           }
                         }
                       }}
@@ -1539,7 +2011,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 const totalEstimate = liveBudget.totalCost;
                 const remaining = userTotalBudget - totalEstimate;
                 const isOverBudget = remaining < 0;
-                const percentage = Math.min(100, (totalEstimate / userTotalBudget) * 100);
+                const percentage = Math.min(100, (totalEstimate / (userTotalBudget || 1)) * 100) || 0;
                 
                 const breakdown = [
                   { label: "Hotels", amount: liveBudget.hotelCost, icon: Briefcase, color: "bg-blue-500" },
@@ -1713,7 +2185,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     type="text" 
                     required
                     placeholder="John Doe"
-                    value={authForm.name}
+                    value={authForm.name || ''}
                     onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
                     className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                   />
@@ -1729,7 +2201,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   type="text" 
                   required
                   placeholder="name@example.com"
-                  value={authForm.email}
+                  value={authForm.email || ''}
                   onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
                   className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                 />
@@ -1744,7 +2216,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   type={showPassword ? "text" : "password"} 
                   required
                   placeholder="••••••••"
-                  value={authForm.password}
+                  value={authForm.password || ''}
                   onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
                   className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-14 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                 />
@@ -1921,7 +2393,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <h3 className="text-2xl font-serif font-bold text-slate-900">{trip.location}</h3>
                     <p className="text-slate-500 text-sm">{trip.start_location} → {trip.location}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{trip.duration} Days</p>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{(trip.duration || 0).toString()} Days</p>
                       <span className="text-slate-200">•</span>
                       <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                         {trip.created_at ? new Date(trip.created_at).toLocaleDateString() : 'Recently'}
@@ -1933,13 +2405,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       onClick={() => {
                         const shareData = {
                           title: `My Trip to ${trip.location}`,
-                          text: `Check out my ${trip.duration}-day ${trip.style} trip to ${trip.location} planned with TripGenious!`,
+                          text: `Check out my ${(trip.duration || 0).toString()}-day ${trip.style} trip to ${trip.location} planned with Travora!`,
                           url: window.location.href
                         };
                         if (navigator.share) {
                           navigator.share(shareData);
                         } else {
-                          alert("Sharing is not supported on this browser. Copy the URL to share!");
+                          showToast("Sharing is not supported on this browser. Copy the URL to share!", "info");
                         }
                       }}
                       className="text-slate-300 hover:text-blue-500 transition-colors"
@@ -1948,13 +2420,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     </button>
                     <button 
                       onClick={async () => {
-                        if (confirm("Are you sure you want to delete this trip?")) {
-                          try {
-                            await deleteDoc(doc(db, 'trips', trip.id));
-                          } catch (err) {
-                            console.error(err);
-                            alert("Failed to delete trip.");
-                          }
+                        try {
+                          await deleteDoc(doc(db, 'trips', trip.id));
+                        } catch (err) {
+                          handleFirestoreError(err, OperationType.DELETE, `trips/${trip.id}`);
                         }
                       }}
                       className="text-slate-300 hover:text-red-500 transition-colors"
@@ -2171,7 +2640,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       });
       setIsEditingProfile(false);
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
     } finally {
       setLoading(false);
     }
@@ -2215,7 +2684,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   type="text" 
-                  value={editForm.name}
+                  value={editForm.name || ''}
                   onChange={(e) => setEditForm({...editForm, name: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
                   placeholder="Your Name"
@@ -2229,7 +2698,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   type="text" 
-                  value={editForm.phone}
+                  value={editForm.phone || ''}
                   onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
                   placeholder="Your Phone"
@@ -2243,7 +2712,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   type="email" 
-                  value={user.email}
+                  value={user?.email || ''}
                   disabled
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-gray-400 font-bold outline-none cursor-not-allowed"
                 />
@@ -2480,6 +2949,112 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#0A2540]",
       activeTab === 'explore' ? "bg-white" : "bg-[#F5F7FA]"
     )}>
+      {/* Budget Trip Details Modal */}
+      <AnimatePresence>
+        {selectedBudgetTrip && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white rounded-[3rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setSelectedBudgetTrip(null)}
+                className="absolute top-6 right-6 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-all z-10"
+              >
+                <ArrowLeft size={20} />
+              </button>
+
+              <div className="h-64 relative">
+                <img src={selectedBudgetTrip.img} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent" />
+                <div className="absolute bottom-6 left-8">
+                  <h2 className="text-4xl font-serif font-black text-[#0A2540]">{selectedBudgetTrip.destination_name || selectedBudgetTrip.title}</h2>
+                  <p className="text-gray-600 font-medium">Suggested {(selectedBudgetTrip.tripDays || selectedBudgetTrip.days || 0).toString()} Day Trip</p>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Total Budget', value: `${currency} ${(selectedBudgetTrip.totalCost || 0).toLocaleString()}`, icon: Wallet, color: 'text-orange-500' },
+                    { label: 'Travel Cost', value: `${currency} ${(selectedBudgetTrip.travelCost || 0).toLocaleString()}`, icon: Navigation, color: 'text-blue-500' },
+                    { label: 'Daily Spend', value: `${currency} ${Math.round((selectedBudgetTrip.foodCost || 0) / (selectedBudgetTrip.tripDays || 1) / (selectedBudgetTrip.travelers || 1)).toLocaleString()}/p`, icon: Utensils, color: 'text-emerald-500' },
+                    { label: 'Distance', value: `${selectedBudgetTrip.distance || 0} km`, icon: MapPin, color: 'text-purple-500' }
+                  ].map((item, i) => (
+                    <div key={i} className="bg-gray-50 p-4 rounded-2xl space-y-1">
+                      <item.icon size={16} className={item.color} />
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{item.label}</p>
+                      <p className="text-[#0A2540] font-black text-sm">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold text-[#0A2540] flex items-center gap-2">
+                    <Sparkles className="text-orange-500" size={20} />
+                    Suggested Itinerary
+                  </h3>
+                  <div className="space-y-4 border-l-2 border-gray-100 ml-3 pl-6">
+                    {[
+                      { day: 'Day 1', title: 'Arrival & Local Exploration', desc: 'Arrive at destination, check-in to a budget hotel, and explore the city center.' },
+                      { day: 'Day 2', title: 'Major Attractions', desc: 'Visit the most famous landmarks and try local street food specialties.' },
+                      { day: 'Day 3', title: 'Hidden Gems & Departure', desc: 'Explore off-beat spots and shop for local souvenirs before heading back.' }
+                    ].slice(0, Math.ceil(selectedBudgetTrip.tripDays || selectedBudgetTrip.days || 3)).map((step, i) => (
+                      <div key={i} className="relative">
+                        <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-white border-4 border-orange-500 shadow-sm" />
+                        <h4 className="font-bold text-[#0A2540]">{step.day}: {step.title}</h4>
+                        <p className="text-gray-500 text-sm leading-relaxed">{step.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-[#0A2540] flex items-center gap-2">
+                      <Hotel className="text-blue-500" size={18} />
+                      Budget Stays
+                    </h3>
+                    <div className="bg-blue-50 p-4 rounded-2xl space-y-2">
+                      <p className="text-sm font-bold text-[#0A2540]">Recommended: Zostel or Local Guesthouses</p>
+                      <p className="text-xs text-gray-500">Estimated: {currency} {Math.round((selectedBudgetTrip.hotelCost || 0) / Math.max(1, (selectedBudgetTrip.tripDays || 1) - 1)).toLocaleString()} per night</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-[#0A2540] flex items-center gap-2">
+                      <Navigation2 className="text-emerald-500" size={18} />
+                      Travel Options
+                    </h3>
+                    <div className="bg-emerald-50 p-4 rounded-2xl space-y-2">
+                      <p className="text-sm font-bold text-[#0A2540]">Best Option: {selectedBudgetTrip.mode || 'Train/Bus'}</p>
+                      <p className="text-xs text-gray-500">Cost: {currency} {(selectedBudgetTrip.travelCost || 0).toLocaleString()} (Round Trip)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setLocationInput(selectedBudgetTrip.destination_name || selectedBudgetTrip.title);
+                    setDuration(Math.ceil(selectedBudgetTrip.tripDays || selectedBudgetTrip.days || 3));
+                    setSelectedBudgetTrip(null);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full bg-[#FF8A00] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20"
+                >
+                  Plan Full Itinerary with AI
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className={cn(
         "pt-6 pb-4 px-6 sticky top-0 z-40 transition-all duration-500",
@@ -2566,6 +3141,30 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         </AnimatePresence>
       </main>
 
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xs"
+          >
+            <div className={cn(
+              "p-4 rounded-2xl shadow-2xl border flex items-center gap-3",
+              toast.type === 'error' ? "bg-rose-50 border-rose-100 text-rose-600" :
+              toast.type === 'success' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+              "bg-blue-50 border-blue-100 text-blue-600"
+            )}>
+              {toast.type === 'error' ? <AlertTriangle size={20} /> :
+               toast.type === 'success' ? <Check size={20} /> :
+               <Info size={20} />}
+              <p className="text-sm font-bold">{toast.message}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sticky Bottom Navigation */}
       <nav className="fixed bottom-6 left-0 right-0 z-50 px-6">
         <div className="max-w-md mx-auto bg-white/90 backdrop-blur-xl border border-gray-100 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
@@ -2611,9 +3210,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 export default function App() {
   const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY;
   if (mapsKey) {
-    return <AppWithMaps mapsKey={mapsKey} />;
+    return (
+      <ErrorBoundary>
+        <AppWithMaps mapsKey={mapsKey} />
+      </ErrorBoundary>
+    );
   }
-  return <AppContent isLoaded={false} />;
+  return (
+    <ErrorBoundary>
+      <AppContent isLoaded={false} />
+    </ErrorBoundary>
+  );
 }
 
 function AppWithMaps({ mapsKey }: { mapsKey: string }) {
