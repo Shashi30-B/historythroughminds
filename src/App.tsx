@@ -284,7 +284,8 @@ const LocationInput = ({
   isLoaded,
   showLocationButton,
   onLocationDetect,
-  isLocating
+  isLocating,
+  variant = 'light'
 }: any) => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -293,8 +294,12 @@ const LocationInput = ({
 
   React.useEffect(() => {
     if (isLoaded && !service && window.google) {
-      setService(new google.maps.places.AutocompleteService());
-      setSessionToken(new google.maps.places.AutocompleteSessionToken());
+      try {
+        setService(new google.maps.places.AutocompleteService());
+        setSessionToken(new google.maps.places.AutocompleteSessionToken());
+      } catch (err) {
+        console.warn("Google Places Autocomplete service failed to initialize:", err);
+      }
     }
   }, [isLoaded]);
 
@@ -341,20 +346,24 @@ const LocationInput = ({
     setShowSuggestions(false);
     
     if (isLoaded && window.google) {
-      const placesService = new google.maps.places.PlacesService(document.createElement('div'));
-      placesService.getDetails(
-        { 
-          placeId: suggestion.place_id,
-          fields: ['geometry', 'formatted_address', 'name'],
-          sessionToken: sessionToken || undefined
-        },
-        (place: any, status: any) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-            onPlaceSelect(place);
-            setSessionToken(new google.maps.places.AutocompleteSessionToken());
+      try {
+        const placesService = new google.maps.places.PlacesService(document.createElement('div'));
+        placesService.getDetails(
+          { 
+            placeId: suggestion.place_id,
+            fields: ['geometry', 'formatted_address', 'name'],
+            sessionToken: sessionToken || undefined
+          },
+          (place: any, status: any) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+              onPlaceSelect(place);
+              setSessionToken(new google.maps.places.AutocompleteSessionToken());
+            }
           }
-        }
-      );
+        );
+      } catch (err) {
+        console.warn("PlacesService failed to initialize:", err);
+      }
     }
   };
 
@@ -364,7 +373,7 @@ const LocationInput = ({
         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</span>
       </div>
       <div className="absolute inset-y-0 left-5 flex items-center pt-5 pointer-events-none">
-        <Icon className="text-gray-300 group-focus-within:text-[#1E90FF] transition-colors" size={20} />
+        {Icon && <Icon className="text-gray-300 group-focus-within:text-[#1E90FF] transition-colors" size={20} />}
       </div>
       <input
         type="text"
@@ -373,7 +382,12 @@ const LocationInput = ({
         onFocus={() => value && suggestions.length > 0 && setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         placeholder={placeholder}
-        className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-14 pr-12 pt-8 pb-4 text-lg font-semibold text-[#0A2540] placeholder:text-gray-300 focus:ring-2 focus:ring-blue-100 focus:bg-white outline-none transition-all"
+        className={cn(
+          "w-full border rounded-2xl pl-14 pr-12 pt-8 pb-4 text-lg font-semibold placeholder:text-gray-300 outline-none transition-all",
+          variant === 'light' 
+            ? "bg-gray-50 border-gray-200 text-[#0A2540] focus:ring-2 focus:ring-blue-100 focus:bg-white" 
+            : "bg-white/10 border-white/20 text-white focus:bg-white/20"
+        )}
       />
       
       {showLocationButton && (
@@ -430,6 +444,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [headlineIndex, setHeadlineIndex] = useState(0);
 
   const headlines = ["Explore the World with Travora", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
+  const heroImages = [
+    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80", // Sea / Beach
+    "https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1920&q=80", // Waterfall
+    "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?auto=format&fit=crop&w=1920&q=80", // Desert
+    "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80"  // Mountains
+  ];
 
   useEffect(() => {
     async function testConnection() {
@@ -490,7 +510,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     startLocation: "",
     totalBudget: 20000,
     travelType: "Solo", // Solo, Couple, Family, Friends
-    duration: "2-3 days" // 1 day, 2-3 days, 4-5 days
+    duration: "2-3 days", // 1 day, 2-3 days, 4-5 days
+    budgetLevel: "Standard" // Standard, Luxury
   });
   const [budgetResults, setBudgetResults] = useState<any[]>([]);
   const [isFindingDestinations, setIsFindingDestinations] = useState(false);
@@ -509,6 +530,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [selectedBudgetTrip, setSelectedBudgetTrip] = useState<any | null>(null);
 
   const liveBudget = useMemo(() => {
+    if (selectedBudgetTrip && selectedBudgetTrip.destination_name === locationInput) {
+      return {
+        transportCost: selectedBudgetTrip.travelCost,
+        hotelCost: selectedBudgetTrip.hotelCost,
+        foodCost: selectedBudgetTrip.foodCost,
+        activitiesCost: selectedBudgetTrip.localTransport,
+        totalCost: selectedBudgetTrip.totalCost
+      };
+    }
+
     const transportRates: Record<string, number> = { public: 500, private: 2000, flight: 5000 };
     const hotelRates: Record<string, number> = { hostel: 800, standard: 2500, luxury: 8000 };
     const foodRates: Record<string, number> = { budget: 500, standard: 1200, luxury: 3000 };
@@ -602,7 +633,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             const { latitude, longitude } = position.coords;
             if (isLoaded && window.google) {
               const geocoder = new google.maps.Geocoder();
-              geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+              geocoder.geocode({ location: { lat: latitude, lng: longitude } }, async (results, status) => {
                 if (status === 'OK' && results && results[0]) {
                   const cityComponent = results[0].address_components.find(
                     (c: any) => c.types.includes('locality') || c.types.includes('administrative_area_level_2')
@@ -613,8 +644,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   if (cityComponent) {
                     setStartLocation(`${cityComponent.long_name}${stateComponent ? ', ' + stateComponent.long_name : ''}`);
                   }
+                  setIsLocating(false);
+                } else {
+                  // Fallback to Nominatim if Geocoding API fails or is blocked
+                  try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const data = await response.json();
+                    const city = data.address.city || data.address.town || data.address.village || data.address.suburb;
+                    const state = data.address.state || data.address.country;
+                    if (city) setStartLocation(`${city}${state ? ', ' + state : ''}`);
+                  } catch (err) {
+                    console.error("Nominatim fallback failed:", err);
+                  }
+                  setIsLocating(false);
                 }
-                setIsLocating(false);
               });
             } else {
               const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
@@ -1050,13 +1093,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         startLat = CITY_COORDS[lowerStart].lat;
         startLng = CITY_COORDS[lowerStart].lng;
       } else if (isLoaded && window.google) {
-        const geocoder = new google.maps.Geocoder();
-        const res = await new Promise<any>((resolve) => 
-          geocoder.geocode({ address: budgetFinderInput.startLocation }, (r) => resolve(r))
-        );
-        if (res && res[0]) {
-          startLat = res[0].geometry.location.lat();
-          startLng = res[0].geometry.location.lng();
+        try {
+          const geocoder = new google.maps.Geocoder();
+          const res = await new Promise<any>((resolve) => 
+            geocoder.geocode({ address: budgetFinderInput.startLocation }, (r, status) => {
+              if (status === 'OK') resolve(r);
+              else resolve(null);
+            })
+          );
+          if (res && res[0]) {
+            startLat = res[0].geometry.location.lat();
+            startLng = res[0].geometry.location.lng();
+          }
+        } catch (geoErr) {
+          console.warn("Geocoding failed, using default coordinates:", geoErr);
         }
       }
 
@@ -1110,6 +1160,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       // 3. Calculate costs for each destination using the new realistic algorithm
       const results = BUDGET_DESTINATIONS.map(dest => {
         const distance = distances[dest.id];
+        const estimatedTime = Math.round(distance / 60); // Average 60km/h
 
         // Travelers count
         let travelers = 1;
@@ -1121,31 +1172,41 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         const tripDays = dest.ideal_trip_duration_days;
         const nights = Math.max(0, tripDays - 1);
 
+        const luxuryMultiplier = budgetFinderInput.budgetLevel === 'Luxury' ? 2.5 : 1;
+
         // 1. Travel Cost = distance_km * 3 * 2
         const travelCost = distance * 3 * 2;
 
         // 2. Hotel Cost = average_hotel_price * nights
-        const hotelCost = dest.average_hotel_price_per_night * nights;
+        const hotelCost = dest.average_hotel_price_per_night * nights * luxuryMultiplier;
 
         // 3. Food Cost = days * 500 * travelers
-        const foodCost = tripDays * 500 * travelers;
+        const foodCost = tripDays * 500 * travelers * (budgetFinderInput.budgetLevel === 'Luxury' ? 3 : 1);
 
         // 4. Local Transport = 600
-        const localTransport = 600;
+        const localTransport = 600 * luxuryMultiplier;
 
         // Total trip cost: total_trip_cost = travel_cost + hotel_cost + food_cost + local_transport
         const totalCost = Math.round(travelCost + hotelCost + foodCost + localTransport);
 
+        // Suggested transport
+        let suggestedTransport = ["Train", "Bus"];
+        if (distance > 800) suggestedTransport = ["Flight", "Train"];
+        else if (distance > 400) suggestedTransport = ["Train", "Bus", "Car"];
+        else suggestedTransport = ["Bus", "Car", "Train"];
+
         return {
           ...dest,
           distance,
+          estimatedTime,
           travelCost,
           hotelCost,
           foodCost,
           localTransport,
           totalCost,
           tripDays,
-          travelers
+          travelers,
+          suggestedTransport
         };
       });
 
@@ -1280,18 +1341,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 1.5 }}
-                src={[
-                  "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80",
-                  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80",
-                  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80",
-                  "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80"
-                ][headlineIndex]} 
+                src={heroImages[headlineIndex]} 
                 alt="Travel Background"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </AnimatePresence>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[4px]" />
           </div>
 
           <div className="relative z-10 space-y-10 max-w-5xl w-full">
@@ -1432,7 +1488,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           : "bg-white border-gray-100 text-gray-500 hover:border-[#FF8A00] hover:text-[#FF8A00]"
                       )}
                     >
-                      <Icon size={16} />
+                      {Icon && <Icon size={16} />}
                       {style.label}
                     </button>
                   );
@@ -1503,16 +1559,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Starting From</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
-                    <input 
-                      type="text"
-                      value={budgetFinderInput.startLocation || ''}
-                      onChange={(e) => setBudgetFinderInput({...budgetFinderInput, startLocation: e.target.value})}
-                      placeholder="e.g. Mumbai"
-                      className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-blue-300/50 focus:bg-white/20 transition-all outline-none"
-                    />
-                  </div>
+                  <LocationInput
+                    value={budgetFinderInput.startLocation || ''}
+                    onChange={(val: string) => setBudgetFinderInput({...budgetFinderInput, startLocation: val})}
+                    onPlaceSelect={(place: any) => {
+                      if (place.formatted_address) setBudgetFinderInput({...budgetFinderInput, startLocation: place.formatted_address});
+                      else if (place.name) setBudgetFinderInput({...budgetFinderInput, startLocation: place.name});
+                    }}
+                    placeholder="e.g. Mumbai"
+                    label="From"
+                    icon={MapPin}
+                    isLoaded={isLoaded}
+                    variant="dark"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1540,13 +1599,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Duration</label>
+                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Budget Level</label>
                   <select 
-                    value={budgetFinderInput.duration || '2-3 days'}
-                    onChange={(e) => setBudgetFinderInput({...budgetFinderInput, duration: e.target.value})}
+                    value={budgetFinderInput.budgetLevel || 'Standard'}
+                    onChange={(e) => setBudgetFinderInput({...budgetFinderInput, budgetLevel: e.target.value})}
                     className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 px-4 text-white outline-none focus:bg-white/20 transition-all appearance-none"
                   >
-                    {["1 day", "2-3 days", "4-5 days"].map(d => <option key={d} value={d} className="bg-[#0A2540]">{d}</option>)}
+                    {["Standard", "Luxury"].map(l => <option key={l} value={l} className="bg-[#0A2540]">{l}</option>)}
                   </select>
                 </div>
               </div>
@@ -1605,17 +1664,37 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight">Stay & Food</span>
                           <p className="text-emerald-600 font-black text-sm">{currency} {(result.hotelCost + result.foodCost).toLocaleString()}</p>
                         </div>
+                        <div className="bg-purple-50 p-3 rounded-xl space-y-1">
+                          <span className="text-[10px] font-bold text-purple-400 uppercase tracking-tight">Hotel/Night</span>
+                          <p className="text-purple-600 font-black text-sm">{currency} {result.average_hotel_price_per_night.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-orange-50 p-3 rounded-xl space-y-1">
+                          <span className="text-[10px] font-bold text-orange-400 uppercase tracking-tight">Local Transport</span>
+                          <p className="text-orange-600 font-black text-sm">{currency} {result.localTransport.toLocaleString()}</p>
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between text-xs font-bold text-gray-400 px-1">
                         <div className="flex items-center gap-1">
                           <Clock size={12} />
-                          <span>{(result.tripDays || 0).toString()} Days</span>
+                          <span>{(result.tripDays || 0).toString()} Days ({result.estimatedTime}h)</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Navigation size={12} />
                           <span>{(result.distance || 0).toString()} km</span>
                         </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        {result.suggestedTransport?.map((mode: string, i: number) => {
+                          const Icon = mode === "Flight" ? Plane : mode === "Train" ? TrainFront : mode === "Bus" ? Bus : Car;
+                          return (
+                            <div key={i} className="px-3 py-1.5 rounded-lg bg-gray-50 flex items-center gap-2 text-gray-400 border border-gray-100">
+                              <Icon size={14} />
+                              <span className="text-[10px] font-bold uppercase tracking-widest">{mode}</span>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <button 
@@ -1853,6 +1932,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <span className="px-4 py-1.5 rounded-full text-[10px] font-bold text-white uppercase tracking-widest bg-emerald-500/20 backdrop-blur-md border border-emerald-500/30 text-emerald-300">
                       AI Optimized
                     </span>
+                    {routeSummary && (
+                      <span className="px-4 py-1.5 rounded-full text-[10px] font-bold text-white uppercase tracking-widest bg-blue-500/20 backdrop-blur-md border border-blue-500/30 text-blue-300">
+                        {routeSummary.distance} • {routeSummary.time}
+                      </span>
+                    )}
                   </motion.div>
                   <h2 className="text-4xl md:text-6xl font-bold text-[#0A2540] tracking-tight">{locationInput}</h2>
                 </div>
@@ -1944,16 +2028,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <h4 className="text-[#0A2540] font-bold text-2xl tracking-tight">Trip Insights</h4>
                   <div className="space-y-8">
                     {[
-                      { label: "Best Time", icon: Clock, value: "Oct - Mar", color: "text-orange-500" },
-                      { label: "Crowd Level", icon: Users, value: "Moderate", color: "text-[#1E90FF]" },
-                      { label: "Weather", icon: Thermometer, value: "Pleasant", color: "text-emerald-500" },
-                      { label: "Photo Spots", icon: Camera, value: "12+ Points", color: "text-pink-500" },
-                      { label: "Shopping", icon: ShoppingBag, value: "Local Crafts", color: "text-purple-500" },
-                      { label: "Pro Tip", icon: Lightbulb, value: "Book early!", color: "text-amber-500" }
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-5 group">
-                        <div className={cn("w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center transition-all group-hover:scale-110 group-hover:bg-white group-hover:shadow-md", item.color)}>
-                          <item.icon size={22} />
+                      { label: "Distance", icon: Navigation, value: routeSummary?.distance || "Calculating...", color: "text-blue-500" },
+                      { label: "Travel Time", icon: Clock, value: routeSummary?.time || "Calculating...", color: "text-orange-500" },
+                      { label: "Best Time", icon: Calendar, value: "Oct - Mar", color: "text-emerald-500" },
+                      { label: "Services", icon: Package, value: "Flight, Train, Bus", color: "text-purple-500" },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-5 group">
+                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110", item.color.replace('text-', 'bg-') + '/10')}>
+                          <item.icon className={item.color} size={24} />
                         </div>
                         <div className="space-y-0.5">
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.label}</p>
@@ -3058,9 +3140,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       {/* Header */}
       <header className={cn(
         "pt-6 pb-4 px-6 sticky top-0 z-40 transition-all duration-500",
-        activeTab === 'explore' 
-          ? "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm" 
-          : "bg-[#0A2540] border-b border-white/10"
+        "bg-[#0A1F44] border-b border-white/10 shadow-lg"
       )}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <motion.div 
@@ -3071,16 +3151,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             className="flex items-center gap-2 cursor-pointer group"
             onClick={() => setActiveTab('explore')}
           >
-            <div className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300",
-              activeTab === 'explore' ? "bg-[#0A2540]" : "bg-white"
-            )}>
-              <Compass className={activeTab === 'explore' ? "text-white" : "text-[#0A2540]"} size={24} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 bg-white">
+              <Compass className="text-[#0A1F44]" size={24} />
             </div>
-            <span className={cn(
-              "text-xl font-bold tracking-tight transition-colors duration-300",
-              activeTab === 'explore' ? "text-[#0A2540]" : "text-white"
-            )}>Travora</span>
+            <span className="text-xl font-bold tracking-tight text-white">Travora</span>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -3091,16 +3165,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <motion.div 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center border cursor-pointer overflow-hidden relative transition-all duration-300",
-                  activeTab === 'explore' ? "bg-gray-100 border-gray-200" : "bg-white/10 border-white/20"
-                )}
+                className="w-10 h-10 rounded-full flex items-center justify-center border cursor-pointer overflow-hidden relative transition-all duration-300 bg-white/10 border-white/20"
                 onClick={() => setActiveTab('profile')}
               >
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ProfileIcon className={activeTab === 'explore' ? "text-[#0A2540]" : "text-white"} size={20} />
+                  <ProfileIcon className="text-white" size={20} />
                 )}
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-10" />
               </motion.div>
@@ -3109,10 +3180,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveTab('profile')}
-                className={cn(
-                  "px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider",
-                  activeTab === 'explore' ? "bg-[#FF8A00] text-white" : "bg-white text-[#0A2540]"
-                )}
+                className="px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider bg-white text-[#0A1F44]"
               >
                 Login
               </motion.button>
@@ -3224,9 +3292,16 @@ export default function App() {
 }
 
 function AppWithMaps({ mapsKey }: { mapsKey: string }) {
-  const { isLoaded } = useLoadScript({
+  const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: mapsKey,
     libraries,
   });
+
+  if (loadError) {
+    console.error("Google Maps load error:", loadError);
+    // Fallback to AppContent without maps features if loading fails (e.g. ApiTargetBlockedMapError)
+    return <AppContent isLoaded={false} />;
+  }
+
   return <AppContent isLoaded={isLoaded} />;
 }
