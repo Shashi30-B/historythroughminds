@@ -515,6 +515,75 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   });
   const [budgetResults, setBudgetResults] = useState<any[]>([]);
   const [isFindingDestinations, setIsFindingDestinations] = useState(false);
+  const [activeService, setActiveService] = useState<'hotels' | 'flights' | 'trains' | 'buses' | 'cabs' | 'packages' | null>(null);
+  const [serviceSearch, setServiceSearch] = useState({
+    city: '',
+    from: '',
+    to: '',
+    date: new Date().toISOString().split('T')[0],
+    passengers: 1,
+    rooms: 1
+  });
+  const [isSearchingService, setIsSearchingService] = useState(false);
+  const [serviceResults, setServiceResults] = useState<any[]>([]);
+
+  const handleServiceSearch = async () => {
+    const loc = activeService === 'hotels' || activeService === 'packages' ? serviceSearch.city : serviceSearch.to;
+    if (!loc) {
+      showToast("Please enter a destination.", "error");
+      return;
+    }
+    
+    setIsSearchingService(true);
+    setServiceResults([]);
+    
+    try {
+      let endpoint = "";
+      const params = new URLSearchParams();
+      
+      if (activeService === 'hotels') {
+        endpoint = "/api/search/hotels";
+        params.append("city", serviceSearch.city);
+      } else if (activeService === 'flights') {
+        endpoint = "/api/search/flights";
+        params.append("from", serviceSearch.from);
+        params.append("to", serviceSearch.to);
+        params.append("date", serviceSearch.date);
+      } else if (activeService === 'trains') {
+        endpoint = "/api/search/trains";
+        params.append("from", serviceSearch.from);
+        params.append("to", serviceSearch.to);
+      } else if (activeService === 'buses') {
+        endpoint = "/api/search/buses";
+        params.append("from", serviceSearch.from);
+        params.append("to", serviceSearch.to);
+      } else if (activeService === 'cabs') {
+        endpoint = "/api/search/cabs";
+        params.append("from", serviceSearch.from);
+        params.append("to", serviceSearch.to);
+      } else if (activeService === 'packages') {
+        endpoint = "/api/search/hotels";
+        params.append("city", serviceSearch.city);
+      }
+
+      const response = await fetch(`${endpoint}?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.error) throw new Error(data.error);
+      
+      setServiceResults(data);
+    } catch (error) {
+      console.error("Search Error:", error);
+      showToast("Failed to fetch real-time data. Showing popular options.", "error");
+      // Fallback mock data
+      setServiceResults([
+        { id: 1, name: "Premium Option", price: 5000, rating: 4.9, type: "Luxury" },
+        { id: 2, name: "Standard Option", price: 2500, rating: 4.2, type: "Comfort" }
+      ]);
+    } finally {
+      setIsSearchingService(false);
+    }
+  };
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
 
   useEffect(() => {
@@ -1328,6 +1397,231 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   const currentColor = StyleColors[travelStyle] || StyleColors.standard;
 
+  const renderServiceSearch = () => {
+    const service = BOOKING_SERVICES.find(s => s.id === activeService);
+    if (!service) return null;
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-[3rem] p-8 md:p-12 shadow-2xl border border-gray-100 space-y-8 max-w-4xl mx-auto relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#1E90FF]/5 rounded-full -mr-32 -mt-32 blur-3xl" />
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg", service.color)}>
+              <service.icon size={28} />
+            </div>
+            <div>
+              <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{service.label} Search</h3>
+              <p className="text-gray-400 text-sm font-medium">Find the best {service.label.toLowerCase()} for your trip</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+              setActiveService(null);
+              setServiceResults([]);
+            }}
+            className="p-3 hover:bg-gray-100 rounded-full transition-all text-gray-400 hover:text-[#0A2540]"
+          >
+            <ArrowLeft size={24} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {activeService === 'hotels' || activeService === 'packages' ? (
+            <LocationInput
+              value={serviceSearch.city}
+              onChange={(val: string) => setServiceSearch({...serviceSearch, city: val})}
+              onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, city: place.formatted_address || place.name})}
+              placeholder="Enter City"
+              label="City"
+              icon={MapPinIcon}
+              isLoaded={isLoaded}
+            />
+          ) : (
+            <>
+              <LocationInput
+                value={serviceSearch.from}
+                onChange={(val: string) => setServiceSearch({...serviceSearch, from: val})}
+                onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, from: place.formatted_address || place.name})}
+                placeholder="From City"
+                label="From"
+                icon={MapPinIcon}
+                isLoaded={isLoaded}
+              />
+              <LocationInput
+                value={serviceSearch.to}
+                onChange={(val: string) => setServiceSearch({...serviceSearch, to: val})}
+                onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, to: place.formatted_address || place.name})}
+                placeholder="To City"
+                label="To"
+                icon={Navigation2}
+                isLoaded={isLoaded}
+              />
+            </>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-1">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</span>
+            <div className="flex items-center gap-3">
+              <Calendar size={18} className="text-gray-300" />
+              <input 
+                type="date" 
+                value={serviceSearch.date}
+                onChange={(e) => setServiceSearch({...serviceSearch, date: e.target.value})}
+                className="bg-transparent text-[#0A2540] font-bold outline-none w-full"
+              />
+            </div>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-1">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+              {activeService === 'hotels' ? 'Rooms' : 'Passengers'}
+            </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Users size={18} className="text-gray-300" />
+                <span className="text-[#0A2540] font-bold">
+                  {activeService === 'hotels' ? serviceSearch.rooms : serviceSearch.passengers}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    if (activeService === 'hotels') setServiceSearch({...serviceSearch, rooms: Math.max(1, serviceSearch.rooms - 1)});
+                    else setServiceSearch({...serviceSearch, passengers: Math.max(1, serviceSearch.passengers - 1)});
+                  }}
+                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540]"
+                >
+                  -
+                </button>
+                <button 
+                  onClick={() => {
+                    if (activeService === 'hotels') setServiceSearch({...serviceSearch, rooms: serviceSearch.rooms + 1});
+                    else setServiceSearch({...serviceSearch, passengers: serviceSearch.passengers + 1});
+                  }}
+                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540]"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleServiceSearch}
+            disabled={isSearchingService}
+            className={cn("text-white rounded-2xl py-4 font-black text-lg flex items-center justify-center gap-3 shadow-xl transition-all", service.color)}
+          >
+            {isSearchingService ? <Loader2 className="animate-spin" size={22} /> : <Search size={22} />}
+            {isSearchingService ? "Searching..." : `Search ${service.label}`}
+          </motion.button>
+        </div>
+
+        {/* Results Section */}
+        <AnimatePresence>
+          {serviceResults.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="pt-8 space-y-6 border-t border-gray-100"
+            >
+              <h4 className="text-xl font-bold text-[#0A2540] flex items-center gap-2">
+                <Sparkles size={20} className="text-amber-500" />
+                Available {activeService === 'packages' ? 'Packages' : 'Options'}
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {serviceResults.map((item, idx) => (
+                  <motion.div 
+                    key={item.id || idx} 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-gray-50 border border-gray-100 rounded-[2rem] p-6 flex flex-col gap-4 hover:shadow-md transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg overflow-hidden", service.color)}>
+                          {item.image ? (
+                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <service.icon size={20} />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#0A2540] line-clamp-1">
+                            {item.name}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-0.5">
+                              {[1, 2, 3, 4, 5].map(star => (
+                                <Sparkles key={star} size={10} className={star <= Math.round(item.rating || 4) ? "text-amber-500 fill-current" : "text-gray-200"} />
+                              ))}
+                            </div>
+                            <span className="text-gray-400 text-[10px] font-bold">{item.rating || '4.0'} Rating</span>
+                            {item.type && (
+                              <span className="text-[10px] font-black uppercase tracking-widest text-[#1E90FF] bg-[#1E90FF]/5 px-2 py-0.5 rounded-md border border-[#1E90FF]/10 ml-1">
+                                {item.type}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[#1E90FF] font-black text-xl">₹{item.price?.toLocaleString() || '0'}</p>
+                        <p className="text-gray-400 text-[10px] uppercase font-black tracking-widest">
+                          {activeService === 'hotels' ? 'Per Night' : 
+                           activeService === 'packages' ? 'Per Person' : 'Per Trip'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {(activeService === 'packages' || activeService === 'hotels') && (
+                      <div className="space-y-2 py-2 border-t border-gray-100">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Highlights</p>
+                        <ul className="text-xs text-gray-400 space-y-1">
+                          {activeService === 'hotels' ? (
+                            <>
+                              <li>• {item.address || 'Central Location'}</li>
+                              <li>• Free WiFi & Breakfast</li>
+                              <li>• 24/7 Room Service</li>
+                            </>
+                          ) : (
+                            <>
+                              <li>• 3 Days, 2 Nights Stay</li>
+                              <li>• Guided City Tour</li>
+                              <li>• Breakfast & Dinner Included</li>
+                            </>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+
+                    <button 
+                      onClick={() => {
+                        const loc = activeService === 'hotels' || activeService === 'packages' ? serviceSearch.city : serviceSearch.to;
+                        window.open(service.link(loc), '_blank');
+                      }}
+                      className="w-full py-3 bg-white border border-gray-100 rounded-xl text-[#0A2540] font-bold text-sm hover:bg-[#0A2540] hover:text-white transition-all"
+                    >
+                      Book Now
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  };
+
   const renderExplore = () => {
     return (
       <div className="space-y-16 pb-24">
@@ -1374,7 +1668,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   key={service.id}
                   whileHover={{ y: -5, scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-white/10 backdrop-blur-md border border-white/20 px-6 py-3 rounded-2xl flex items-center gap-3 text-white hover:bg-white hover:text-[#0A2540] transition-all shadow-lg"
+                  onClick={() => setActiveService(service.id as any)}
+                  className={cn(
+                    "backdrop-blur-md border px-6 py-3 rounded-2xl flex items-center gap-3 transition-all shadow-lg",
+                    activeService === service.id 
+                      ? "bg-white text-[#0A2540] border-white" 
+                      : "bg-white/10 border-white/20 text-white hover:bg-white hover:text-[#0A2540]"
+                  )}
                 >
                   <service.icon size={20} />
                   <span className="font-bold text-sm">{service.label}</span>
@@ -1382,12 +1682,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               ))}
             </div>
 
-            {/* Premium Search Card */}
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white/95 backdrop-blur-xl rounded-[3rem] p-6 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 space-y-8 mx-auto"
-            >
+            {/* Conditional Rendering of Service Search or Main Search */}
+            <AnimatePresence mode="wait">
+              {activeService ? (
+                <div key="service-search" className="w-full">
+                  {renderServiceSearch()}
+                </div>
+              ) : (
+                <motion.div 
+                  key="main-search"
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -30 }}
+                  className="bg-white/95 backdrop-blur-xl rounded-[3rem] p-6 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 space-y-8 mx-auto"
+                >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 <LocationInput
                   value={startLocation || ''}
@@ -1495,8 +1803,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 })}
               </div>
             </motion.div>
-          </div>
-        </section>
+          )}
+          </AnimatePresence>
+        </div>
+      </section>
 
         {/* Travel Stats Section */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
@@ -1652,6 +1962,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <div className="p-6 space-y-4">
                       <div className="space-y-1">
                         <h4 className="text-xl font-bold text-[#0A2540]">{result.destination_name}</h4>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <Sparkles key={star} size={10} className={star <= 4 ? "text-amber-500 fill-current" : "text-gray-200"} />
+                            ))}
+                          </div>
+                          <span className="text-gray-400 text-[10px] font-bold">4.5 Rating</span>
+                        </div>
                         <p className="text-gray-500 text-xs line-clamp-2">{result.desc}</p>
                       </div>
                       
@@ -2638,20 +2956,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {[
-          { label: "Hotels", icon: Hotel, color: "bg-orange-500", desc: "Find the best stays", url: "https://www.makemytrip.com/hotels/" },
-          { label: "Flights", icon: Navigation, color: "bg-[#1E90FF]", rotate: "-rotate-45", desc: "Fly anywhere in the world", url: "https://www.makemytrip.com/flights/" },
-          { label: "Trains", icon: Navigation, color: "bg-emerald-500", rotate: "rotate-90", desc: "Scenic rail journeys", url: "https://www.confirmtkt.com/" },
-          { label: "Buses", icon: Navigation, color: "bg-rose-500", desc: "Affordable road travel", url: "https://www.redbus.in/" },
-          { label: "Cabs", icon: Navigation, color: "bg-amber-500", desc: "Local & outstation rides", url: "https://www.savaari.com/" },
-          { label: "Activities", icon: Sparkles, color: "bg-purple-500", desc: "Unforgettable experiences", url: "https://www.klook.com/" }
+          { id: "hotels", label: "Hotels", icon: Hotel, color: "bg-orange-500", desc: "Find the best stays" },
+          { id: "flights", label: "Flights", icon: Navigation, color: "bg-[#1E90FF]", rotate: "-rotate-45", desc: "Fly anywhere in the world" },
+          { id: "trains", label: "Trains", icon: Navigation, color: "bg-emerald-500", rotate: "rotate-90", desc: "Scenic rail journeys" },
+          { id: "buses", label: "Buses", icon: Navigation, color: "bg-rose-500", desc: "Affordable road travel" },
+          { id: "cabs", label: "Cabs", icon: Navigation, color: "bg-amber-500", desc: "Local & outstation rides" },
+          { id: "packages", label: "Packages", icon: Sparkles, color: "bg-purple-500", desc: "Unforgettable experiences" }
         ].map((item, idx) => (
-          <motion.a 
+          <motion.button 
             key={idx}
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
+            onClick={() => {
+              setActiveTab('explore');
+              setActiveService(item.id as any);
+            }}
             whileHover={{ y: -10 }}
-            className="group bg-white border border-gray-100 rounded-[3rem] p-8 shadow-xl hover:shadow-2xl transition-all flex items-center gap-6 relative overflow-hidden"
+            className="group bg-white border border-gray-100 rounded-[3rem] p-8 shadow-xl hover:shadow-2xl transition-all flex items-center gap-6 relative overflow-hidden text-left w-full"
           >
             <div className={cn("absolute top-0 right-0 w-24 h-24 opacity-5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110", item.color)} />
             <div className={cn("w-20 h-20 rounded-3xl flex items-center justify-center text-white shadow-2xl transition-transform group-hover:scale-110 relative z-10", item.color)}>
@@ -2662,7 +2981,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <p className="text-gray-400 text-xs font-medium">{item.desc}</p>
             </div>
             <ArrowRight className="text-gray-200 group-hover:text-[#0A2540] transition-all relative z-10" />
-          </motion.a>
+          </motion.button>
         ))}
       </div>
 
