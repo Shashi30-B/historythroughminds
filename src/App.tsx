@@ -29,6 +29,205 @@ import { BUDGET_DESTINATIONS, type Destination } from './data/destinations';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
+const TRANSLATIONS: Record<string, any> = {
+  English: {
+    explore: "Explore",
+    trips: "Trips",
+    bookings: "Bookings",
+    wishlist: "Wishlist",
+    settings: "Settings",
+    planTrip: "Plan Your Perfect Trip",
+    search: "Search",
+    destinations: "Destinations",
+    profile: "Profile",
+    language: "Language",
+    currency: "Currency",
+    theme: "Theme",
+    notifications: "Notifications",
+    support: "Support",
+    logout: "Logout Account",
+    editProfile: "Edit Profile",
+    saveChanges: "Save Changes",
+    cancel: "Cancel",
+    contactSupport: "Contact Support",
+    emailSupport: "Email Support",
+    faq: "Help Center",
+    reportIssue: "Terms & Privacy",
+    flights: "Flights",
+    hotels: "Hotels",
+    packages: "Packages",
+    activities: "Activities",
+    edit: "Edit",
+    changePassword: "Change Password",
+    emailPhone: "Email / Phone",
+    addPhone: "Add phone",
+    budgetSummary: "Budget Summary",
+    totalEstimate: "Total Estimate",
+    perPerson: "Per Person",
+    perDay: "Per Day",
+    fullName: "Full Name",
+    phoneNumber: "Phone Number",
+    emailAddress: "Email Address",
+    emailNoChange: "Email cannot be changed",
+    tapToChangePhoto: "Tap to change photo",
+    needHelp: "Need help with booking?",
+    supportDesc: "Our travel experts are available 24/7 to assist you with your journey.",
+    headline1: "Explore the World with Travolor",
+    headline2: "Plan Your Perfect Journey",
+    headline3: "Discover Hidden Gems",
+    headline4: "Travel with Confidence"
+  },
+  Hindi: {
+    explore: "खोजें",
+    trips: "यात्राएं",
+    bookings: "बुकिंग",
+    wishlist: "इच्छासूची",
+    settings: "सेटिंग्स",
+    planTrip: "अपनी सही यात्रा की योजना बनाएं",
+    search: "खोजें",
+    destinations: "गंतव्य",
+    profile: "प्रोफ़ाइल",
+    language: "भाषा",
+    currency: "मुद्रा",
+    theme: "थीम",
+    notifications: "सूचनाएं",
+    support: "सहायता",
+    logout: "खाता लॉगआउट करें",
+    editProfile: "प्रोफ़ाइल संपादित करें",
+    saveChanges: "परिवर्तन सहेजें",
+    cancel: "रद्द करें",
+    contactSupport: "सहायता से संपर्क करें",
+    emailSupport: "ईमेल सहायता",
+    faq: "सहायता केंद्र",
+    reportIssue: "नियम और गोपनीयता",
+    flights: "उड़ानें",
+    hotels: "होटल",
+    packages: "पैकेज",
+    activities: "गतिविधियां",
+    edit: "संपादित करें",
+    changePassword: "पासवर्ड बदलें",
+    emailPhone: "ईमेल / फोन",
+    addPhone: "फोन जोड़ें",
+    budgetSummary: "बजट सारांश",
+    totalEstimate: "कुल अनुमान",
+    perPerson: "प्रति व्यक्ति",
+    perDay: "प्रति दिन",
+    fullName: "पूरा नाम",
+    phoneNumber: "फ़ोन नंबर",
+    emailAddress: "ईमेल पता",
+    emailNoChange: "ईमेल बदला नहीं जा सकता",
+    tapToChangePhoto: "फोटो बदलने के लिए टैप करें",
+    needHelp: "बुकिंग में मदद चाहिए?",
+    supportDesc: "हमारे यात्रा विशेषज्ञ आपकी यात्रा में सहायता के लिए 24/7 उपलब्ध हैं।",
+    headline1: "Travolor के साथ दुनिया की सैर करें",
+    headline2: "अपनी सही यात्रा की योजना बनाएं",
+    headline3: "छिपे हुए रत्नों की खोज करें",
+    headline4: "विश्वास के साथ यात्रा करें"
+  },
+  Spanish: {
+    explore: "Explorar",
+    trips: "Viajes",
+    bookings: "Reservas",
+    wishlist: "Favoritos",
+    settings: "Ajustes",
+    planTrip: "Planifica tu viaje perfecto",
+    search: "Buscar",
+    destinations: "Destinos",
+    profile: "Perfil",
+    language: "Idioma",
+    currency: "Moneda",
+    theme: "Tema",
+    notifications: "Notificaciones",
+    support: "Soporte",
+    logout: "Cerrar sesión",
+    editProfile: "Editar perfil",
+    saveChanges: "Guardar cambios",
+    cancel: "Cancelar",
+    contactSupport: "Contactar soporte",
+    emailSupport: "Soporte por email",
+    faq: "Centro de ayuda",
+    reportIssue: "Términos y privacidad",
+    flights: "Vuelos",
+    hotels: "Hoteles",
+    packages: "Paquetes",
+    activities: "Actividades",
+    edit: "Editar",
+    changePassword: "Cambiar contraseña",
+    emailPhone: "Correo / Teléfono",
+    addPhone: "Añadir teléfono",
+    budgetSummary: "Resumen del presupuesto",
+    totalEstimate: "Estimación total",
+    perPerson: "Por persona",
+    perDay: "Por día",
+    fullName: "Nombre completo",
+    phoneNumber: "Número de teléfono",
+    emailAddress: "Correo electrónico",
+    emailNoChange: "El correo no se puede cambiar",
+    tapToChangePhoto: "Toca para cambiar la foto",
+    needHelp: "¿Necesitas ayuda con la reserva?",
+    supportDesc: "Nuestros expertos en viajes están disponibles 24/7 para ayudarte en tu viaje.",
+    headline1: "Explora el mundo con Travolor",
+    headline2: "Planifica tu viaje perfecto",
+    headline3: "Descubre gemas ocultas",
+    headline4: "Viaja con confianza"
+  },
+  French: {
+    explore: "Explorer",
+    trips: "Voyages",
+    bookings: "Réservations",
+    wishlist: "Favoris",
+    settings: "Paramètres",
+    planTrip: "Planifiez votre voyage parfait",
+    search: "Rechercher",
+    destinations: "Destinations",
+    profile: "Profil",
+    language: "Langue",
+    currency: "Devise",
+    theme: "Thème",
+    notifications: "Notifications",
+    support: "Support",
+    logout: "Se déconnecter",
+    editProfile: "Modifier le profil",
+    saveChanges: "Sauvegarder",
+    cancel: "Annuler",
+    contactSupport: "Contacter le support",
+    emailSupport: "Support par email",
+    faq: "Centre d'aide",
+    reportIssue: "Conditions et confidentialité",
+    flights: "Vols",
+    hotels: "Hôtels",
+    packages: "Forfaits",
+    activities: "Activités",
+    edit: "Modifier",
+    changePassword: "Changer le mot de passe",
+    emailPhone: "Email / Téléphone",
+    addPhone: "Ajouter un téléphone",
+    budgetSummary: "Résumé du budget",
+    totalEstimate: "Estimation totale",
+    perPerson: "Par personne",
+    perDay: "Par jour",
+    fullName: "Nom complet",
+    phoneNumber: "Numéro de téléphone",
+    emailAddress: "Adresse e-mail",
+    emailNoChange: "L'e-mail ne peut pas être modifié",
+    tapToChangePhoto: "Appuyez pour changer la photo",
+    needHelp: "Besoin d'aide pour la réservation ?",
+    supportDesc: "Nos experts en voyages sont disponibles 24/7 pour vous aider dans votre voyage.",
+    headline1: "Explorez le monde avec Travolor",
+    headline2: "Planifiez votre voyage parfait",
+    headline3: "Découvrez des trésors cachés",
+    headline4: "Voyagez en toute confiance"
+  }
+};
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  "INR (₹)": "₹",
+  "USD ($)": "$",
+  "EUR (€)": "€",
+  "GBP (£)": "£",
+  "JPY (¥)": "¥"
+};
+
 import { auth, db } from './firebase';
 import { 
   onAuthStateChanged, 
@@ -304,40 +503,60 @@ const LocationInput = ({
   }, [isLoaded]);
 
   React.useEffect(() => {
-    if (service && value && value.length > 0 && !value.includes(',')) {
-      const timeoutId = setTimeout(() => {
-        service.getPlacePredictions(
-          { 
-            input: value, 
-            types: ['(cities)'],
-            sessionToken: sessionToken || undefined
-          },
-          (predictions: any, status: any) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-              setSuggestions(predictions);
-              setShowSuggestions(true);
-            } else {
-              // Fallback to local search if API fails or returns no results
-              const filtered = FALLBACK_CITIES.filter(c => 
-                c.description.toLowerCase().includes(value.toLowerCase())
-              );
-              setSuggestions(filtered);
-              setShowSuggestions(filtered.length > 0);
+    if (value && value.length > 0 && !value.includes(',')) {
+      const timeoutId = setTimeout(async () => {
+        if (service) {
+          service.getPlacePredictions(
+            { 
+              input: value, 
+              types: ['(cities)'],
+              sessionToken: sessionToken || undefined
+            },
+            (predictions: any, status: any) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                setSuggestions(predictions);
+                setShowSuggestions(true);
+              } else {
+                fetchBackendAutocomplete();
+              }
             }
-          }
-        );
+          );
+        } else {
+          fetchBackendAutocomplete();
+        }
       }, 200);
       return () => clearTimeout(timeoutId);
-    } else if (!service && value && value.length > 0 && !value.includes(',')) {
-      // Fallback if service is not available
-      const filtered = FALLBACK_CITIES.filter(c => 
-        c.description.toLowerCase().includes(value.toLowerCase())
-      );
-      setSuggestions(filtered);
-      setShowSuggestions(filtered.length > 0);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
+    }
+
+    async function fetchBackendAutocomplete() {
+      try {
+        const res = await fetch(`/api/search/autocomplete?input=${encodeURIComponent(value)}`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          setSuggestions(data.map((item: any) => ({
+            description: item.description,
+            place_id: item.id,
+            structured_formatting: { main_text: item.main_text }
+          })));
+          setShowSuggestions(true);
+        } else {
+          // Final fallback to local search
+          const filtered = FALLBACK_CITIES.filter(c => 
+            c.description.toLowerCase().includes(value.toLowerCase())
+          );
+          setSuggestions(filtered);
+          setShowSuggestions(filtered.length > 0);
+        }
+      } catch (err) {
+        const filtered = FALLBACK_CITIES.filter(c => 
+          c.description.toLowerCase().includes(value.toLowerCase())
+        );
+        setSuggestions(filtered);
+        setShowSuggestions(filtered.length > 0);
+      }
     }
   }, [value, service, sessionToken]);
 
@@ -443,7 +662,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [headlineIndex, setHeadlineIndex] = useState(0);
 
-  const headlines = ["Explore the World with Travora", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
+  const headlines = [t.headline1, t.headline2, t.headline3, t.headline4];
   const heroImages = [
     "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80", // Sea / Beach
     "https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1920&q=80", // Waterfall
@@ -504,6 +723,84 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [userTotalBudget, setUserTotalBudget] = useState<number>(50000);
   const [transportType, setTransportType] = useState("public"); // public, private, flight
   const [accommodationType, setAccommodationType] = useState("standard"); // hostel, standard, luxury
+  const [adminConfig, setAdminConfig] = useState<any>(null);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [adminLoginForm, setAdminLoginForm] = useState({ email: '', password: '' });
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/config')
+      .then(res => res.json())
+      .then(data => setAdminConfig(data))
+      .catch(err => console.error("Failed to fetch admin config:", err));
+  }, []);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('tripgenious_theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
+
+  const handleUpdatePreferences = async (updates: any) => {
+    if (!user) return;
+    try {
+      const res = await fetch('/api/user/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.id, ...updates })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.user);
+        if (updates.language) localStorage.setItem('tripgenious_lang', updates.language);
+        if (updates.currency) localStorage.setItem('tripgenious_currency', updates.currency);
+      }
+    } catch (err) {
+      console.error("Failed to update preferences:", err);
+    }
+  };
+
+  const fetchAdminStats = async () => {
+    try {
+      const res = await fetch('/api/admin/stats', {
+        headers: {
+          'Authorization': 'Bearer admin-token-123'
+        }
+      });
+      const data = await res.json();
+      setAdminStats(data);
+    } catch (err) {
+      console.error("Failed to fetch admin stats:", err);
+    }
+  };
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAdminLoading(true);
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(adminLoginForm)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAdminLoggedIn(true);
+        fetchAdminStats();
+        showToast("Admin logged in successfully", "success");
+      } else {
+        showToast(data.message || "Invalid admin credentials", "error");
+      }
+    } catch (err) {
+      showToast("Admin login failed", "error");
+    } finally {
+      setIsAdminLoading(false);
+    }
+  };
 
   // Budget Finder State
   const [budgetFinderInput, setBudgetFinderInput] = useState({
@@ -526,6 +823,29 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   });
   const [isSearchingService, setIsSearchingService] = useState(false);
   const [serviceResults, setServiceResults] = useState<any[]>([]);
+  const [attractions, setAttractions] = useState<any[]>([]);
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ INR: 1, USD: 0.012, EUR: 0.011, GBP: 0.0094, JPY: 1.8 });
+
+  useEffect(() => {
+    fetch('https://api.exchangerate-api.com/v4/latest/INR')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.rates) {
+          setExchangeRates(data.rates);
+        }
+      })
+      .catch(err => console.error("Failed to fetch exchange rates:", err));
+  }, []);
+
+  const t = useMemo(() => TRANSLATIONS[language] || TRANSLATIONS.English, [language]);
+
+  const formatPrice = (priceInINR: number) => {
+    const currencyCode = currency.split(' ')[0];
+    const rate = exchangeRates[currencyCode] || 1;
+    const symbol = CURRENCY_SYMBOLS[currency] || "₹";
+    const converted = (priceInINR * rate).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    return `${symbol}${converted}`;
+  };
 
   const handleServiceSearch = async () => {
     const loc = activeService === 'hotels' || activeService === 'packages' ? serviceSearch.city : serviceSearch.to;
@@ -566,12 +886,25 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         params.append("city", serviceSearch.city);
       }
 
+      if (user) {
+        params.append("userId", user.id.toString());
+      }
+
       const response = await fetch(`${endpoint}?${params.toString()}`);
       const data = await response.json();
       
       if (data.error) throw new Error(data.error);
       
       setServiceResults(data);
+
+      // Fetch attractions if it's a city-based search
+      if (activeService === 'hotels' || activeService === 'packages') {
+        const attrRes = await fetch(`/api/search/attractions?city=${serviceSearch.city}`);
+        const attrData = await attrRes.json();
+        setAttractions(attrData);
+      } else {
+        setAttractions([]);
+      }
     } catch (error) {
       console.error("Search Error:", error);
       showToast("Failed to fetch real-time data. Showing popular options.", "error");
@@ -1574,7 +1907,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-[#1E90FF] font-black text-xl">₹{item.price?.toLocaleString() || '0'}</p>
+                        <p className="text-[#1E90FF] font-black text-xl">{formatPrice(item.price || 0)}</p>
                         <p className="text-gray-400 text-[10px] uppercase font-black tracking-widest">
                           {activeService === 'hotels' ? 'Per Night' : 
                            activeService === 'packages' ? 'Per Person' : 'Per Trip'}
@@ -1582,15 +1915,26 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       </div>
                     </div>
                     
-                    {(activeService === 'packages' || activeService === 'hotels') && (
+                    {(activeService === 'packages' || activeService === 'hotels' || activeService === 'flights') && (
                       <div className="space-y-2 py-2 border-t border-gray-100">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Highlights</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                          {activeService === 'flights' ? 'Flight Details' : 'Highlights'}
+                        </p>
                         <ul className="text-xs text-gray-400 space-y-1">
                           {activeService === 'hotels' ? (
                             <>
                               <li>• {item.address || 'Central Location'}</li>
                               <li>• Free WiFi & Breakfast</li>
                               <li>• 24/7 Room Service</li>
+                            </>
+                          ) : activeService === 'flights' ? (
+                            <>
+                              <li className="flex justify-between">
+                                <span>Departure: <span className="text-[#0A2540] font-bold">{item.departure}</span></span>
+                                <span>Arrival: <span className="text-[#0A2540] font-bold">{item.arrival}</span></span>
+                              </li>
+                              <li>• Duration: <span className="text-[#0A2540] font-bold">{item.duration}</span></li>
+                              <li>• {item.type} Class</li>
                             </>
                           ) : (
                             <>
@@ -1615,6 +1959,37 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </motion.div>
                 ))}
               </div>
+
+              {attractions.length > 0 && (
+                <div className="pt-8 space-y-6">
+                  <h4 className="text-xl font-bold text-[#0A2540] flex items-center gap-2">
+                    <MapPin size={20} className="text-emerald-500" />
+                    Must-Visit Attractions in {serviceSearch.city}
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {attractions.map((attr) => (
+                      <motion.div 
+                        key={attr.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+                      >
+                        <div className="h-32 overflow-hidden relative">
+                          <img src={attr.image} alt={attr.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                          <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-lg flex items-center gap-1">
+                            <Sparkles size={10} className="text-amber-500 fill-current" />
+                            <span className="text-[10px] font-bold text-[#0A2540]">{attr.rating}</span>
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <p className="text-xs font-bold text-[#0A2540] line-clamp-1">{attr.name}</p>
+                          <p className="text-[10px] text-gray-400 line-clamp-1">{attr.address}</p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -1677,7 +2052,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   )}
                 >
                   <service.icon size={20} />
-                  <span className="font-bold text-sm">{service.label}</span>
+                  <span className="font-bold text-sm">{t[service.id] || service.label}</span>
                 </motion.button>
               ))}
             </div>
@@ -1778,7 +2153,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   className="bg-[#FF8A00] text-white rounded-2xl py-4 font-black text-lg flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-orange-500/20 transition-colors"
                 >
                   {loading ? <Loader2 className="animate-spin" size={22} /> : <Zap size={22} className="fill-current" />}
-                  {loading ? "Planning..." : "Start Journey"}
+                  {loading ? "Planning..." : t.search}
                 </motion.button>
               </div>
 
@@ -1885,7 +2260,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Total Budget (₹)</label>
+                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Total Budget ({CURRENCY_SYMBOLS[currency] || "₹"})</label>
                   <div className="relative">
                     <WalletIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
                     <input 
@@ -1984,7 +2359,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         </div>
                         <div className="bg-purple-50 p-3 rounded-xl space-y-1">
                           <span className="text-[10px] font-bold text-purple-400 uppercase tracking-tight">Hotel/Night</span>
-                          <p className="text-purple-600 font-black text-sm">{currency} {result.average_hotel_price_per_night.toLocaleString()}</p>
+                          <p className="text-purple-600 font-black text-sm">{formatPrice(result.average_hotel_price_per_night)}</p>
                         </div>
                         <div className="bg-orange-50 p-3 rounded-xl space-y-1">
                           <span className="text-[10px] font-bold text-orange-400 uppercase tracking-tight">Local Transport</span>
@@ -2316,20 +2691,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {/* Budget Summary Card */}
                 <div className="bg-[#0A2540] rounded-[3rem] p-8 md:p-10 shadow-xl text-white relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 opacity-70">Budget Summary</h4>
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 opacity-70">{t.budgetSummary}</h4>
                   <div className="space-y-8">
                     <div className="flex justify-between items-end">
-                      <span className="text-sm font-light opacity-80 tracking-wide">Total Estimate</span>
+                      <span className="text-sm font-light opacity-80 tracking-wide">{t.totalEstimate}</span>
                       <span className="text-4xl font-bold tracking-tighter">{formatPrice(liveBudget.totalCost)}</span>
                     </div>
                     <div className="h-px bg-white/20" />
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">Per Person</p>
+                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">{t.perPerson}</p>
                         <p className="text-xl font-bold">{formatPrice(liveBudget.totalCost / numPeople)}</p>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">Per Day</p>
+                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">{t.perDay}</p>
                         <p className="text-xl font-bold">{formatPrice(liveBudget.totalCost / duration)}</p>
                       </div>
                     </div>
@@ -2528,7 +2903,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 group-hover:rotate-6", service.color)}>
                       <service.icon className="text-white" size={28} />
                     </div>
-                    <span className="text-[#0A2540] font-bold text-xs uppercase tracking-[0.2em]">{service.label}</span>
+                    <span className="text-[#0A2540] font-bold text-xs uppercase tracking-[0.2em]">{t[service.id] || service.label}</span>
                     <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-full -mr-8 -mt-8" />
                   </motion.button>
                 ))}
@@ -2556,10 +2931,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group"
           >
             <div className="absolute inset-0 bg-gradient-to-tr from-[#0A1F44] to-[#1E90FF] opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity" />
-            <Plane className="text-[#0A1F44] -rotate-45 group-hover:rotate-0 transition-transform duration-500" size={40} />
+            <img src="/logo.png" alt="Travolor Logo" className="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-500" />
           </motion.div>
           <div className="space-y-1">
-            <h1 className="text-4xl font-serif font-black text-[#0A1F44] tracking-tight">TripGenious</h1>
+            <h1 className="text-4xl font-serif font-black text-[#0A1F44] tracking-tight">Travolor</h1>
             <p className="text-gray-400 font-medium text-sm tracking-wide">Plan Your Perfect Trip</p>
           </div>
         </div>
@@ -2805,7 +3180,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       onClick={() => {
                         const shareData = {
                           title: `My Trip to ${trip.location}`,
-                          text: `Check out my ${(trip.duration || 0).toString()}-day ${trip.style} trip to ${trip.location} planned with Travora!`,
+                          text: `Check out my ${(trip.duration || 0).toString()}-day ${trip.style} trip to ${trip.location} planned with Travolor!`,
                           url: window.location.href
                         };
                         if (navigator.share) {
@@ -2991,14 +3366,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         className="bg-white border border-gray-100 rounded-[3rem] p-12 text-center relative overflow-hidden group shadow-xl"
       >
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#1E90FF]/5 to-indigo-600/5 opacity-50" />
-        <h4 className="text-3xl font-serif font-black text-[#0A2540] mb-3 tracking-tight relative z-10">Need help with booking?</h4>
-        <p className="text-gray-500 text-lg mb-8 max-w-md mx-auto relative z-10 font-medium">Our travel experts are available 24/7 to assist you with your journey.</p>
+        <h4 className="text-3xl font-serif font-black text-[#0A2540] mb-3 tracking-tight relative z-10">{t.needHelp}</h4>
+        <p className="text-gray-500 text-lg mb-8 max-w-md mx-auto relative z-10 font-medium">{t.supportDesc}</p>
         <motion.button 
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
+          onClick={() => window.open(`tel:${adminConfig?.supportPhone || '+1 800 TRAVOLOR'}`, '_self')}
           className="bg-[#0A2540] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
         >
-          Contact Support
+          {t.contactSupport}
         </motion.button>
       </motion.div>
     </div>
@@ -3026,6 +3402,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     if (!user) return;
     setLoading(true);
     try {
+      // Update Firestore
       const userDocRef = doc(db, 'users', user.id);
       await updateDoc(userDocRef, {
         name: editForm.name,
@@ -3033,13 +3410,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         photo: editForm.photo
       });
       
-      setUser({
-        ...user,
-        name: editForm.name,
-        phone: editForm.phone,
-        photo: editForm.photo
+      // Update SQLite Backend
+      const res = await fetch('/api/user/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          name: editForm.name,
+          phone: editForm.phone,
+          photo: editForm.photo
+        })
       });
-      setIsEditingProfile(false);
+      const data = await res.json();
+
+      if (data.success) {
+        setUser(data.user);
+        setIsEditingProfile(false);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
     } finally {
@@ -3055,7 +3442,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <button onClick={() => setIsEditingProfile(false)} className="p-2 hover:bg-gray-100 rounded-full transition-all">
             <ArrowLeft size={24} className="text-[#0A2540]" />
           </button>
-          <h2 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">Edit Profile</h2>
+          <h2 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{t.editProfile}</h2>
         </div>
 
         <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
@@ -3074,13 +3461,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
               </label>
             </div>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Tap to change photo</p>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">{t.tapToChangePhoto}</p>
           </div>
 
           {/* Form Fields */}
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">{t.fullName}</label>
               <div className="relative">
                 <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
@@ -3088,13 +3475,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   value={editForm.name || ''}
                   onChange={(e) => setEditForm({...editForm, name: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
-                  placeholder="Your Name"
+                  placeholder={t.fullName}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Phone Number</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">{t.phoneNumber}</label>
               <div className="relative">
                 <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
@@ -3102,13 +3489,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   value={editForm.phone || ''}
                   onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
-                  placeholder="Your Phone"
+                  placeholder={t.phoneNumber}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Email Address</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">{t.emailAddress}</label>
               <div className="relative">
                 <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
@@ -3118,7 +3505,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-gray-400 font-bold outline-none cursor-not-allowed"
                 />
               </div>
-              <p className="text-[10px] text-gray-400 ml-4 italic">Email cannot be changed</p>
+              <p className="text-[10px] text-gray-400 ml-4 italic">{t.emailNoChange}</p>
             </div>
           </div>
 
@@ -3130,14 +3517,157 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               disabled={loading}
               className="w-full bg-[#0A2540] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:glow-blue transition-all disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Save Changes"}
+              {loading ? "Saving..." : t.saveChanges}
             </motion.button>
             <button 
               onClick={() => setIsEditingProfile(false)}
               className="w-full bg-white text-gray-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] border border-gray-100 hover:bg-gray-50 transition-all"
             >
-              Cancel
+              {t.cancel}
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdminPanel = () => {
+    if (!isAdminLoggedIn) {
+      return (
+        <div className="min-h-[80vh] flex items-center justify-center px-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white p-8 rounded-[3rem] shadow-2xl border border-gray-100 w-full max-w-md space-y-8"
+          >
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <ShieldCheck size={32} className="text-[#1E90FF]" />
+              </div>
+              <h2 className="text-3xl font-serif font-black text-[#0A2540]">Admin Login</h2>
+              <p className="text-gray-400 text-sm">Secure access to Travolor Dashboard</p>
+            </div>
+
+            <form onSubmit={handleAdminLogin} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input 
+                      type="email" 
+                      required
+                      value={adminLoginForm.email}
+                      onChange={(e) => setAdminLoginForm({...adminLoginForm, email: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-[#1E90FF] transition-all font-bold text-[#0A2540]"
+                      placeholder="admin@travolor.com"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input 
+                      type="password" 
+                      required
+                      value={adminLoginForm.password}
+                      onChange={(e) => setAdminLoginForm({...adminLoginForm, password: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-[#1E90FF] transition-all font-bold text-[#0A2540]"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                disabled={isAdminLoading}
+                className="w-full bg-[#0A1F44] text-white py-4 rounded-2xl font-black text-lg shadow-xl flex items-center justify-center gap-2"
+              >
+                {isAdminLoading ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
+                Login as Admin
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-12 pb-24 pt-8">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-4xl font-serif font-black text-[#0A2540]">Admin Dashboard</h2>
+            <p className="text-gray-400 font-medium">Real-time platform insights</p>
+          </div>
+          <button 
+            onClick={() => setIsAdminLoggedIn(false)}
+            className="px-6 py-2 bg-rose-50 text-rose-600 rounded-full font-bold text-sm hover:bg-rose-100 transition-all"
+          >
+            Logout
+          </button>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { label: "Total Users", value: adminStats?.users || 0, icon: Users, color: "text-blue-500", bg: "bg-blue-50" },
+            { label: "Travel Searches", value: adminStats?.searches || 0, icon: Search, color: "text-emerald-500", bg: "bg-emerald-50" },
+            { label: "API Requests", value: (adminStats?.apiUsage?.amadeus || 0) + (adminStats?.apiUsage?.googleMaps || 0), icon: Zap, color: "text-amber-500", bg: "bg-amber-50" }
+          ].map((stat, i) => (
+            <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
+              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", stat.bg)}>
+                <stat.icon className={stat.color} size={24} />
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs font-black uppercase tracking-widest">{stat.label}</p>
+                <p className="text-3xl font-black text-[#0A2540]">{stat.value.toLocaleString()}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Recent Bookings */}
+        <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+            <h3 className="text-xl font-bold text-[#0A2540]">Recent Bookings</h3>
+            <button onClick={fetchAdminStats} className="text-blue-500 text-sm font-bold hover:underline">Refresh</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-widest">
+                  <th className="px-8 py-4">User</th>
+                  <th className="px-8 py-4">Service</th>
+                  <th className="px-8 py-4">Details</th>
+                  <th className="px-8 py-4">Date</th>
+                  <th className="px-8 py-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {adminStats?.recentBookings?.map((booking: any) => (
+                  <tr key={booking.id} className="hover:bg-gray-50/50 transition-all">
+                    <td className="px-8 py-4 font-bold text-[#0A2540]">{booking.user_name}</td>
+                    <td className="px-8 py-4">
+                      <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                        {booking.type}
+                      </span>
+                    </td>
+                    <td className="px-8 py-4 text-sm text-gray-500">{booking.title}</td>
+                    <td className="px-8 py-4 text-sm text-gray-400">{booking.date}</td>
+                    <td className="px-8 py-4">
+                      <span className="text-emerald-500 font-bold text-sm">{booking.status}</span>
+                    </td>
+                  </tr>
+                ))}
+                {(!adminStats?.recentBookings || adminStats.recentBookings.length === 0) && (
+                  <tr>
+                    <td colSpan={5} className="px-8 py-12 text-center text-gray-400 font-medium">No recent bookings found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -3152,7 +3682,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <div className="space-y-12 pb-24 px-4 md:px-0">
         {/* Header Section */}
         <div className="text-center space-y-2 pt-8">
-          <h2 className="text-4xl font-serif font-black text-[#0A2540] tracking-tight">Settings</h2>
+          <h2 className="text-4xl font-serif font-black text-[#0A2540] tracking-tight">{t.settings}</h2>
           <p className="text-gray-400 text-sm font-medium">Manage your account and preferences</p>
         </div>
 
@@ -3180,13 +3710,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 onClick={startEditing}
                 className="text-[#1E90FF] font-black text-[10px] uppercase tracking-widest px-4 py-2 bg-white rounded-full border border-blue-50 hover:bg-blue-50 transition-all"
               >
-                Edit
+                {t.edit}
               </button>
             </div>
 
             {[
-              { label: "Change Password", icon: Lock, color: "text-amber-500" },
-              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone" }
+              { label: t.changePassword, icon: Lock, color: "text-amber-500" },
+              { label: t.emailPhone, icon: Mail, color: "text-emerald-500", detail: user.phone || t.addPhone }
             ].map((item, idx) => (
               <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
                 <div className="flex items-center gap-4">
@@ -3208,12 +3738,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
             <Settings className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">Preferences</h3>
+            <h3 className="text-lg font-bold text-[#0A2540]">{t.settings}</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
-              { label: "Language", icon: Languages, color: "text-blue-500", value: language, options: ["English", "Marathi", "Hindi"], onChange: setLanguage },
-              { label: "Currency", icon: WalletIcon, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)"], onChange: setCurrency }
+              { label: t.language, icon: Languages, color: "text-blue-500", value: language, options: ["English", "Marathi", "Hindi", "Spanish", "French"], onChange: (val: string) => { setLanguage(val); handleUpdatePreferences({ language: val }); } },
+              { label: t.currency, icon: WalletIcon, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)", "GBP (£)", "JPY (¥)"], onChange: (val: string) => { setCurrency(val); handleUpdatePreferences({ currency: val }); } }
             ].map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
                 <div className="flex items-center gap-4">
@@ -3240,10 +3770,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                   <Bell size={20} className="text-amber-500" />
                 </div>
-                <span className="text-[#0A2540] font-bold text-sm">Notifications</span>
+                <span className="text-[#0A2540] font-bold text-sm">{t.notifications}</span>
               </div>
               <button 
-                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                onClick={() => {
+                  const newVal = !notificationsEnabled;
+                  setNotificationsEnabled(newVal);
+                  handleUpdatePreferences({ notifications: newVal ? 1 : 0 });
+                }}
                 className={cn(
                   "w-12 h-6 rounded-full transition-all relative p-1",
                   notificationsEnabled ? "bg-emerald-500" : "bg-gray-200"
@@ -3262,10 +3796,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                   {isDarkMode ? <Moon size={20} className="text-indigo-500" /> : <Sun size={20} className="text-orange-500" />}
                 </div>
-                <span className="text-[#0A2540] font-bold text-sm">Theme</span>
+                <span className="text-[#0A2540] font-bold text-sm">{t.theme}</span>
               </div>
               <button 
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={() => {
+                  const newVal = !isDarkMode;
+                  setIsDarkMode(newVal);
+                  handleUpdatePreferences({ theme: newVal ? 'dark' : 'light' });
+                }}
                 className="bg-gray-50 px-4 py-2 rounded-xl text-[#0A2540] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all border border-gray-100"
               >
                 {isDarkMode ? "Dark" : "Light"}
@@ -3310,15 +3848,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
             <HelpCircle className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">Support</h3>
+            <h3 className="text-lg font-bold text-[#0A2540]">{t.support}</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
-              { label: "Help Center", icon: HelpCircle, color: "text-blue-500" },
-              { label: "Contact Support", icon: Phone, color: "text-emerald-500" },
-              { label: "Terms & Privacy", icon: ShieldCheck, color: "text-slate-500" }
+              { label: t.contactSupport, icon: Phone, color: "text-blue-500", action: () => window.location.href = `tel:${adminConfig?.supportPhone || '1800-123-4567'}` },
+              { label: t.emailSupport, icon: Mail, color: "text-emerald-500", action: () => window.location.href = `mailto:${adminConfig?.supportEmail || 'support@travolor.com'}` },
+              { label: t.helpCenter, icon: HelpCircle, color: "text-amber-500", action: () => window.open('https://travolor.com/faq', '_blank') },
+              { label: t.termsPrivacy, icon: Shield, color: "text-indigo-500", action: () => window.open('https://travolor.com/terms', '_blank') }
             ].map((item, idx) => (
-              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
+              <button key={idx} onClick={item.action} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
@@ -3339,7 +3878,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           className="w-full bg-rose-50 border border-rose-100 text-rose-600 py-5 rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-rose-600 hover:text-white transition-all shadow-sm group"
         >
           <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-          Logout Account
+          {t.logout}
         </motion.button>
       </div>
     );
@@ -3470,10 +4009,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             className="flex items-center gap-2 cursor-pointer group"
             onClick={() => setActiveTab('explore')}
           >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 bg-white">
-              <Compass className="text-[#0A1F44]" size={24} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 bg-white overflow-hidden">
+              <img src="/logo.png" alt="Travolor Logo" className="w-full h-full object-cover" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">Travora</span>
+            <span className="text-xl font-bold tracking-tight text-white">Travolor</span>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -3524,9 +4063,73 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {activeTab === 'trips' && renderMyTrips()}
             {activeTab === 'bookings' && renderBookings()}
             {activeTab === 'profile' && renderProfile()}
+            {activeTab === 'admin' && renderAdminPanel()}
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-[#0A1F44] pt-20 pb-12 px-6 mt-20">
+        <div className="max-w-6xl mx-auto space-y-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+            <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center overflow-hidden">
+                  <img src="/logo.png" alt="Travolor Logo" className="w-full h-full object-cover" />
+                </div>
+                <span className="text-xl font-bold text-white">Travolor</span>
+              </div>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Making travel smarter, easier, and more accessible with AI-powered planning and real-time insights.
+              </p>
+            </div>
+            
+            <div className="space-y-6">
+              <h4 className="text-white font-bold uppercase tracking-widest text-xs">Quick Links</h4>
+              <ul className="space-y-4 text-white/60 text-sm">
+                <li><button onClick={() => setActiveTab('explore')} className="hover:text-white transition-all">Explore</button></li>
+                <li><button onClick={() => setActiveTab('trips')} className="hover:text-white transition-all">My Trips</button></li>
+                <li><button onClick={() => setActiveTab('bookings')} className="hover:text-white transition-all">Bookings</button></li>
+                <li><button onClick={() => setActiveTab('profile')} className="hover:text-white transition-all">Settings</button></li>
+              </ul>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-white font-bold uppercase tracking-widest text-xs">Support</h4>
+              <ul className="space-y-4 text-white/60 text-sm">
+                <li><span className="flex items-center gap-2"><Mail size={14} /> {adminConfig?.supportEmail || 'support@travolor.com'}</span></li>
+                <li><span className="flex items-center gap-2"><Phone size={14} /> {adminConfig?.supportPhone || '+1 800 TRAVOLOR'}</span></li>
+                <li><button className="hover:text-white transition-all">Help Center</button></li>
+                <li><button className="hover:text-white transition-all">Privacy Policy</button></li>
+              </ul>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-white font-bold uppercase tracking-widest text-xs">Admin</h4>
+              <p className="text-white/60 text-sm">
+                Managed by {adminConfig?.adminName || 'Admin'}<br/>
+                {adminConfig?.companyName || 'Travolor'} Inc.
+              </p>
+              <button 
+                onClick={() => setActiveTab('admin')}
+                className="text-white/40 hover:text-white text-[10px] font-black uppercase tracking-widest border border-white/10 px-4 py-2 rounded-lg transition-all"
+              >
+                Admin Panel
+              </button>
+            </div>
+          </div>
+          
+          <div className="pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
+            <p className="text-white/40 text-xs font-medium">
+              © {new Date().getFullYear()} {adminConfig?.companyName || 'Travolor'}. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6">
+              <Share2 size={18} className="text-white/40 hover:text-white cursor-pointer transition-all" />
+              <Github size={18} className="text-white/40 hover:text-white cursor-pointer transition-all" />
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Toast Notification */}
       <AnimatePresence>
@@ -3556,10 +4159,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <nav className="fixed bottom-6 left-0 right-0 z-50 px-6">
         <div className="max-w-md mx-auto bg-white/90 backdrop-blur-xl border border-gray-100 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
           {[
-            { id: "explore", icon: Globe, label: "Explore" },
-            { id: "trips", icon: MapIcon, label: "Trips" },
-            { id: "bookings", icon: BookingIcon, label: "Bookings" },
-            { id: "profile", icon: Settings, label: "Settings" }
+            { id: "explore", icon: Globe, label: t.explore },
+            { id: "trips", icon: MapIcon, label: t.trips },
+            { id: "bookings", icon: BookingIcon, label: t.bookings },
+            { id: "profile", icon: Settings, label: t.settings }
           ].map((tab) => (
             <button
               key={tab.id}
