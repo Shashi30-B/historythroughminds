@@ -10,14 +10,14 @@ import {
   Utensils, Hotel, Navigation, Sparkles, Loader2, 
   User, Users, Heart, Users2, Church, Trees, Castle,
   Clock, Thermometer, Info, ExternalLink, Compass,
-  Mountain, Briefcase, Crown, Wallet as WalletIcon,
-  Home, Globe, Briefcase as BookingIcon, User as ProfileIcon,
+  Mountain, Briefcase, Crown,
+  Home, Globe,
   ArrowRight, ArrowLeft, Camera, ShoppingBag, Lightbulb,
   Bell, Moon, Sun, Languages, LogOut, Settings, HelpCircle, ShieldCheck, Phone,
   AlertTriangle, Check,
   Mail, Lock, Eye, EyeOff, Github, Share2,
   Plane, TrainFront, Bus, Car, Package,
-  GripVertical, MapPin as MapPinIcon, Navigation2, Zap
+  GripVertical, Navigation2, Zap
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
@@ -28,205 +28,6 @@ import { TRAVEL_STYLES } from './constants';
 import { BUDGET_DESTINATIONS, type Destination } from './data/destinations';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
-
-const TRANSLATIONS: Record<string, any> = {
-  English: {
-    explore: "Explore",
-    trips: "Trips",
-    bookings: "Bookings",
-    wishlist: "Wishlist",
-    settings: "Settings",
-    planTrip: "Plan Your Perfect Trip",
-    search: "Search",
-    destinations: "Destinations",
-    profile: "Profile",
-    language: "Language",
-    currency: "Currency",
-    theme: "Theme",
-    notifications: "Notifications",
-    support: "Support",
-    logout: "Logout Account",
-    editProfile: "Edit Profile",
-    saveChanges: "Save Changes",
-    cancel: "Cancel",
-    contactSupport: "Contact Support",
-    emailSupport: "Email Support",
-    faq: "Help Center",
-    reportIssue: "Terms & Privacy",
-    flights: "Flights",
-    hotels: "Hotels",
-    packages: "Packages",
-    activities: "Activities",
-    edit: "Edit",
-    changePassword: "Change Password",
-    emailPhone: "Email / Phone",
-    addPhone: "Add phone",
-    budgetSummary: "Budget Summary",
-    totalEstimate: "Total Estimate",
-    perPerson: "Per Person",
-    perDay: "Per Day",
-    fullName: "Full Name",
-    phoneNumber: "Phone Number",
-    emailAddress: "Email Address",
-    emailNoChange: "Email cannot be changed",
-    tapToChangePhoto: "Tap to change photo",
-    needHelp: "Need help with booking?",
-    supportDesc: "Our travel experts are available 24/7 to assist you with your journey.",
-    headline1: "Explore the World with Travolor",
-    headline2: "Plan Your Perfect Journey",
-    headline3: "Discover Hidden Gems",
-    headline4: "Travel with Confidence"
-  },
-  Hindi: {
-    explore: "खोजें",
-    trips: "यात्राएं",
-    bookings: "बुकिंग",
-    wishlist: "इच्छासूची",
-    settings: "सेटिंग्स",
-    planTrip: "अपनी सही यात्रा की योजना बनाएं",
-    search: "खोजें",
-    destinations: "गंतव्य",
-    profile: "प्रोफ़ाइल",
-    language: "भाषा",
-    currency: "मुद्रा",
-    theme: "थीम",
-    notifications: "सूचनाएं",
-    support: "सहायता",
-    logout: "खाता लॉगआउट करें",
-    editProfile: "प्रोफ़ाइल संपादित करें",
-    saveChanges: "परिवर्तन सहेजें",
-    cancel: "रद्द करें",
-    contactSupport: "सहायता से संपर्क करें",
-    emailSupport: "ईमेल सहायता",
-    faq: "सहायता केंद्र",
-    reportIssue: "नियम और गोपनीयता",
-    flights: "उड़ानें",
-    hotels: "होटल",
-    packages: "पैकेज",
-    activities: "गतिविधियां",
-    edit: "संपादित करें",
-    changePassword: "पासवर्ड बदलें",
-    emailPhone: "ईमेल / फोन",
-    addPhone: "फोन जोड़ें",
-    budgetSummary: "बजट सारांश",
-    totalEstimate: "कुल अनुमान",
-    perPerson: "प्रति व्यक्ति",
-    perDay: "प्रति दिन",
-    fullName: "पूरा नाम",
-    phoneNumber: "फ़ोन नंबर",
-    emailAddress: "ईमेल पता",
-    emailNoChange: "ईमेल बदला नहीं जा सकता",
-    tapToChangePhoto: "फोटो बदलने के लिए टैप करें",
-    needHelp: "बुकिंग में मदद चाहिए?",
-    supportDesc: "हमारे यात्रा विशेषज्ञ आपकी यात्रा में सहायता के लिए 24/7 उपलब्ध हैं।",
-    headline1: "Travolor के साथ दुनिया की सैर करें",
-    headline2: "अपनी सही यात्रा की योजना बनाएं",
-    headline3: "छिपे हुए रत्नों की खोज करें",
-    headline4: "विश्वास के साथ यात्रा करें"
-  },
-  Spanish: {
-    explore: "Explorar",
-    trips: "Viajes",
-    bookings: "Reservas",
-    wishlist: "Favoritos",
-    settings: "Ajustes",
-    planTrip: "Planifica tu viaje perfecto",
-    search: "Buscar",
-    destinations: "Destinos",
-    profile: "Perfil",
-    language: "Idioma",
-    currency: "Moneda",
-    theme: "Tema",
-    notifications: "Notificaciones",
-    support: "Soporte",
-    logout: "Cerrar sesión",
-    editProfile: "Editar perfil",
-    saveChanges: "Guardar cambios",
-    cancel: "Cancelar",
-    contactSupport: "Contactar soporte",
-    emailSupport: "Soporte por email",
-    faq: "Centro de ayuda",
-    reportIssue: "Términos y privacidad",
-    flights: "Vuelos",
-    hotels: "Hoteles",
-    packages: "Paquetes",
-    activities: "Actividades",
-    edit: "Editar",
-    changePassword: "Cambiar contraseña",
-    emailPhone: "Correo / Teléfono",
-    addPhone: "Añadir teléfono",
-    budgetSummary: "Resumen del presupuesto",
-    totalEstimate: "Estimación total",
-    perPerson: "Por persona",
-    perDay: "Por día",
-    fullName: "Nombre completo",
-    phoneNumber: "Número de teléfono",
-    emailAddress: "Correo electrónico",
-    emailNoChange: "El correo no se puede cambiar",
-    tapToChangePhoto: "Toca para cambiar la foto",
-    needHelp: "¿Necesitas ayuda con la reserva?",
-    supportDesc: "Nuestros expertos en viajes están disponibles 24/7 para ayudarte en tu viaje.",
-    headline1: "Explora el mundo con Travolor",
-    headline2: "Planifica tu viaje perfecto",
-    headline3: "Descubre gemas ocultas",
-    headline4: "Viaja con confianza"
-  },
-  French: {
-    explore: "Explorer",
-    trips: "Voyages",
-    bookings: "Réservations",
-    wishlist: "Favoris",
-    settings: "Paramètres",
-    planTrip: "Planifiez votre voyage parfait",
-    search: "Rechercher",
-    destinations: "Destinations",
-    profile: "Profil",
-    language: "Langue",
-    currency: "Devise",
-    theme: "Thème",
-    notifications: "Notifications",
-    support: "Support",
-    logout: "Se déconnecter",
-    editProfile: "Modifier le profil",
-    saveChanges: "Sauvegarder",
-    cancel: "Annuler",
-    contactSupport: "Contacter le support",
-    emailSupport: "Support par email",
-    faq: "Centre d'aide",
-    reportIssue: "Conditions et confidentialité",
-    flights: "Vols",
-    hotels: "Hôtels",
-    packages: "Forfaits",
-    activities: "Activités",
-    edit: "Modifier",
-    changePassword: "Changer le mot de passe",
-    emailPhone: "Email / Téléphone",
-    addPhone: "Ajouter un téléphone",
-    budgetSummary: "Résumé du budget",
-    totalEstimate: "Estimation totale",
-    perPerson: "Par personne",
-    perDay: "Par jour",
-    fullName: "Nom complet",
-    phoneNumber: "Numéro de téléphone",
-    emailAddress: "Adresse e-mail",
-    emailNoChange: "L'e-mail ne peut pas être modifié",
-    tapToChangePhoto: "Appuyez pour changer la photo",
-    needHelp: "Besoin d'aide pour la réservation ?",
-    supportDesc: "Nos experts en voyages sont disponibles 24/7 pour vous aider dans votre voyage.",
-    headline1: "Explorez le monde avec Travolor",
-    headline2: "Planifiez votre voyage parfait",
-    headline3: "Découvrez des trésors cachés",
-    headline4: "Voyagez en toute confiance"
-  }
-};
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  "INR (₹)": "₹",
-  "USD ($)": "$",
-  "EUR (€)": "€",
-  "GBP (£)": "£",
-  "JPY (¥)": "¥"
-};
 
 import { auth, db } from './firebase';
 import { 
@@ -369,7 +170,7 @@ const StyleColors: Record<string, { bg: string; text: string; border: string; li
 };
 
 const IconMap: Record<string, any> = {
-  Wallet: WalletIcon,
+  Wallet: Wallet,
   Briefcase,
   Crown,
   Compass,
@@ -662,7 +463,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [headlineIndex, setHeadlineIndex] = useState(0);
 
-  const headlines = [t.headline1, t.headline2, t.headline3, t.headline4];
+  const headlines = ["Explore the World with Travolor", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
   const heroImages = [
     "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80", // Sea / Beach
     "https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1920&q=80", // Waterfall
@@ -736,34 +537,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       .catch(err => console.error("Failed to fetch admin config:", err));
   }, []);
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('tripgenious_theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
-
-  const handleUpdatePreferences = async (updates: any) => {
-    if (!user) return;
-    try {
-      const res = await fetch('/api/user/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id, ...updates })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUser(data.user);
-        if (updates.language) localStorage.setItem('tripgenious_lang', updates.language);
-        if (updates.currency) localStorage.setItem('tripgenious_currency', updates.currency);
-      }
-    } catch (err) {
-      console.error("Failed to update preferences:", err);
-    }
-  };
-
   const fetchAdminStats = async () => {
     try {
       const res = await fetch('/api/admin/stats', {
@@ -824,28 +597,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [isSearchingService, setIsSearchingService] = useState(false);
   const [serviceResults, setServiceResults] = useState<any[]>([]);
   const [attractions, setAttractions] = useState<any[]>([]);
-  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ INR: 1, USD: 0.012, EUR: 0.011, GBP: 0.0094, JPY: 1.8 });
-
-  useEffect(() => {
-    fetch('https://api.exchangerate-api.com/v4/latest/INR')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.rates) {
-          setExchangeRates(data.rates);
-        }
-      })
-      .catch(err => console.error("Failed to fetch exchange rates:", err));
-  }, []);
-
-  const t = useMemo(() => TRANSLATIONS[language] || TRANSLATIONS.English, [language]);
-
-  const formatPrice = (priceInINR: number) => {
-    const currencyCode = currency.split(' ')[0];
-    const rate = exchangeRates[currencyCode] || 1;
-    const symbol = CURRENCY_SYMBOLS[currency] || "₹";
-    const converted = (priceInINR * rate).toLocaleString(undefined, { maximumFractionDigits: 0 });
-    return `${symbol}${converted}`;
-  };
 
   const handleServiceSearch = async () => {
     const loc = activeService === 'hotels' || activeService === 'packages' ? serviceSearch.city : serviceSearch.to;
@@ -1771,7 +1522,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, city: place.formatted_address || place.name})}
               placeholder="Enter City"
               label="City"
-              icon={MapPinIcon}
+              icon={MapPin}
               isLoaded={isLoaded}
             />
           ) : (
@@ -1782,7 +1533,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, from: place.formatted_address || place.name})}
                 placeholder="From City"
                 label="From"
-                icon={MapPinIcon}
+                icon={MapPin}
                 isLoaded={isLoaded}
               />
               <LocationInput
@@ -1907,7 +1658,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-[#1E90FF] font-black text-xl">{formatPrice(item.price || 0)}</p>
+                        <p className="text-[#1E90FF] font-black text-xl">₹{item.price?.toLocaleString() || '0'}</p>
                         <p className="text-gray-400 text-[10px] uppercase font-black tracking-widest">
                           {activeService === 'hotels' ? 'Per Night' : 
                            activeService === 'packages' ? 'Per Person' : 'Per Trip'}
@@ -2052,7 +1803,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   )}
                 >
                   <service.icon size={20} />
-                  <span className="font-bold text-sm">{t[service.id] || service.label}</span>
+                  <span className="font-bold text-sm">{service.label}</span>
                 </motion.button>
               ))}
             </div>
@@ -2087,7 +1838,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   }}
                   placeholder="Starting City"
                   label="From"
-                  icon={MapPinIcon}
+                  icon={MapPin}
                   isLoaded={isLoaded}
                   showLocationButton={true}
                   onLocationDetect={detectLocation}
@@ -2153,7 +1904,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   className="bg-[#FF8A00] text-white rounded-2xl py-4 font-black text-lg flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-orange-500/20 transition-colors"
                 >
                   {loading ? <Loader2 className="animate-spin" size={22} /> : <Zap size={22} className="fill-current" />}
-                  {loading ? "Planning..." : t.search}
+                  {loading ? "Planning..." : "Start Journey"}
                 </motion.button>
               </div>
 
@@ -2260,9 +2011,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Total Budget ({CURRENCY_SYMBOLS[currency] || "₹"})</label>
+                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Total Budget (₹)</label>
                   <div className="relative">
-                    <WalletIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
+                    <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
                     <input 
                       type="number"
                       value={budgetFinderInput.totalBudget || 0}
@@ -2279,7 +2030,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     onChange={(e) => setBudgetFinderInput({...budgetFinderInput, travelType: e.target.value})}
                     className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 px-4 text-white outline-none focus:bg-white/20 transition-all appearance-none"
                   >
-                    {["Solo", "Couple", "Family", "Friends"].map(t => <option key={t} value={t} className="bg-[#0A2540]">{t}</option>)}
+                    {["Solo", "Couple", "Family", "Friends"].map(type => <option key={type} value={type} className="bg-[#0A2540]">{type}</option>)}
                   </select>
                 </div>
 
@@ -2359,7 +2110,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         </div>
                         <div className="bg-purple-50 p-3 rounded-xl space-y-1">
                           <span className="text-[10px] font-bold text-purple-400 uppercase tracking-tight">Hotel/Night</span>
-                          <p className="text-purple-600 font-black text-sm">{formatPrice(result.average_hotel_price_per_night)}</p>
+                          <p className="text-purple-600 font-black text-sm">{currency} {result.average_hotel_price_per_night.toLocaleString()}</p>
                         </div>
                         <div className="bg-orange-50 p-3 rounded-xl space-y-1">
                           <span className="text-[10px] font-bold text-orange-400 uppercase tracking-tight">Local Transport</span>
@@ -2691,20 +2442,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {/* Budget Summary Card */}
                 <div className="bg-[#0A2540] rounded-[3rem] p-8 md:p-10 shadow-xl text-white relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 opacity-70">{t.budgetSummary}</h4>
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 opacity-70">Budget Summary</h4>
                   <div className="space-y-8">
                     <div className="flex justify-between items-end">
-                      <span className="text-sm font-light opacity-80 tracking-wide">{t.totalEstimate}</span>
+                      <span className="text-sm font-light opacity-80 tracking-wide">Total Estimate</span>
                       <span className="text-4xl font-bold tracking-tighter">{formatPrice(liveBudget.totalCost)}</span>
                     </div>
                     <div className="h-px bg-white/20" />
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">{t.perPerson}</p>
+                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">Per Person</p>
                         <p className="text-xl font-bold">{formatPrice(liveBudget.totalCost / numPeople)}</p>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">{t.perDay}</p>
+                        <p className="text-[10px] font-bold uppercase opacity-50 tracking-widest">Per Day</p>
                         <p className="text-xl font-bold">{formatPrice(liveBudget.totalCost / duration)}</p>
                       </div>
                     </div>
@@ -2884,7 +2635,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-[#0A2540] flex items-center justify-center shadow-xl">
-                    <BookingIcon className="text-white" size={24} />
+                    <Briefcase className="text-white" size={24} />
                   </div>
                   <h3 className="text-3xl font-bold text-[#0A2540] tracking-tight">Complete Your Booking</h3>
                 </div>
@@ -2903,7 +2654,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 group-hover:rotate-6", service.color)}>
                       <service.icon className="text-white" size={28} />
                     </div>
-                    <span className="text-[#0A2540] font-bold text-xs uppercase tracking-[0.2em]">{t[service.id] || service.label}</span>
+                    <span className="text-[#0A2540] font-bold text-xs uppercase tracking-[0.2em]">{service.label}</span>
                     <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-full -mr-8 -mt-8" />
                   </motion.button>
                 ))}
@@ -2955,7 +2706,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
                 <div className="relative group">
-                  <ProfileIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
+                  <User className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
                   <input 
                     type="text" 
                     required
@@ -3245,7 +2996,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         </div>
         <div className="flex gap-3">
           <div className="px-6 py-3 bg-white rounded-full border border-gray-100 flex items-center gap-3 shadow-xl">
-            <BookingIcon size={16} className="text-[#1E90FF]" />
+            <Briefcase size={16} className="text-[#1E90FF]" />
             <span className="text-[#0A2540] font-black text-lg tracking-tighter">{bookings.length}</span>
             <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Active</span>
           </div>
@@ -3283,7 +3034,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-emerald-600/10 transition-all duration-700" />
           <div className="w-32 h-32 bg-gray-50 rounded-full flex items-center justify-center mx-auto border border-gray-100 shadow-2xl relative z-10">
-            <BookingIcon size={56} className="text-gray-300" />
+            <Briefcase size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
             <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">No bookings found</h3>
@@ -3311,7 +3062,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#1E90FF]/5 rounded-full -mr-16 -mt-16 blur-2xl" />
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1E90FF] to-indigo-600 flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform relative z-10">
-                <BookingIcon size={32} />
+                <Briefcase size={32} />
               </div>
               <div className="flex-1 space-y-1 relative z-10">
                 <h4 className="font-black text-[#0A2540] text-xl tracking-tight">{booking.title}</h4>
@@ -3366,15 +3117,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         className="bg-white border border-gray-100 rounded-[3rem] p-12 text-center relative overflow-hidden group shadow-xl"
       >
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#1E90FF]/5 to-indigo-600/5 opacity-50" />
-        <h4 className="text-3xl font-serif font-black text-[#0A2540] mb-3 tracking-tight relative z-10">{t.needHelp}</h4>
-        <p className="text-gray-500 text-lg mb-8 max-w-md mx-auto relative z-10 font-medium">{t.supportDesc}</p>
+        <h4 className="text-3xl font-serif font-black text-[#0A2540] mb-3 tracking-tight relative z-10">Need help with booking?</h4>
+        <p className="text-gray-500 text-lg mb-8 max-w-md mx-auto relative z-10 font-medium">Our travel experts are available 24/7 to assist you with your journey.</p>
         <motion.button 
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => window.open(`tel:${adminConfig?.supportPhone || '+1 800 TRAVOLOR'}`, '_self')}
           className="bg-[#0A2540] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
         >
-          {t.contactSupport}
+          Contact Support
         </motion.button>
       </motion.div>
     </div>
@@ -3402,7 +3152,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     if (!user) return;
     setLoading(true);
     try {
-      // Update Firestore
       const userDocRef = doc(db, 'users', user.id);
       await updateDoc(userDocRef, {
         name: editForm.name,
@@ -3410,23 +3159,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         photo: editForm.photo
       });
       
-      // Update SQLite Backend
-      const res = await fetch('/api/user/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          name: editForm.name,
-          phone: editForm.phone,
-          photo: editForm.photo
-        })
+      setUser({
+        ...user,
+        name: editForm.name,
+        phone: editForm.phone,
+        photo: editForm.photo
       });
-      const data = await res.json();
-
-      if (data.success) {
-        setUser(data.user);
-        setIsEditingProfile(false);
-      }
+      setIsEditingProfile(false);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
     } finally {
@@ -3442,7 +3181,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <button onClick={() => setIsEditingProfile(false)} className="p-2 hover:bg-gray-100 rounded-full transition-all">
             <ArrowLeft size={24} className="text-[#0A2540]" />
           </button>
-          <h2 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{t.editProfile}</h2>
+          <h2 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">Edit Profile</h2>
         </div>
 
         <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
@@ -3453,7 +3192,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {editForm.photo ? (
                   <img src={editForm.photo} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <ProfileIcon size={48} className="text-[#1E90FF]" />
+                  <User size={48} className="text-[#1E90FF]" />
                 )}
               </div>
               <label className="absolute bottom-0 right-0 bg-[#1E90FF] text-white p-2.5 rounded-full shadow-lg border-2 border-white hover:scale-110 transition-all cursor-pointer">
@@ -3461,13 +3200,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
               </label>
             </div>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">{t.tapToChangePhoto}</p>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Tap to change photo</p>
           </div>
 
           {/* Form Fields */}
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">{t.fullName}</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
               <div className="relative">
                 <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
@@ -3475,13 +3214,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   value={editForm.name || ''}
                   onChange={(e) => setEditForm({...editForm, name: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
-                  placeholder={t.fullName}
+                  placeholder="Your Name"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">{t.phoneNumber}</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Phone Number</label>
               <div className="relative">
                 <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
@@ -3489,13 +3228,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   value={editForm.phone || ''}
                   onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
-                  placeholder={t.phoneNumber}
+                  placeholder="Your Phone"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">{t.emailAddress}</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
@@ -3505,7 +3244,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-gray-400 font-bold outline-none cursor-not-allowed"
                 />
               </div>
-              <p className="text-[10px] text-gray-400 ml-4 italic">{t.emailNoChange}</p>
+              <p className="text-[10px] text-gray-400 ml-4 italic">Email cannot be changed</p>
             </div>
           </div>
 
@@ -3517,13 +3256,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               disabled={loading}
               className="w-full bg-[#0A2540] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:glow-blue transition-all disabled:opacity-50"
             >
-              {loading ? "Saving..." : t.saveChanges}
+              {loading ? "Saving..." : "Save Changes"}
             </motion.button>
             <button 
               onClick={() => setIsEditingProfile(false)}
               className="w-full bg-white text-gray-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] border border-gray-100 hover:bg-gray-50 transition-all"
             >
-              {t.cancel}
+              Cancel
             </button>
           </div>
         </div>
@@ -3682,7 +3421,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <div className="space-y-12 pb-24 px-4 md:px-0">
         {/* Header Section */}
         <div className="text-center space-y-2 pt-8">
-          <h2 className="text-4xl font-serif font-black text-[#0A2540] tracking-tight">{t.settings}</h2>
+          <h2 className="text-4xl font-serif font-black text-[#0A2540] tracking-tight">Settings</h2>
           <p className="text-gray-400 text-sm font-medium">Manage your account and preferences</p>
         </div>
 
@@ -3699,7 +3438,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ProfileIcon size={32} className="text-[#1E90FF]" />
+                  <User size={32} className="text-[#1E90FF]" />
                 )}
               </div>
               <div className="flex-1">
@@ -3710,13 +3449,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 onClick={startEditing}
                 className="text-[#1E90FF] font-black text-[10px] uppercase tracking-widest px-4 py-2 bg-white rounded-full border border-blue-50 hover:bg-blue-50 transition-all"
               >
-                {t.edit}
+                Edit
               </button>
             </div>
 
             {[
-              { label: t.changePassword, icon: Lock, color: "text-amber-500" },
-              { label: t.emailPhone, icon: Mail, color: "text-emerald-500", detail: user.phone || t.addPhone }
+              { label: "Change Password", icon: Lock, color: "text-amber-500" },
+              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone" }
             ].map((item, idx) => (
               <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
                 <div className="flex items-center gap-4">
@@ -3738,12 +3477,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
             <Settings className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">{t.settings}</h3>
+            <h3 className="text-lg font-bold text-[#0A2540]">Preferences</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
-              { label: t.language, icon: Languages, color: "text-blue-500", value: language, options: ["English", "Marathi", "Hindi", "Spanish", "French"], onChange: (val: string) => { setLanguage(val); handleUpdatePreferences({ language: val }); } },
-              { label: t.currency, icon: WalletIcon, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)", "GBP (£)", "JPY (¥)"], onChange: (val: string) => { setCurrency(val); handleUpdatePreferences({ currency: val }); } }
+              { label: "Language", icon: Languages, color: "text-blue-500", value: language, options: ["English", "Marathi", "Hindi"], onChange: setLanguage },
+              { label: "Currency", icon: Wallet, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)"], onChange: setCurrency }
             ].map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
                 <div className="flex items-center gap-4">
@@ -3770,14 +3509,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                   <Bell size={20} className="text-amber-500" />
                 </div>
-                <span className="text-[#0A2540] font-bold text-sm">{t.notifications}</span>
+                <span className="text-[#0A2540] font-bold text-sm">Notifications</span>
               </div>
               <button 
-                onClick={() => {
-                  const newVal = !notificationsEnabled;
-                  setNotificationsEnabled(newVal);
-                  handleUpdatePreferences({ notifications: newVal ? 1 : 0 });
-                }}
+                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
                 className={cn(
                   "w-12 h-6 rounded-full transition-all relative p-1",
                   notificationsEnabled ? "bg-emerald-500" : "bg-gray-200"
@@ -3796,14 +3531,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                   {isDarkMode ? <Moon size={20} className="text-indigo-500" /> : <Sun size={20} className="text-orange-500" />}
                 </div>
-                <span className="text-[#0A2540] font-bold text-sm">{t.theme}</span>
+                <span className="text-[#0A2540] font-bold text-sm">Theme</span>
               </div>
               <button 
-                onClick={() => {
-                  const newVal = !isDarkMode;
-                  setIsDarkMode(newVal);
-                  handleUpdatePreferences({ theme: newVal ? 'dark' : 'light' });
-                }}
+                onClick={() => setIsDarkMode(!isDarkMode)}
                 className="bg-gray-50 px-4 py-2 rounded-xl text-[#0A2540] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all border border-gray-100"
               >
                 {isDarkMode ? "Dark" : "Light"}
@@ -3821,8 +3552,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
               { label: "Saved Trips", icon: Globe, color: "text-blue-500", count: savedTrips.length, tab: 'trips' },
-              { label: "Booking History", icon: BookingIcon, color: "text-emerald-500", count: bookings.length, tab: 'bookings' },
-              { label: "Payment Methods", icon: WalletIcon, color: "text-purple-500" }
+              { label: "Booking History", icon: Briefcase, color: "text-emerald-500", count: bookings.length, tab: 'bookings' },
+              { label: "Payment Methods", icon: Wallet, color: "text-purple-500" }
             ].map((item, idx) => (
               <button 
                 key={idx} 
@@ -3848,23 +3579,26 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
             <HelpCircle className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">{t.support}</h3>
+            <h3 className="text-lg font-bold text-[#0A2540]">Support</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
-              { label: t.contactSupport, icon: Phone, color: "text-blue-500", action: () => window.location.href = `tel:${adminConfig?.supportPhone || '1800-123-4567'}` },
-              { label: t.emailSupport, icon: Mail, color: "text-emerald-500", action: () => window.location.href = `mailto:${adminConfig?.supportEmail || 'support@travolor.com'}` },
-              { label: t.helpCenter, icon: HelpCircle, color: "text-amber-500", action: () => window.open('https://travolor.com/faq', '_blank') },
-              { label: t.termsPrivacy, icon: Shield, color: "text-indigo-500", action: () => window.open('https://travolor.com/terms', '_blank') }
+              { label: "Help Center", icon: HelpCircle, color: "text-blue-500" },
+              { label: "Contact Support", icon: Phone, color: "text-emerald-500", detail: adminConfig?.supportPhone },
+              { label: "Email Support", icon: Mail, color: "text-amber-500", detail: adminConfig?.supportEmail },
+              { label: "Terms & Privacy", icon: ShieldCheck, color: "text-slate-500" }
             ].map((item, idx) => (
-              <button key={idx} onClick={item.action} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
+              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
                   </div>
                   <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
                 </div>
-                <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+                <div className="flex items-center gap-2">
+                  {item.detail && <span className="text-gray-400 text-xs font-medium">{item.detail}</span>}
+                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+                </div>
               </button>
             ))}
           </div>
@@ -3878,7 +3612,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           className="w-full bg-rose-50 border border-rose-100 text-rose-600 py-5 rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-rose-600 hover:text-white transition-all shadow-sm group"
         >
           <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-          {t.logout}
+          Logout Account
         </motion.button>
       </div>
     );
@@ -4029,7 +3763,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ProfileIcon className="text-white" size={20} />
+                  <User className="text-white" size={20} />
                 )}
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-10" />
               </motion.div>
@@ -4159,10 +3893,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <nav className="fixed bottom-6 left-0 right-0 z-50 px-6">
         <div className="max-w-md mx-auto bg-white/90 backdrop-blur-xl border border-gray-100 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
           {[
-            { id: "explore", icon: Globe, label: t.explore },
-            { id: "trips", icon: MapIcon, label: t.trips },
-            { id: "bookings", icon: BookingIcon, label: t.bookings },
-            { id: "profile", icon: Settings, label: t.settings }
+            { id: "explore", icon: Globe, label: "Explore" },
+            { id: "trips", icon: MapIcon, label: "Trips" },
+            { id: "bookings", icon: Briefcase, label: "Bookings" },
+            { id: "profile", icon: Settings, label: "Settings" }
           ].map((tab) => (
             <button
               key={tab.id}
