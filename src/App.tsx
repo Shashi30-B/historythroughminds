@@ -185,7 +185,7 @@ const BOOKING_SERVICES = [
   { id: 'flights', label: 'Flights', icon: Plane, color: 'bg-[#0A2540]', link: (loc: string) => `https://www.skyscanner.com/transport/flights-from/anywhere/to/${encodeURIComponent(loc)}` },
   { id: 'trains', label: 'Trains', icon: TrainFront, color: 'bg-red-600', link: (loc: string) => `https://www.irctc.co.in/nget/train-search` },
   { id: 'buses', label: 'Buses', icon: Bus, color: 'bg-rose-500', link: (loc: string) => `https://www.redbus.in/search?toCityName=${encodeURIComponent(loc)}` },
-  { id: 'cabs', label: 'Cabs', icon: Car, color: 'bg-amber-500', link: (loc: string) => `https://www.uber.com` },
+  { id: 'cabs', label: 'Cabs', icon: Car, color: 'bg-amber-500', link: (loc: string) => `https://www.olacabs.com` },
   { id: 'packages', label: 'Packages', icon: Package, color: 'bg-purple-600', link: (loc: string) => `https://www.makemytrip.com/holiday-packages/search?dest=${encodeURIComponent(loc)}` },
 ];
 
@@ -1794,7 +1794,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   key={service.id}
                   whileHover={{ y: -5, scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setActiveService(service.id as any)}
+                  onClick={() => {
+                    const loc = locationInput || 'India';
+                    window.open(service.link(loc), '_blank');
+                  }}
                   className={cn(
                     "backdrop-blur-md border px-6 py-3 rounded-2xl flex items-center gap-3 transition-all shadow-lg",
                     activeService === service.id 
@@ -2679,10 +2682,22 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <motion.div 
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
-            className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group"
+            className="cursor-pointer mx-auto"
+            onClick={() => setActiveTab('explore')}
           >
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#0A1F44] to-[#1E90FF] opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity" />
-            <img src="/logo.png" alt="Travolor Logo" className="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-500" />
+            <img 
+              src="/travolor-logo.png" 
+              alt="Travolor Logo" 
+              className="h-24 min-w-[200px] w-auto object-contain mx-auto" 
+              referrerPolicy="no-referrer"
+              onLoad={() => console.log("Auth logo loaded successfully")}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                if (!target.src.includes('placehold.co')) {
+                  target.src = "https://placehold.co/250x80/FFFFFF/0A1F44/png?text=Travolor";
+                }
+              }}
+            />
           </motion.div>
           <div className="space-y-1">
             <h1 className="text-4xl font-serif font-black text-[#0A1F44] tracking-tight">Travolor</h1>
@@ -3092,8 +3107,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <motion.button 
             key={idx}
             onClick={() => {
-              setActiveTab('explore');
-              setActiveService(item.id as any);
+              const service = BOOKING_SERVICES.find(s => s.id === item.id);
+              if (service) {
+                const loc = locationInput || 'India';
+                window.open(service.link(loc), '_blank');
+              } else {
+                setActiveTab('explore');
+                setActiveService(item.id as any);
+              }
             }}
             whileHover={{ y: -10 }}
             className="group bg-white border border-gray-100 rounded-[3rem] p-8 shadow-xl hover:shadow-2xl transition-all flex items-center gap-6 relative overflow-hidden text-left w-full"
@@ -3740,13 +3761,29 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             animate={{ opacity: 1, x: 0 }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-2 cursor-pointer group"
-            onClick={() => setActiveTab('explore')}
+            className="flex items-center cursor-pointer group"
+            onClick={() => {
+              setActiveTab('explore');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              if (window.location.pathname !== '/') {
+                window.location.href = '/';
+              }
+            }}
           >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 bg-white overflow-hidden">
-              <img src="/logo.png" alt="Travolor Logo" className="w-full h-full object-cover" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-white">Travolor</span>
+            <img 
+              src="/travolor-logo.png" 
+              alt="Travolor Logo" 
+              className="h-[60px] min-w-[180px] w-auto object-contain" 
+              referrerPolicy="no-referrer"
+              onLoad={() => console.log("Header logo loaded successfully")}
+              onError={(e) => {
+                console.error("Header logo failed to load, trying fallback");
+                const target = e.target as HTMLImageElement;
+                if (!target.src.includes('placehold.co')) {
+                  target.src = "https://placehold.co/250x80/0A1F44/FFFFFF/png?text=Travolor";
+                }
+              }}
+            />
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -3807,11 +3844,26 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <div className="max-w-6xl mx-auto space-y-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="space-y-6">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center overflow-hidden">
-                  <img src="/logo.png" alt="Travolor Logo" className="w-full h-full object-cover" />
-                </div>
-                <span className="text-xl font-bold text-white">Travolor</span>
+              <div 
+                className="flex items-center cursor-pointer" 
+                onClick={() => {
+                  setActiveTab('explore');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                <img 
+                  src="/travolor-logo.png" 
+                  alt="Travolor Logo" 
+                  className="h-12 min-w-[150px] w-auto object-contain" 
+                  referrerPolicy="no-referrer"
+                  onLoad={() => console.log("Footer logo loaded successfully")}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (!target.src.includes('placehold.co')) {
+                      target.src = "https://placehold.co/250x80/0A1F44/FFFFFF/png?text=Travolor";
+                    }
+                  }}
+                />
               </div>
               <p className="text-white/60 text-sm leading-relaxed">
                 Making travel smarter, easier, and more accessible with AI-powered planning and real-time insights.

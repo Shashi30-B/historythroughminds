@@ -1,0 +1,11 @@
+<svg width="250" height="80" viewBox="0 0 250 80" xmlns="http://www.w3.org/2000/svg">
+  <rect width="250" height="80" fill="#0A1F44"/>
+  <g transform="translate(15, 10)">
+    <path d="M25 0 C35 10 40 25 25 45 C10 25 15 10 25 0" fill="#FF4500" />
+    <path d="M25 10 C30 15 33 25 25 35 C17 25 20 15 25 10" fill="#FFD700" />
+    <path d="M15 45 L35 45 L30 65 L20 65 Z" fill="#DAA520" />
+    <path d="M180 10 L210 20 L180 30 L185 20 Z" fill="#FFFFFF" transform="rotate(-15, 195, 20)" />
+  </g>
+  <text x="70" y="45" font-family="Arial, sans-serif" font-weight="900" font-size="36" fill="#FFFFFF">Travolor</text>
+  <text x="70" y="65" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#FFD700">Your journey our passion</text>
+</svg>
