@@ -11,6 +11,7 @@ export interface ItineraryRequest {
   travelStyle: string;
   language?: string;
   budgetData?: any;
+  isPremium?: boolean;
 }
 
 const FALLBACK_ITINERARY = `
@@ -39,7 +40,7 @@ const FALLBACK_ITINERARY = `
 `;
 
 export async function generateItinerary(request: ItineraryRequest) {
-  const { location, startLocation, duration, numPeople, travelStyle, language = "en", budgetData } = request;
+  const { location, startLocation, duration, numPeople, travelStyle, language = "en", budgetData, isPremium = false } = request;
 
   if (!apiKey) {
     console.error("Gemini API key is missing. Please set VITE_GEMINI_API_KEY in your environment.");
@@ -64,6 +65,10 @@ export async function generateItinerary(request: ItineraryRequest) {
     `;
   }
 
+  const premiumInstructions = isPremium 
+    ? "The user is a PREMIUM member. Provide a full, detailed, and comprehensive itinerary with all sections."
+    : "The user is a FREE member. Provide a BRIEF overview and the first 2 days of the itinerary ONLY. At the end, add a note: '[PREMIUM_ONLY] Upgrade to unlock the full day-wise plan, hidden gems, and local secrets.'";
+
   const prompt = `You are BHATKANTIMITRA – a smart AI Global Travel Planner.
   Your role is to create a complete, AUTO-BUDGETED travel plan for any destination in the world, including travel options from the user's starting location.
   
@@ -75,6 +80,7 @@ export async function generateItinerary(request: ItineraryRequest) {
   - Travel Style: ${travelStyle}
   
   ${budgetInstructions}
+  ${premiumInstructions}
   
   Language Rule:
   - If the user input is in Marathi or the requested language is Marathi, reply in Marathi.
@@ -184,5 +190,33 @@ export async function generateItinerary(request: ItineraryRequest) {
     }
 
     return FALLBACK_ITINERARY;
+  }
+}
+
+export async function getChatResponse(message: string, history: { role: string; text: string }[], location?: string) {
+  if (!apiKey) return "I'm sorry, but I'm having trouble connecting to my brain right now. Please try again later.";
+
+  const ai = new GoogleGenAI({ apiKey });
+  const context = location ? `The user is currently planning a trip to ${location}. ` : "";
+  
+  const prompt = `You are Travolor AI, a helpful travel assistant. ${context}
+  Answer the user's question concisely and helpfully.
+  
+  Chat History:
+  ${history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n')}
+  
+  User: ${message}
+  Assistant:`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+
+    return response.text || "I'm not sure how to answer that. Could you rephrase?";
+  } catch (error) {
+    console.error("Chat Error:", error);
+    return "Oops! Something went wrong. Let's try that again.";
   }
 }

@@ -10,7 +10,7 @@ import {
   Utensils, Hotel, Navigation, Sparkles, Loader2, 
   User, Users, Heart, Users2, Church, Trees, Castle,
   Clock, Thermometer, Info, ExternalLink, Compass,
-  Mountain, Briefcase, Crown,
+  Mountain, Briefcase, Crown, X, MessageSquare,
   Home, Globe,
   ArrowRight, ArrowLeft, Camera, ShoppingBag, Lightbulb,
   Bell, Moon, Sun, Languages, LogOut, Settings, HelpCircle, ShieldCheck, Phone,
@@ -23,7 +23,7 @@ import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
-import { generateItinerary } from './services/geminiService';
+import { generateItinerary, getChatResponse } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
 import { BUDGET_DESTINATIONS, type Destination } from './data/destinations';
 
@@ -153,6 +153,181 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     return this.props.children;
   }
 }
+
+const ItineraryDisplay = ({ content, isPremium, onUpgrade }: { content: string; isPremium: boolean; onUpgrade: () => void }) => {
+  const sections = useMemo(() => {
+    const parts = content.split('# ');
+    return parts.filter(p => p.trim()).map(p => {
+      const lines = p.split('\n');
+      const title = lines[0].trim();
+      const body = lines.slice(1).join('\n').trim();
+      return { title, body };
+    });
+  }, [content]);
+
+  const getIcon = (title: string) => {
+    const t = title.toLowerCase();
+    if (t.includes('overview')) return <Globe className="text-sky-500" />;
+    if (t.includes('transport')) return <Plane className="text-navy-500" />;
+    if (t.includes('budget')) return <Wallet className="text-emerald-500" />;
+    if (t.includes('itinerary')) return <Calendar className="text-orange-500" />;
+    if (t.includes('hotels')) return <Hotel className="text-purple-500" />;
+    if (t.includes('food')) return <Utensils className="text-rose-500" />;
+    if (t.includes('hidden gems')) return <Sparkles className="text-amber-500" />;
+    if (t.includes('tips')) return <Lightbulb className="text-yellow-500" />;
+    return <Info className="text-gray-500" />;
+  };
+
+  return (
+    <div className="space-y-8">
+      {sections.map((section, idx) => (
+        <motion.div
+          key={idx}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: idx * 0.1 }}
+          className="glass-card p-6 rounded-3xl"
+        >
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-white rounded-2xl shadow-sm">
+              {getIcon(section.title)}
+            </div>
+            <h3 className="text-xl font-bold text-navy">{section.title}</h3>
+          </div>
+          <div className="markdown-body">
+            <Markdown>{section.body}</Markdown>
+          </div>
+          {!isPremium && idx > 2 && (
+            <div className="mt-4 p-6 bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl border border-orange-100 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
+                  <Crown size={24} />
+                </div>
+                <div>
+                  <p className="text-sm text-orange-900 font-bold">Premium Content Locked</p>
+                  <p className="text-xs text-orange-700">Upgrade to unlock full day-wise plan, hidden gems, and local secrets.</p>
+                </div>
+              </div>
+              <button 
+                onClick={onUpgrade}
+                className="px-6 py-3 bg-[#FF8A00] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-105 transition-all"
+              >
+                Unlock Now
+              </button>
+            </div>
+          )}
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
+const ChatAssistant = ({ isOpen, onClose, location }: { isOpen: boolean; onClose: () => void; location?: string }) => {
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+
+  const handleSend = async () => {
+    if (!input.trim() || isTyping) return;
+    
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setIsTyping(true);
+
+    try {
+      const response = await getChatResponse(userMsg, messages, location);
+      setMessages(prev => [...prev, { role: 'assistant', text: response }]);
+    } catch (error) {
+      console.error("Chat Error:", error);
+      setMessages(prev => [...prev, { role: 'assistant', text: "Sorry, I'm having trouble connecting right now. Please try again later." }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-navy/60 backdrop-blur-sm"
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[600px]"
+      >
+        <div className="p-6 bg-navy text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center shadow-lg">
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold">Travolor AI Assistant</h3>
+              <p className="text-[10px] text-white/60 uppercase tracking-widest">Always here to help</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+          {messages.length === 0 && (
+            <div className="text-center py-10 space-y-4">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
+                <MessageSquare className="text-blue-500" size={32} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[#0A2540] font-bold">How can I help you today?</p>
+                <p className="text-gray-400 text-sm">Ask me about hotels, food, or local tips for {location || 'your trip'}!</p>
+              </div>
+            </div>
+          )}
+          {messages.map((msg, idx) => (
+            <div key={idx} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
+              <div className={cn(
+                "max-w-[85%] p-4 rounded-3xl text-sm leading-relaxed shadow-sm",
+                msg.role === 'user' ? "bg-navy text-white rounded-tr-none" : "bg-gray-50 text-[#0A2540] rounded-tl-none border border-gray-100"
+              )}>
+                <Markdown>{msg.text}</Markdown>
+              </div>
+            </div>
+          ))}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="bg-gray-50 p-4 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
+                <Loader2 className="animate-spin text-orange-500" size={20} />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="p-6 bg-white border-t border-gray-100 flex gap-3">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Type your message..."
+            className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-navy/5 outline-none transition-all"
+          />
+          <button
+            onClick={handleSend}
+            disabled={isTyping || !input.trim()}
+            className="w-14 h-14 bg-navy text-white rounded-2xl flex items-center justify-center hover:bg-navy/90 transition-all disabled:opacity-50 shadow-lg shadow-navy/10"
+          >
+            <ArrowRight size={24} />
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -522,6 +697,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', phone: '', photo: '' });
   const [isLocating, setIsLocating] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+
+  const upgradeToPremium = () => {
+    setIsPremium(true);
+    showToast("Welcome to Premium! You now have full access to all features.", "success");
+  };
   const [typingText, setTypingText] = useState("");
   const [startAutocomplete, setStartAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [endAutocomplete, setEndAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
@@ -1422,7 +1604,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         numPeople,
         travelStyle: styleToUse,
         language: language,
-        budgetData: budgetData || selectedBudgetTrip
+        budgetData: budgetData || selectedBudgetTrip,
+        isPremium: isPremium
       });
 
       if (!result) {
@@ -2444,14 +2627,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       </span>
                     )}
                   </motion.div>
-                  <h2 className="text-4xl md:text-6xl font-bold text-[#0A2540] tracking-tight">{locationInput}</h2>
+                  <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tight drop-shadow-lg">{locationInput}</h2>
                 </div>
                 <div className="flex gap-4">
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={saveTrip}
-                    className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-[#1E90FF] transition-all shadow-2xl border border-white/20"
+                    className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-[#0A2540] transition-all shadow-2xl border border-white/20"
                   >
                     <Heart size={20} /> {t.saveTrip}
                   </motion.button>
@@ -2459,7 +2642,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => openInMaps(locationInput)}
-                    className="bg-[#1E90FF] text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-[#1E90FF]/90 transition-all shadow-2xl"
+                    className="bg-[#FF8A00] text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-[#FF8A00]/90 transition-all shadow-2xl"
                   >
                     <MapIcon size={20} /> {t.viewMaps}
                   </motion.button>
@@ -2471,7 +2654,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { id: "budget", label: "Budget Version", icon: Wallet, color: "bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-500 hover:text-white" },
-                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-50 border-blue-100 text-[#1E90FF] hover:bg-[#1E90FF] hover:text-white" },
+                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-50 border-blue-100 text-[#0A2540] hover:bg-[#0A2540] hover:text-white" },
                 { id: "luxury", label: "Make It Luxury", icon: Crown, color: "bg-purple-50 border-purple-100 text-purple-600 hover:bg-purple-500 hover:text-white" }
               ].map((action) => (
                 <button 
@@ -2491,12 +2674,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {/* Itinerary Content */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-8 space-y-10">
-                <div className="bg-white rounded-[3rem] p-8 md:p-12 shadow-xl border border-gray-100 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50" />
-                  <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:text-[#0A2540] prose-headings:font-bold prose-p:text-gray-600 prose-li:text-gray-600">
-                    <Markdown>{itinerary}</Markdown>
-                  </div>
-                </div>
+              <ItineraryDisplay 
+                content={itinerary} 
+                isPremium={isPremium} 
+                onUpgrade={upgradeToPremium}
+              />
               </div>
 
               {/* Sidebar */}
@@ -3522,7 +3704,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="text-lg font-bold text-[#0A2540]">{user.name}</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-lg font-bold text-[#0A2540]">{user.name}</h4>
+                  {isPremium && (
+                    <span className="px-2 py-0.5 bg-orange-100 text-orange-600 text-[8px] font-black uppercase tracking-widest rounded-full border border-orange-200 flex items-center gap-1">
+                      <Crown size={8} />
+                      Premium
+                    </span>
+                  )}
+                </div>
                 <p className="text-gray-400 text-xs font-medium">{user.email}</p>
               </div>
               <button 
@@ -4038,6 +4228,30 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           ))}
         </div>
       </nav>
+
+      {/* Chat Assistant Modal */}
+      <ChatAssistant 
+        isOpen={showChat} 
+        onClose={() => setShowChat(false)} 
+        location={locationInput}
+      />
+
+      {/* Floating Chat Button */}
+      {itinerary && (
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowChat(true)}
+          className="fixed bottom-8 right-8 w-16 h-16 bg-[#FF8A00] text-white rounded-full shadow-2xl flex items-center justify-center z-50 group"
+        >
+          <MessageSquare size={28} className="group-hover:rotate-12 transition-transform" />
+          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-bounce">
+            AI
+          </div>
+        </motion.button>
+      )}
     </div>
   );
 }
