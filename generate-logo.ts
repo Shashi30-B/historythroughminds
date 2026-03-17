@@ -18,8 +18,8 @@ async function generateLogo() {
     if (part.inlineData) {
       const base64EncodeString = part.inlineData.data;
       const buffer = Buffer.from(base64EncodeString, 'base64');
-      fs.writeFileSync('public/travolor-logo.png', buffer);
-      console.log('Logo generated and saved to public/travolor-logo.png');
+      fs.writeFileSync('public/travolor-logo.svg', buffer);
+      console.log('Logo generated and saved to public/travolor-logo.svg');
     }
   }
 }

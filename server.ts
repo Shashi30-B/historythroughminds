@@ -80,6 +80,11 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // Helper to log searches
   const logSearch = (userId: number | null, type: string, query: any) => {
     try {
@@ -569,12 +574,21 @@ async function startServer() {
     const { input } = req.query;
     const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY;
     
-    if (!apiKey || !input) return res.json([]);
+    if (!input) return res.json([]);
+    if (!apiKey) {
+      console.warn("Google Maps API key missing for autocomplete");
+      return res.json([]);
+    }
 
     try {
       const response = await fetch(`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${input}&types=(cities)&key=${apiKey}`);
       const data = await response.json();
       
+      if (data.status === "REQUEST_DENIED") {
+        console.error("Google Maps Autocomplete Request Denied:", data.error_message);
+        return res.status(403).json({ error: "API key invalid or restricted" });
+      }
+
       const suggestions = (data.predictions || []).map((item: any) => ({
         id: item.place_id,
         description: item.description,
@@ -583,7 +597,8 @@ async function startServer() {
 
       res.json(suggestions);
     } catch (error) {
-      res.json([]);
+      console.error("Autocomplete Error:", error);
+      res.status(500).json({ error: "Failed to fetch suggestions" });
     }
   });
 
@@ -644,6 +659,11 @@ async function startServer() {
       { id: 1, name: "Sleeper AC", price: Math.floor(distance * 3), rating: 4.9, type: "AC" },
       { id: 2, name: "Sleeper Non-AC", price: Math.floor(distance * 2), rating: 4.2, type: "Non-AC" }
     ]);
+  });
+
+  // API 404 handler
+  app.use("/api/*", (req, res) => {
+    res.status(404).json({ error: "API endpoint not found" });
   });
 
   // Vite middleware for development

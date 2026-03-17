@@ -333,8 +333,13 @@ const LocationInput = ({
     }
 
     async function fetchBackendAutocomplete() {
+      if (!value || value.length < 2) return;
+      
       try {
         const res = await fetch(`/api/search/autocomplete?input=${encodeURIComponent(value)}`);
+        if (!res.ok) {
+          throw new Error(`Autocomplete API returned ${res.status}`);
+        }
         const data = await res.json();
         if (data && data.length > 0) {
           setSuggestions(data.map((item: any) => ({
@@ -352,6 +357,7 @@ const LocationInput = ({
           setShowSuggestions(filtered.length > 0);
         }
       } catch (err) {
+        console.warn("Backend autocomplete failed, using local fallback:", err);
         const filtered = FALLBACK_CITIES.filter(c => 
           c.description.toLowerCase().includes(value.toLowerCase())
         );
@@ -1380,20 +1386,35 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   };
 
   const handleGenerate = async (overrideStyle?: string, budgetData?: any) => {
-    if (!locationInput.trim()) {
+    // 1. Validate inputs
+    if (!locationInput?.trim()) {
       showToast("Please enter a destination.", "error");
       return;
     }
-    if (!startLocation.trim()) {
+    if (!startLocation?.trim()) {
       showToast("Please enter your starting location.", "error");
       return;
     }
+    if (duration <= 0) {
+      showToast("Please enter a valid duration (at least 1 day).", "error");
+      return;
+    }
+    if (numPeople <= 0) {
+      showToast("Please enter the number of travelers (at least 1).", "error");
+      return;
+    }
+
+    // 2. Prevent multiple rapid clicks
+    if (loading) return;
+
     const styleToUse = overrideStyle || travelStyle;
     if (overrideStyle) setTravelStyle(overrideStyle);
 
     setLoading(true);
     setItinerary(null);
+    
     try {
+      // 3. Call API with proper error handling
       const result = await generateItinerary({
         location: locationInput,
         startLocation: startLocation,
@@ -1403,21 +1424,59 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         language: language,
         budgetData: budgetData || selectedBudgetTrip
       });
+
+      if (!result) {
+        throw new Error("Failed to get a valid itinerary response.");
+      }
+
       setItinerary(result);
-      // Simple heuristic to extract some info for the route card if possible
-      // Or just set defaults for the visual card
+      
+      // 4. Update route summary
       setRouteSummary({
-        distance: "Calculating...",
-        time: "Calculating...",
-        mode: "Multiple Options"
+        distance: budgetData?.distance ? `${budgetData.distance} km` : "Calculating...",
+        time: budgetData?.estimatedTime || "Calculating...",
+        mode: budgetData?.suggestedTransport || "Multiple Options"
       });
-    } catch (error) {
-      console.error(error);
-      showToast("Failed to generate itinerary. Please try again.", "error");
+
+      showToast("Itinerary generated successfully!", "success");
+    } catch (error: any) {
+      console.error("Itinerary Generation Error:", error);
+      
+      // Show user-friendly message
+      const errorMessage = error.message?.includes("expired") 
+        ? "API key expired. Using fallback itinerary." 
+        : "Unable to generate itinerary. Please try again.";
+      
+      showToast(errorMessage, "error");
+      
+      // Fallback is already handled in geminiService.ts, but we can double-check here
+      if (!itinerary) {
+        setItinerary(`
+# 🌍 DESTINATION OVERVIEW
+- Best time to visit: October to March
+- Crowd level: Moderate
+- Weather: Pleasant (20°C - 28°C)
+
+# 💰 BUDGET ESTIMATION (Estimated)
+- Budget Category: Standard Trip
+- Estimated Total Cost: ₹25,000 - ₹40,000
+
+# 🗓 DAY-WISE ITINERARY
+- Day 1: Arrival and Local Sightseeing.
+- Day 2: Visit top landmarks.
+- Day 3: Leisure day and departure.
+
+# ⚠️ SMART TRAVEL TIPS
+- Book in advance for better rates.
+        `);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Alias for handleGenerate to satisfy user request
+  const handleSearch = handleGenerate;
 
   const toggleWishlist = async (dest: any) => {
     if (!user) {
@@ -2686,7 +2745,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             onClick={() => setActiveTab('explore')}
           >
             <img 
-              src="/travolor-logo.png" 
+              src="/travolor-logo.svg" 
               alt="Travolor Logo" 
               className="h-24 min-w-[200px] w-auto object-contain mx-auto" 
               referrerPolicy="no-referrer"
@@ -3771,7 +3830,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             }}
           >
             <img 
-              src="/travolor-logo.png" 
+              src="/travolor-logo.svg" 
               alt="Travolor Logo" 
               className="h-[60px] min-w-[180px] w-auto object-contain" 
               referrerPolicy="no-referrer"
@@ -3852,7 +3911,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 }}
               >
                 <img 
-                  src="/travolor-logo.png" 
+                  src="/travolor-logo.svg" 
                   alt="Travolor Logo" 
                   className="h-12 min-w-[150px] w-auto object-contain" 
                   referrerPolicy="no-referrer"

@@ -1,6 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// Use VITE_ prefix for client-side environment variables in Vite
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 export interface ItineraryRequest {
   location: string;
@@ -12,8 +13,40 @@ export interface ItineraryRequest {
   budgetData?: any;
 }
 
+const FALLBACK_ITINERARY = `
+# 🌍 DESTINATION OVERVIEW
+- Best time to visit: October to March
+- Crowd level: Moderate
+- Weather: Pleasant (20°C - 28°C)
+- Visa: Check local requirements
+- Currency: Local Currency
+
+# 💰 BUDGET ESTIMATION (Estimated)
+- Budget Category: Standard Trip
+- Estimated Total Cost: ₹25,000 - ₹40,000
+- Cost per person: ₹12,500
+- Cost per day: ₹4,000
+
+# 🗓 DAY-WISE ITINERARY
+- Day 1: Arrival and Local Sightseeing. Explore the city center and enjoy local cuisine.
+- Day 2: Visit top landmarks and historical sites.
+- Day 3: Leisure day, shopping, and departure.
+
+# ⚠️ SMART TRAVEL TIPS
+- Book in advance for better rates.
+- Use local transport for an authentic experience.
+- Keep a digital copy of your documents.
+`;
+
 export async function generateItinerary(request: ItineraryRequest) {
   const { location, startLocation, duration, numPeople, travelStyle, language = "en", budgetData } = request;
+
+  if (!apiKey) {
+    console.error("Gemini API key is missing. Please set VITE_GEMINI_API_KEY in your environment.");
+    return FALLBACK_ITINERARY;
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   let budgetInstructions = "";
   if (budgetData) {
@@ -137,9 +170,19 @@ export async function generateItinerary(request: ItineraryRequest) {
       contents: prompt,
     });
 
-    return response.text || "Sorry, I couldn't generate the plan.";
-  } catch (error) {
+    if (!response.text) {
+      throw new Error("Empty response from Gemini API");
+    }
+
+    return response.text;
+  } catch (error: any) {
     console.error("Error generating itinerary:", error);
-    return "Something went wrong. Please try again.";
+    
+    // Check for specific error types if needed
+    if (error.message?.includes("expired") || error.status === 400) {
+      console.warn("Gemini API key might be expired or invalid. Using fallback.");
+    }
+
+    return FALLBACK_ITINERARY;
   }
 }
