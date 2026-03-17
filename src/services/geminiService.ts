@@ -69,106 +69,64 @@ export async function generateItinerary(request: ItineraryRequest) {
     ? "The user is a PREMIUM member. Provide a full, detailed, and comprehensive itinerary with all sections."
     : "The user is a FREE member. Provide a BRIEF overview and the first 2 days of the itinerary ONLY. At the end, add a note: '[PREMIUM_ONLY] Upgrade to unlock the full day-wise plan, hidden gems, and local secrets.'";
 
-  const prompt = `You are BHATKANTIMITRA – a smart AI Global Travel Planner.
-  Your role is to create a complete, AUTO-BUDGETED travel plan for any destination in the world, including travel options from the user's starting location.
-  
-  User Details:
-  - Starting Location: ${startLocation}
-  - Destination: ${location}
-  - Duration: ${duration} days
-  - Number of People: ${numPeople}
-  - Travel Style: ${travelStyle}
-  
+  const prompt = `You are a professional travel planner.
+  Create a COMPLETE and VERY DETAILED travel itinerary.
+
+  Trip Details:
+  From: ${startLocation}
+  To: ${location}
+  Days: ${duration}
+  Travelers: ${numPeople}
+  Travel Style: ${travelStyle}
+
   ${budgetInstructions}
   ${premiumInstructions}
-  
-  Language Rule:
-  - If the user input is in Marathi or the requested language is Marathi, reply in Marathi.
-  - Otherwise, reply in English.
-  Current Language: ${language === "mr" ? "Marathi" : "English"}.
-  
-  AI TASK:
-  1. TRAVEL OPTIONS FROM STARTING LOCATION:
-     - Generate best travel options from ${startLocation} to ${location}.
-     - Include:
-       ✈️ Best flight options (estimated time & price)
-       🚆 Train options (if applicable)
-       🚌 Bus options (if applicable)
-       🚗 Self-drive distance and travel time
-     - Show:
-       - Total travel distance
-       - Total travel time
-       - Estimated travel cost (add this to the total budget)
-       - Best departure time
-       - Nearest airport / railway station for both cities.
 
-  2. AUTO-CALCULATE the budget for this trip based on the destination, travel style, and travel costs from ${startLocation}.
-  
-  3. Provide a structured travel plan with the following sections using Markdown headers:
-  
-  # 🌍 DESTINATION OVERVIEW
-  - Best time to visit for lowest cost
-  - Crowd level
-  - Weather insight
-  - Visa requirement (if international)
-  - Currency used
-  
-  # ✈️ TRAVEL FROM ${startLocation.toUpperCase()} TO ${location.toUpperCase()}
-  - Detailed travel options as requested above.
-  - Total travel distance: [Distance]
-  - Total travel time: [Time]
-  - Estimated travel cost: [Amount]
-  
-  # 💰 BUDGET ESTIMATION (Auto-Calculated)
-  - Budget Category: [Budget Trip / Standard Trip / Luxury Trip]
-  - Estimated Total Cost: [Amount] (Including travel from ${startLocation})
-  - Cost per person: [Amount]
-  - Cost per day: [Amount]
-  
-  ## 📊 Cost Breakdown
-  - ✈️ Travel from ${startLocation}: [Amount]
-  - 🏨 Hotel cost: [Amount]
-  - 🍽 Food cost: [Amount]
-  - 🚕 Transport cost: [Amount]
-  - 🎟 Activities & entry fees: [Amount]
-  - ➕ Buffer amount: [Amount]
-  
-  # 💡 TRAVEL STRATEGY
-  - [If Budget/Backpacking] Savings tips for budget travellers.
-  - [If Luxury] Upgrade suggestions for a more premium experience.
-  - [General] Optimization tips for this specific destination.
-  
-  # 🗓 DAY-WISE ITINERARY
-  Create a clear plan for each day with:
-  - Day 1: MUST mention travel from ${startLocation} to ${location}.
-  - Morning, Afternoon, Evening, Night
-  - Include: Travel route, estimated distance, and parking availability.
-  
-  # 📍 TOP ATTRACTIONS & EXPERIENCES
-  - Must-visit places in the suggested budget.
-  - Hidden gems.
-  - Nearby experiences.
-  
-  # 🍜 FOOD TO TRY
-  - Famous local food and best budget-friendly/premium eateries.
-  
-  # 🏨 HOTEL SUGGESTIONS (Within Budget)
-  - Suggest 3 specific hotels that fit the calculated budget for ${numPeople} people.
-  
-  # 🚆 TRANSPORT GUIDE
-  - Best transport options (Local/Intercity).
-  
-  # 📸 PHOTO SPOTS & 🛍 SHOPPING
-  - Instagram-worthy locations.
-  - What to buy.
-  
-  # ⚠️ SMART TRAVEL TIPS
-  - Practical tips for this location.
-  
-  💎 OUTPUT STYLE:
-  - Use emojis, headings, and proper spacing.
-  - Use cards/tables for budget breakdown if possible.
-  - Keep it structured and easy to read.`;
+  IMPORTANT INSTRUCTIONS:
+  - Give VERY detailed output (minimum 1200 words if premium)
+  - Do NOT give short summary
+  - Write in structured format with headings
+  - Include all details clearly
+  - Language Rule: If the user input is in Marathi or the requested language is Marathi, reply in Marathi. Otherwise, reply in English. Current Language: ${language === "mr" ? "Marathi" : "English"}.
+
+  FORMAT:
+
+  # 🌍 Overview of the trip
+  Provide a comprehensive overview of the destination, best time to visit, and what to expect.
+
+  # 🗓 Day-wise detailed itinerary
+  - Detailed plan for each day (Morning, Afternoon, Evening)
+  - Exact places to visit with descriptions
+  - MUST mention travel from ${startLocation} to ${location} on Day 1.
+
+  # 🚆 Transport
+  - Flight, Train, Bus options from ${startLocation} to ${location}
+  - Time + price estimate for each
+  - Nearest airport / railway station for both cities.
+
+  # 🏨 Hotels
+  - Budget, Standard, and Luxury suggestions
+  - Specific area suggestions for staying
+
+  # 🍜 Food
+  - Famous local dishes
+  - Best places to eat (budget-friendly and premium)
+
+  # 💎 Hidden gems
+  - Less crowded places
+  - Unique local experiences
+
+  # 💰 Budget breakdown
+  - Travel cost
+  - Hotel cost
+  - Food cost
+  - Local transport
+  - Total estimate (Use the pre-calculated values if provided in instructions)
+
+  # ⚠️ Travel tips
+  - Practical advice, safety tips, and cultural etiquette.
+
+  Make it detailed like a professional travel guide. Use emojis and clear Markdown formatting.`;
 
   try {
     const response = await ai.models.generateContent({
