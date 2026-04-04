@@ -10,24 +10,23 @@ import {
   Utensils, Hotel, Navigation, Sparkles, Loader2, 
   User, Users, Heart, Users2, Church, Trees, Castle,
   Clock, Thermometer, Info, ExternalLink, Compass,
-  Mountain, Briefcase, Crown, X, MessageSquare,
-  Home, Globe,
+  Mountain, Briefcase, Crown, Wallet as WalletIcon,
+  Home, Globe, Briefcase as BookingIcon, User as ProfileIcon,
   ArrowRight, ArrowLeft, Camera, ShoppingBag, Lightbulb,
   Bell, Moon, Sun, Languages, LogOut, Settings, HelpCircle, ShieldCheck, Phone,
   AlertTriangle, Check,
   Mail, Lock, Eye, EyeOff, Github, Share2,
   Plane, TrainFront, Bus, Car, Package,
-  GripVertical, Navigation2, Zap
+  GripVertical, MapPin as MapPinIcon, Navigation2, Zap
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
-import { generateItinerary, getChatResponse } from './services/geminiService';
+import { generateItinerary } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
-import { BUDGET_DESTINATIONS, type Destination } from './data/destinations';
 
-const libraries: ("places" | "geometry")[] = ["places", "geometry"];
+const libraries: ("places")[] = ["places"];
 
 import { auth, db } from './firebase';
 import { 
@@ -50,284 +49,8 @@ import {
   onSnapshot,
   deleteDoc,
   updateDoc,
-  orderBy,
-  getDocFromServer
+  orderBy
 } from 'firebase/firestore';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
-
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      let errorMessage = "Something went wrong.";
-      try {
-        const parsedError = JSON.parse(this.state.error?.message || "{}");
-        if (parsedError.error) {
-          errorMessage = `Database Error: ${parsedError.error}. Please check your permissions.`;
-        }
-      } catch (e) {
-        errorMessage = this.state.error?.message || errorMessage;
-      }
-
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl max-w-md w-full text-center space-y-6">
-            <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto">
-              <AlertTriangle size={40} className="text-rose-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-[#0A2540]">Application Error</h2>
-            <p className="text-gray-500 leading-relaxed">{errorMessage}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full bg-[#0A2540] text-white py-4 rounded-2xl font-bold hover:bg-[#1E90FF] transition-all"
-            >
-              Reload Application
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-const ItineraryDisplay = ({ content, isPremium, onUpgrade }: { content: string; isPremium: boolean; onUpgrade: () => void }) => {
-  const sections = useMemo(() => {
-    const parts = content.split('# ');
-    return parts.filter(p => p.trim()).map(p => {
-      const lines = p.split('\n');
-      const title = lines[0].trim();
-      const body = lines.slice(1).join('\n').trim();
-      return { title, body };
-    });
-  }, [content]);
-
-  const getIcon = (title: string) => {
-    const t = title.toLowerCase();
-    if (t.includes('overview')) return <Globe className="text-sky-500" />;
-    if (t.includes('transport')) return <Plane className="text-navy-500" />;
-    if (t.includes('budget')) return <Wallet className="text-emerald-500" />;
-    if (t.includes('itinerary')) return <Calendar className="text-orange-500" />;
-    if (t.includes('hotels')) return <Hotel className="text-purple-500" />;
-    if (t.includes('food')) return <Utensils className="text-rose-500" />;
-    if (t.includes('hidden gems')) return <Sparkles className="text-amber-500" />;
-    if (t.includes('tips')) return <Lightbulb className="text-yellow-500" />;
-    return <Info className="text-gray-500" />;
-  };
-
-  return (
-    <div className="space-y-8">
-      {sections.map((section, idx) => (
-        <motion.div
-          key={idx}
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: idx * 0.1 }}
-          className="glass-card p-6 rounded-3xl"
-        >
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-white rounded-2xl shadow-sm">
-              {getIcon(section.title)}
-            </div>
-            <h3 className="text-xl font-bold text-navy">{section.title}</h3>
-          </div>
-          <div className="markdown-body">
-            <Markdown>{section.body}</Markdown>
-          </div>
-          {!isPremium && idx > 2 && (
-            <div className="mt-4 p-6 bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl border border-orange-100 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
-                  <Crown size={24} />
-                </div>
-                <div>
-                  <p className="text-sm text-orange-900 font-bold">Premium Content Locked</p>
-                  <p className="text-xs text-orange-700">Upgrade to unlock full day-wise plan, hidden gems, and local secrets.</p>
-                </div>
-              </div>
-              <button 
-                onClick={onUpgrade}
-                className="px-6 py-3 bg-[#FF8A00] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-105 transition-all"
-              >
-                Unlock Now
-              </button>
-            </div>
-          )}
-        </motion.div>
-      ))}
-    </div>
-  );
-};
-
-const ChatAssistant = ({ isOpen, onClose, location }: { isOpen: boolean; onClose: () => void; location?: string }) => {
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-
-  const handleSend = async () => {
-    if (!input.trim() || isTyping) return;
-    
-    const userMsg = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
-    setIsTyping(true);
-
-    try {
-      const response = await getChatResponse(userMsg, messages, location);
-      setMessages(prev => [...prev, { role: 'assistant', text: response }]);
-    } catch (error) {
-      console.error("Chat Error:", error);
-      setMessages(prev => [...prev, { role: 'assistant', text: "Sorry, I'm having trouble connecting right now. Please try again later." }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-navy/60 backdrop-blur-sm"
-      />
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[600px]"
-      >
-        <div className="p-6 bg-navy text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center shadow-lg">
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <h3 className="font-bold">Travolor AI Assistant</h3>
-              <p className="text-[10px] text-white/60 uppercase tracking-widest">Always here to help</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
-          {messages.length === 0 && (
-            <div className="text-center py-10 space-y-4">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
-                <MessageSquare className="text-blue-500" size={32} />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[#0A2540] font-bold">How can I help you today?</p>
-                <p className="text-gray-400 text-sm">Ask me about hotels, food, or local tips for {location || 'your trip'}!</p>
-              </div>
-            </div>
-          )}
-          {messages.map((msg, idx) => (
-            <div key={idx} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
-              <div className={cn(
-                "max-w-[85%] p-4 rounded-3xl text-sm leading-relaxed shadow-sm",
-                msg.role === 'user' ? "bg-navy text-white rounded-tr-none" : "bg-gray-50 text-[#0A2540] rounded-tl-none border border-gray-100"
-              )}>
-                <Markdown>{msg.text}</Markdown>
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-gray-50 p-4 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
-                <Loader2 className="animate-spin text-orange-500" size={20} />
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="p-6 bg-white border-t border-gray-100 flex gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Type your message..."
-            className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-navy/5 outline-none transition-all"
-          />
-          <button
-            onClick={handleSend}
-            disabled={isTyping || !input.trim()}
-            className="w-14 h-14 bg-navy text-white rounded-2xl flex items-center justify-center hover:bg-navy/90 transition-all disabled:opacity-50 shadow-lg shadow-navy/10"
-          >
-            <ArrowRight size={24} />
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -345,7 +68,7 @@ const StyleColors: Record<string, { bg: string; text: string; border: string; li
 };
 
 const IconMap: Record<string, any> = {
-  Wallet: Wallet,
+  Wallet: WalletIcon,
   Briefcase,
   Crown,
   Compass,
@@ -356,12 +79,12 @@ const IconMap: Record<string, any> = {
 };
 
 const BOOKING_SERVICES = [
-  { id: 'hotels', label: 'Hotels', icon: Hotel, color: 'bg-[#1E90FF]', link: (loc: string) => `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(loc)}` },
-  { id: 'flights', label: 'Flights', icon: Plane, color: 'bg-[#0A2540]', link: (loc: string) => `https://www.skyscanner.com/transport/flights-from/anywhere/to/${encodeURIComponent(loc)}` },
-  { id: 'trains', label: 'Trains', icon: TrainFront, color: 'bg-red-600', link: (loc: string) => `https://www.irctc.co.in/nget/train-search` },
-  { id: 'buses', label: 'Buses', icon: Bus, color: 'bg-rose-500', link: (loc: string) => `https://www.redbus.in/search?toCityName=${encodeURIComponent(loc)}` },
-  { id: 'cabs', label: 'Cabs', icon: Car, color: 'bg-amber-500', link: (loc: string) => `https://www.olacabs.com` },
-  { id: 'packages', label: 'Packages', icon: Package, color: 'bg-purple-600', link: (loc: string) => `https://www.makemytrip.com/holiday-packages/search?dest=${encodeURIComponent(loc)}` },
+  { id: 'hotels', label: 'Hotels', icon: Hotel, color: 'bg-[#1E90FF]', link: (from: string, to: string) => `https://www.makemytrip.com/hotels/hotel-listing/?city=${encodeURIComponent(to)}` },
+  { id: 'flights', label: 'Flights', icon: Plane, color: 'bg-[#0A2540]', link: (from: string, to: string) => `https://www.makemytrip.com/flight/search?itinerary=${encodeURIComponent(from)}-${encodeURIComponent(to)}-${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')}&tripType=O&paxType=A-1_C-0_I-0&intl=false&cabinClass=E` },
+  { id: 'trains', label: 'Trains', icon: TrainFront, color: 'bg-red-600', link: (from: string, to: string) => `https://www.makemytrip.com/railways/listing?srcCity=${encodeURIComponent(from)}&destCity=${encodeURIComponent(to)}&date=${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')}` },
+  { id: 'buses', label: 'Buses', icon: Bus, color: 'bg-rose-500', link: (from: string, to: string) => `https://www.redbus.in/search?fromCityName=${encodeURIComponent(from)}&toCityName=${encodeURIComponent(to)}` },
+  { id: 'cabs', label: 'Cabs', icon: Car, color: 'bg-amber-500', link: (from: string, to: string) => `https://www.makemytrip.com/cabs/listing/?fromCity=${encodeURIComponent(from)}&toCity=${encodeURIComponent(to)}` },
+  { id: 'packages', label: 'Packages', icon: Package, color: 'bg-purple-600', link: (from: string, to: string) => `https://www.makemytrip.com/holiday-packages/search?dest=${encodeURIComponent(to)}` },
 ];
 
 const TRENDING_DESTINATIONS = [
@@ -459,8 +182,7 @@ const LocationInput = ({
   isLoaded,
   showLocationButton,
   onLocationDetect,
-  isLocating,
-  variant = 'light'
+  isLocating
 }: any) => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -469,76 +191,46 @@ const LocationInput = ({
 
   React.useEffect(() => {
     if (isLoaded && !service && window.google) {
-      try {
-        setService(new google.maps.places.AutocompleteService());
-        setSessionToken(new google.maps.places.AutocompleteSessionToken());
-      } catch (err) {
-        console.warn("Google Places Autocomplete service failed to initialize:", err);
-      }
+      setService(new google.maps.places.AutocompleteService());
+      setSessionToken(new google.maps.places.AutocompleteSessionToken());
     }
   }, [isLoaded]);
 
   React.useEffect(() => {
-    if (value && value.length > 0 && !value.includes(',')) {
-      const timeoutId = setTimeout(async () => {
-        if (service) {
-          service.getPlacePredictions(
-            { 
-              input: value, 
-              types: ['(cities)'],
-              sessionToken: sessionToken || undefined
-            },
-            (predictions: any, status: any) => {
-              if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-                setSuggestions(predictions);
-                setShowSuggestions(true);
-              } else {
-                fetchBackendAutocomplete();
-              }
+    if (service && value && value.length > 0 && !value.includes(',')) {
+      const timeoutId = setTimeout(() => {
+        service.getPlacePredictions(
+          { 
+            input: value, 
+            types: ['(cities)'],
+            sessionToken: sessionToken || undefined
+          },
+          (predictions: any, status: any) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+              setSuggestions(predictions);
+              setShowSuggestions(true);
+            } else {
+              // Fallback to local search if API fails or returns no results
+              const filtered = FALLBACK_CITIES.filter(c => 
+                c.description.toLowerCase().includes(value.toLowerCase())
+              );
+              setSuggestions(filtered);
+              setShowSuggestions(filtered.length > 0);
             }
-          );
-        } else {
-          fetchBackendAutocomplete();
-        }
+          }
+        );
       }, 200);
       return () => clearTimeout(timeoutId);
+    } else if (!service && value && value.length > 0 && !value.includes(',')) {
+      // Fallback if service is not available
+      const filtered = FALLBACK_CITIES.filter(c => 
+        c.description.toLowerCase().includes(value.toLowerCase())
+      );
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
-    }
-
-    async function fetchBackendAutocomplete() {
-      if (!value || value.length < 2) return;
-      
-      try {
-        const res = await fetch(`/api/search/autocomplete?input=${encodeURIComponent(value)}`);
-        if (!res.ok) {
-          throw new Error(`Autocomplete API returned ${res.status}`);
-        }
-        const data = await res.json();
-        if (data && data.length > 0) {
-          setSuggestions(data.map((item: any) => ({
-            description: item.description,
-            place_id: item.id,
-            structured_formatting: { main_text: item.main_text }
-          })));
-          setShowSuggestions(true);
-        } else {
-          // Final fallback to local search
-          const filtered = FALLBACK_CITIES.filter(c => 
-            c.description.toLowerCase().includes(value.toLowerCase())
-          );
-          setSuggestions(filtered);
-          setShowSuggestions(filtered.length > 0);
-        }
-      } catch (err) {
-        console.warn("Backend autocomplete failed, using local fallback:", err);
-        const filtered = FALLBACK_CITIES.filter(c => 
-          c.description.toLowerCase().includes(value.toLowerCase())
-        );
-        setSuggestions(filtered);
-        setShowSuggestions(filtered.length > 0);
-      }
     }
   }, [value, service, sessionToken]);
 
@@ -547,24 +239,20 @@ const LocationInput = ({
     setShowSuggestions(false);
     
     if (isLoaded && window.google) {
-      try {
-        const placesService = new google.maps.places.PlacesService(document.createElement('div'));
-        placesService.getDetails(
-          { 
-            placeId: suggestion.place_id,
-            fields: ['geometry', 'formatted_address', 'name'],
-            sessionToken: sessionToken || undefined
-          },
-          (place: any, status: any) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-              onPlaceSelect(place);
-              setSessionToken(new google.maps.places.AutocompleteSessionToken());
-            }
+      const placesService = new google.maps.places.PlacesService(document.createElement('div'));
+      placesService.getDetails(
+        { 
+          placeId: suggestion.place_id,
+          fields: ['geometry', 'formatted_address', 'name'],
+          sessionToken: sessionToken || undefined
+        },
+        (place: any, status: any) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+            onPlaceSelect(place);
+            setSessionToken(new google.maps.places.AutocompleteSessionToken());
           }
-        );
-      } catch (err) {
-        console.warn("PlacesService failed to initialize:", err);
-      }
+        }
+      );
     }
   };
 
@@ -574,21 +262,16 @@ const LocationInput = ({
         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</span>
       </div>
       <div className="absolute inset-y-0 left-5 flex items-center pt-5 pointer-events-none">
-        {Icon && <Icon className="text-gray-300 group-focus-within:text-[#1E90FF] transition-colors" size={20} />}
+        <Icon className="text-gray-300 group-focus-within:text-[#1E90FF] transition-colors" size={20} />
       </div>
       <input
         type="text"
-        value={value || ''}
+        value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => value && suggestions.length > 0 && setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         placeholder={placeholder}
-        className={cn(
-          "w-full border rounded-2xl pl-14 pr-12 pt-8 pb-4 text-lg font-semibold placeholder:text-gray-300 outline-none transition-all",
-          variant === 'light' 
-            ? "bg-gray-50 border-gray-200 text-[#0A2540] focus:ring-2 focus:ring-blue-100 focus:bg-white" 
-            : "bg-white/10 border-white/20 text-white focus:bg-white/20"
-        )}
+        className="input-premium pl-14 pr-12 pt-8 pb-4 text-lg font-semibold"
       />
       
       {showLocationButton && (
@@ -645,27 +328,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [headlineIndex, setHeadlineIndex] = useState(0);
 
   const headlines = ["Explore the World with Travolor", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
-  const heroImages = [
-    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80", // Sea / Beach
-    "https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1920&q=80", // Waterfall
-    "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?auto=format&fit=crop&w=1920&q=80", // Desert
-    "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80"  // Mountains
-  ];
-
-  useEffect(() => {
-    async function testConnection() {
-      if (!db) return;
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if(error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration. ");
-        }
-        // Skip logging for other errors, as this is simply a connection test.
-      }
-    }
-    testConnection();
-  }, []);
 
   useEffect(() => {
     if (activeTab === 'explore') {
@@ -685,25 +347,18 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [itinerary, setItinerary] = useState<string | null>(null);
   const [routeSummary, setRouteSummary] = useState<{distance: string, time: string, mode: string} | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('tripgenious_theme');
+    const saved = localStorage.getItem('travolor_theme');
     return saved === 'dark';
   });
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [language, setLanguage] = useState(() => localStorage.getItem('tripgenious_lang') || "English");
-  const [currency, setCurrency] = useState(() => localStorage.getItem('tripgenious_currency') || "INR (₹)");
+  const [language, setLanguage] = useState(() => localStorage.getItem('travolor_lang') || "English");
+  const [currency, setCurrency] = useState(() => localStorage.getItem('travolor_currency') || "INR (₹)");
   const [savedTrips, setSavedTrips] = useState<{id: string, start_location?: string, location: string, duration: number, style: string, budget?: string, itinerary: string, created_at?: string}[]>([]);
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', phone: '', photo: '' });
   const [isLocating, setIsLocating] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-
-  const upgradeToPremium = () => {
-    setIsPremium(true);
-    showToast("Welcome to Premium! You now have full access to all features.", "success");
-  };
   const [typingText, setTypingText] = useState("");
   const [startAutocomplete, setStartAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [endAutocomplete, setEndAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
@@ -712,175 +367,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [userTotalBudget, setUserTotalBudget] = useState<number>(50000);
   const [transportType, setTransportType] = useState("public"); // public, private, flight
   const [accommodationType, setAccommodationType] = useState("standard"); // hostel, standard, luxury
-  const [adminConfig, setAdminConfig] = useState<any>(null);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [adminStats, setAdminStats] = useState<any>(null);
-  const [adminLoginForm, setAdminLoginForm] = useState({ email: '', password: '' });
-  const [isAdminLoading, setIsAdminLoading] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/admin/config')
-      .then(res => res.json())
-      .then(data => setAdminConfig(data))
-      .catch(err => console.error("Failed to fetch admin config:", err));
-  }, []);
-
-  const fetchAdminStats = async () => {
-    try {
-      const res = await fetch('/api/admin/stats', {
-        headers: {
-          'Authorization': 'Bearer admin-token-123'
-        }
-      });
-      const data = await res.json();
-      setAdminStats(data);
-    } catch (err) {
-      console.error("Failed to fetch admin stats:", err);
-    }
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAdminLoading(true);
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(adminLoginForm)
-      });
-      const data = await res.json();
-      if (data.success) {
-        setIsAdminLoggedIn(true);
-        fetchAdminStats();
-        showToast("Admin logged in successfully", "success");
-      } else {
-        showToast(data.message || "Invalid admin credentials", "error");
-      }
-    } catch (err) {
-      showToast("Admin login failed", "error");
-    } finally {
-      setIsAdminLoading(false);
-    }
-  };
-
-  // Budget Finder State
-  const [budgetFinderInput, setBudgetFinderInput] = useState({
-    startLocation: "",
-    totalBudget: 20000,
-    travelType: "Solo", // Solo, Couple, Family, Friends
-    duration: "2-3 days", // 1 day, 2-3 days, 4-5 days
-    budgetLevel: "Standard" // Standard, Luxury
-  });
-  const [budgetResults, setBudgetResults] = useState<any[]>([]);
-  const [isFindingDestinations, setIsFindingDestinations] = useState(false);
-  const [activeService, setActiveService] = useState<'hotels' | 'flights' | 'trains' | 'buses' | 'cabs' | 'packages' | null>(null);
-  const [serviceSearch, setServiceSearch] = useState({
-    city: '',
-    from: '',
-    to: '',
-    date: new Date().toISOString().split('T')[0],
-    passengers: 1,
-    rooms: 1
-  });
-  const [isSearchingService, setIsSearchingService] = useState(false);
-  const [serviceResults, setServiceResults] = useState<any[]>([]);
-  const [attractions, setAttractions] = useState<any[]>([]);
-
-  const handleServiceSearch = async () => {
-    const loc = activeService === 'hotels' || activeService === 'packages' ? serviceSearch.city : serviceSearch.to;
-    if (!loc) {
-      showToast("Please enter a destination.", "error");
-      return;
-    }
-    
-    setIsSearchingService(true);
-    setServiceResults([]);
-    
-    try {
-      let endpoint = "";
-      const params = new URLSearchParams();
-      
-      if (activeService === 'hotels') {
-        endpoint = "/api/search/hotels";
-        params.append("city", serviceSearch.city);
-      } else if (activeService === 'flights') {
-        endpoint = "/api/search/flights";
-        params.append("from", serviceSearch.from);
-        params.append("to", serviceSearch.to);
-        params.append("date", serviceSearch.date);
-      } else if (activeService === 'trains') {
-        endpoint = "/api/search/trains";
-        params.append("from", serviceSearch.from);
-        params.append("to", serviceSearch.to);
-      } else if (activeService === 'buses') {
-        endpoint = "/api/search/buses";
-        params.append("from", serviceSearch.from);
-        params.append("to", serviceSearch.to);
-      } else if (activeService === 'cabs') {
-        endpoint = "/api/search/cabs";
-        params.append("from", serviceSearch.from);
-        params.append("to", serviceSearch.to);
-      } else if (activeService === 'packages') {
-        endpoint = "/api/search/hotels";
-        params.append("city", serviceSearch.city);
-      }
-
-      if (user) {
-        params.append("userId", user.id.toString());
-      }
-
-      const response = await fetch(`${endpoint}?${params.toString()}`);
-      const data = await response.json();
-      
-      if (data.error) throw new Error(data.error);
-      
-      setServiceResults(data);
-
-      // Fetch attractions if it's a city-based search
-      if (activeService === 'hotels' || activeService === 'packages') {
-        const attrRes = await fetch(`/api/search/attractions?city=${serviceSearch.city}`);
-        const attrData = await attrRes.json();
-        setAttractions(attrData);
-      } else {
-        setAttractions([]);
-      }
-    } catch (error) {
-      console.error("Search Error:", error);
-      showToast("Failed to fetch real-time data. Showing popular options.", "error");
-      // Fallback mock data
-      setServiceResults([
-        { id: 1, name: "Premium Option", price: 5000, rating: 4.9, type: "Luxury" },
-        { id: 2, name: "Standard Option", price: 2500, rating: 4.2, type: "Comfort" }
-      ]);
-    } finally {
-      setIsSearchingService(false);
-    }
-  };
-  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setToast({ message, type });
-  };
-  const [selectedBudgetTrip, setSelectedBudgetTrip] = useState<any | null>(null);
 
   const liveBudget = useMemo(() => {
-    if (selectedBudgetTrip && selectedBudgetTrip.destination_name === locationInput) {
-      return {
-        transportCost: selectedBudgetTrip.travelCost,
-        hotelCost: selectedBudgetTrip.hotelCost,
-        foodCost: selectedBudgetTrip.foodCost,
-        activitiesCost: selectedBudgetTrip.localTransport,
-        totalCost: selectedBudgetTrip.totalCost
-      };
-    }
-
     const transportRates: Record<string, number> = { public: 500, private: 2000, flight: 5000 };
     const hotelRates: Record<string, number> = { hostel: 800, standard: 2500, luxury: 8000 };
     const foodRates: Record<string, number> = { budget: 500, standard: 1200, luxury: 3000 };
@@ -974,7 +462,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             const { latitude, longitude } = position.coords;
             if (isLoaded && window.google) {
               const geocoder = new google.maps.Geocoder();
-              geocoder.geocode({ location: { lat: latitude, lng: longitude } }, async (results, status) => {
+              geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
                 if (status === 'OK' && results && results[0]) {
                   const cityComponent = results[0].address_components.find(
                     (c: any) => c.types.includes('locality') || c.types.includes('administrative_area_level_2')
@@ -985,20 +473,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   if (cityComponent) {
                     setStartLocation(`${cityComponent.long_name}${stateComponent ? ', ' + stateComponent.long_name : ''}`);
                   }
-                  setIsLocating(false);
-                } else {
-                  // Fallback to Nominatim if Geocoding API fails or is blocked
-                  try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-                    const data = await response.json();
-                    const city = data.address.city || data.address.town || data.address.village || data.address.suburb;
-                    const state = data.address.state || data.address.country;
-                    if (city) setStartLocation(`${city}${state ? ', ' + state : ''}`);
-                  } catch (err) {
-                    console.error("Nominatim fallback failed:", err);
-                  }
-                  setIsLocating(false);
                 }
+                setIsLocating(false);
               });
             } else {
               const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
@@ -1205,20 +681,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Fetch additional profile data from Firestore
-        try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          const userData = userDoc.exists() ? userDoc.data() : {};
-          
-          setUser({
-            id: firebaseUser.uid,
-            name: userData.name || firebaseUser.displayName || 'Traveler',
-            email: firebaseUser.email || '',
-            photo: userData.photo || firebaseUser.photoURL || '',
-            phone: userData.phone || ''
-          });
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
-        }
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        const userData = userDoc.exists() ? userDoc.data() : {};
+        
+        setUser({
+          id: firebaseUser.uid,
+          name: userData.name || firebaseUser.displayName || 'Traveler',
+          email: firebaseUser.email || '',
+          photo: userData.photo || firebaseUser.photoURL || '',
+          phone: userData.phone || ''
+        });
       } else {
         setUser(null);
       }
@@ -1243,8 +715,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribeTrips = onSnapshot(tripsQuery, (snapshot) => {
       const trips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       setSavedTrips(trips);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'trips');
     });
 
     // Listen to Bookings
@@ -1255,8 +725,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribeBookings = onSnapshot(bookingsQuery, (snapshot) => {
       const bks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       setBookings(bks);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'bookings');
     });
 
     // Listen to Wishlist
@@ -1267,8 +735,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribeWishlist = onSnapshot(wishlistQuery, (snapshot) => {
       const wsh = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       setWishlist(wsh);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'wishlist');
     });
 
     // Listen to User Budget
@@ -1278,8 +744,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         const data = doc.data();
         if (data.totalBudget) setUserTotalBudget(data.totalBudget);
       }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${user.id}`);
     });
 
     setEditForm({ name: user.name, phone: user.phone || '', photo: user.photo || '' });
@@ -1294,15 +758,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
-    localStorage.setItem('tripgenious_theme', isDarkMode ? 'dark' : 'light');
+    localStorage.setItem('travolor_theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
   React.useEffect(() => {
-    localStorage.setItem('tripgenious_lang', language);
+    localStorage.setItem('travolor_lang', language);
   }, [language]);
 
   React.useEffect(() => {
-    localStorage.setItem('tripgenious_currency', currency);
+    localStorage.setItem('travolor_currency', currency);
   }, [currency]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -1321,16 +785,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         const newUser = userCredential.user;
         
         // Initialize user profile in Firestore
-        try {
-          await setDoc(doc(db, 'users', newUser.uid), {
-            name: authForm.name,
-            email: authForm.email,
-            totalBudget: 50000,
-            created_at: new Date().toISOString()
-          });
-        } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `users/${newUser.uid}`);
-        }
+        await setDoc(doc(db, 'users', newUser.uid), {
+          name: authForm.name,
+          email: authForm.email,
+          totalBudget: 50000,
+          created_at: new Date().toISOString()
+        });
 
         await firebaseUpdateProfile(newUser, {
           displayName: authForm.name
@@ -1339,13 +799,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       setActiveTab('explore');
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setAuthError("Email/Password sign-in is not enabled in Firebase Console. Please go to Authentication > Sign-in method and enable it.");
-      } else if (err.code === 'auth/invalid-credential') {
-        setAuthError("Invalid email or password. Please check your credentials and try again.");
-      } else {
-        setAuthError(err.message || "Authentication failed.");
-      }
+      setAuthError(err.message || "Authentication failed.");
     } finally {
       setLoading(false);
     }
@@ -1363,30 +817,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       const user = result.user;
       
       // Check if user exists in Firestore, if not create
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (!userDoc.exists()) {
-          await setDoc(doc(db, 'users', user.uid), {
-            name: user.displayName || 'Traveler',
-            email: user.email,
-            photo: user.photoURL,
-            totalBudget: 50000,
-            created_at: new Date().toISOString()
-          });
-        }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName || 'Traveler',
+          email: user.email,
+          photo: user.photoURL,
+          totalBudget: 50000,
+          created_at: new Date().toISOString()
+        });
       }
       setActiveTab('explore');
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setAuthError("Google sign-in is not enabled in Firebase Console. Please go to Authentication > Sign-in method and enable it.");
-      } else if (err.code === 'auth/invalid-credential') {
-        setAuthError("Google login failed. Please ensure your App URL is added to 'Authorized domains' in Firebase Console > Authentication > Settings.");
-      } else {
-        setAuthError(err.message || "Google login failed.");
-      }
+      setAuthError(err.message || "Google login failed.");
     } finally {
       setLoading(false);
     }
@@ -1399,271 +843,48 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     setActiveTab('explore');
   };
 
-  const findBudgetDestinations = async () => {
-    if (!budgetFinderInput.startLocation.trim()) {
-      showToast("Please enter a starting location.", "error");
+  const handleGenerate = async (overrideStyle?: string) => {
+    if (!locationInput.trim()) {
+      alert("Please enter a destination.");
       return;
     }
-
-    setIsFindingDestinations(true);
-    setBudgetResults([]);
-
-    try {
-      // 1. Get coordinates for start location
-      let startLat = 19.0760; // Default Mumbai
-      let startLng = 72.8777;
-
-      const CITY_COORDS: Record<string, {lat: number, lng: number}> = {
-        'mumbai': { lat: 19.0760, lng: 72.8777 },
-        'delhi': { lat: 28.6139, lng: 77.2090 },
-        'bangalore': { lat: 12.9716, lng: 77.5946 },
-        'hyderabad': { lat: 17.3850, lng: 78.4867 },
-        'chennai': { lat: 13.0827, lng: 80.2707 },
-        'kolkata': { lat: 22.5726, lng: 88.3639 },
-        'pune': { lat: 18.5204, lng: 73.8567 },
-        'ahmedabad': { lat: 23.0225, lng: 72.5714 },
-        'jaipur': { lat: 26.9124, lng: 75.7873 },
-        'lucknow': { lat: 26.8467, lng: 80.9462 },
-        'chandigarh': { lat: 30.7333, lng: 76.7794 },
-        'kochi': { lat: 9.9312, lng: 76.2673 },
-        'goa': { lat: 15.2993, lng: 74.1240 },
-      };
-
-      const lowerStart = budgetFinderInput.startLocation.toLowerCase().trim();
-      if (CITY_COORDS[lowerStart]) {
-        startLat = CITY_COORDS[lowerStart].lat;
-        startLng = CITY_COORDS[lowerStart].lng;
-      } else if (isLoaded && window.google) {
-        try {
-          const geocoder = new google.maps.Geocoder();
-          const res = await new Promise<any>((resolve) => 
-            geocoder.geocode({ address: budgetFinderInput.startLocation }, (r, status) => {
-              if (status === 'OK') resolve(r);
-              else resolve(null);
-            })
-          );
-          if (res && res[0]) {
-            startLat = res[0].geometry.location.lat();
-            startLng = res[0].geometry.location.lng();
-          }
-        } catch (geoErr) {
-          console.warn("Geocoding failed, using default coordinates:", geoErr);
-        }
-      }
-
-      // 2. Calculate distances
-      const distances: Record<string, number> = {};
-      
-      // Default: Haversine fallback
-      BUDGET_DESTINATIONS.forEach(dest => {
-        const R = 6371;
-        const dLat = (dest.lat - startLat) * Math.PI / 180;
-        const dLon = (dest.lng - startLng) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(startLat * Math.PI / 180) * Math.cos(dest.lat * Math.PI / 180) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        distances[dest.id] = Math.round(R * c);
-      });
-
-      // Try Google Distance Matrix API for more realistic road distance
-      if (isLoaded && window.google) {
-        try {
-          const service = new google.maps.DistanceMatrixService();
-          const chunks = [];
-          for (let i = 0; i < BUDGET_DESTINATIONS.length; i += 25) {
-            chunks.push(BUDGET_DESTINATIONS.slice(i, i + 25));
-          }
-
-          await Promise.all(chunks.map(async (chunk) => {
-            return new Promise<void>((resolve) => {
-              service.getDistanceMatrix({
-                origins: [{ lat: startLat, lng: startLng }],
-                destinations: chunk.map(d => ({ lat: d.lat, lng: d.lng })),
-                travelMode: google.maps.TravelMode.DRIVING,
-              }, (response, status) => {
-                if (status === 'OK' && response && response.rows[0]) {
-                  response.rows[0].elements.forEach((element, idx) => {
-                    if (element.status === 'OK' && element.distance) {
-                      distances[chunk[idx].id] = Math.round(element.distance.value / 1000);
-                    }
-                  });
-                }
-                resolve();
-              });
-            });
-          }));
-        } catch (apiErr) {
-          console.warn("Distance Matrix API failed, using Haversine fallback:", apiErr);
-        }
-      }
-
-      // 3. Calculate costs for each destination using the new realistic algorithm
-      const results = BUDGET_DESTINATIONS.map(dest => {
-        const distance = distances[dest.id];
-        const estimatedTime = Math.round(distance / 60); // Average 60km/h
-
-        // Travelers count
-        let travelers = 1;
-        if (budgetFinderInput.travelType === "Couple") travelers = 2;
-        if (budgetFinderInput.travelType === "Family") travelers = 4;
-        if (budgetFinderInput.travelType === "Friends") travelers = 3;
-
-        // Trip Days (based on destination's ideal duration)
-        const tripDays = dest.ideal_trip_duration_days;
-        const nights = Math.max(0, tripDays - 1);
-
-        const luxuryMultiplier = budgetFinderInput.budgetLevel === 'Luxury' ? 2.5 : 1;
-
-        // 1. Travel Cost = distance_km * 3 * 2
-        const travelCost = distance * 3 * 2;
-
-        // 2. Hotel Cost = average_hotel_price * nights
-        const hotelCost = dest.average_hotel_price_per_night * nights * luxuryMultiplier;
-
-        // 3. Food Cost = days * 500 * travelers
-        const foodCost = tripDays * 500 * travelers * (budgetFinderInput.budgetLevel === 'Luxury' ? 3 : 1);
-
-        // 4. Local Transport = 600
-        const localTransport = 600 * luxuryMultiplier;
-
-        // Total trip cost: total_trip_cost = travel_cost + hotel_cost + food_cost + local_transport
-        const totalCost = Math.round(travelCost + hotelCost + foodCost + localTransport);
-
-        // Suggested transport
-        let suggestedTransport = ["Train", "Bus"];
-        if (distance > 800) suggestedTransport = ["Flight", "Train"];
-        else if (distance > 400) suggestedTransport = ["Train", "Bus", "Car"];
-        else suggestedTransport = ["Bus", "Car", "Train"];
-
-        return {
-          ...dest,
-          distance,
-          estimatedTime,
-          travelCost,
-          hotelCost,
-          foodCost,
-          localTransport,
-          totalCost,
-          tripDays,
-          travelers,
-          suggestedTransport
-        };
-      });
-
-      // 4. Strict Budget Filter & Sort by nearest distance
-      const filtered = results.filter(r => r.totalCost <= budgetFinderInput.totalBudget)
-                              .sort((a, b) => a.distance - b.distance);
-
-      setBudgetResults(filtered);
-      if (filtered.length === 0) {
-        showToast("No destinations found within this budget. Try increasing your budget or changing the duration.", "info");
-      }
-    } catch (error) {
-      console.error(error);
-      showToast("Error finding destinations.", "error");
-    } finally {
-      setIsFindingDestinations(false);
-    }
-  };
-
-  const handleGenerate = async (overrideStyle?: string, budgetData?: any) => {
-    // 1. Validate inputs
-    if (!locationInput?.trim()) {
-      showToast("Please enter a destination.", "error");
+    if (!startLocation.trim()) {
+      alert("Please enter your starting location.");
       return;
     }
-    if (!startLocation?.trim()) {
-      showToast("Please enter your starting location.", "error");
-      return;
-    }
-    if (duration <= 0) {
-      showToast("Please enter a valid duration (at least 1 day).", "error");
-      return;
-    }
-    if (numPeople <= 0) {
-      showToast("Please enter the number of travelers (at least 1).", "error");
-      return;
-    }
-
-    // 2. Prevent multiple rapid clicks
-    if (loading) return;
-
     const styleToUse = overrideStyle || travelStyle;
     if (overrideStyle) setTravelStyle(overrideStyle);
 
     setLoading(true);
     setItinerary(null);
-    
     try {
-      // 3. Call API with proper error handling
       const result = await generateItinerary({
         location: locationInput,
         startLocation: startLocation,
         duration,
         numPeople,
         travelStyle: styleToUse,
-        language: language,
-        budgetData: budgetData || selectedBudgetTrip,
-        isPremium: isPremium
+        language: language
       });
-
-      if (!result) {
-        throw new Error("Failed to get a valid itinerary response.");
-      }
-
       setItinerary(result);
-      
-      // 4. Update route summary
+      // Simple heuristic to extract some info for the route card if possible
+      // Or just set defaults for the visual card
       setRouteSummary({
-        distance: budgetData?.distance ? `${budgetData.distance} km` : "Calculating...",
-        time: budgetData?.estimatedTime || "Calculating...",
-        mode: budgetData?.suggestedTransport || "Multiple Options"
+        distance: "Calculating...",
+        time: "Calculating...",
+        mode: "Multiple Options"
       });
-
-      showToast("Itinerary generated successfully!", "success");
-    } catch (error: any) {
-      console.error("Itinerary Generation Error:", error);
-      
-      // Show user-friendly message
-      const errorMessage = error.message?.includes("expired") 
-        ? "API key expired. Using fallback itinerary." 
-        : "Unable to generate itinerary. Please try again.";
-      
-      showToast(errorMessage, "error");
-      
-      // Fallback is already handled in geminiService.ts, but we can double-check here
-      if (!itinerary) {
-        setItinerary(`
-# 🌍 DESTINATION OVERVIEW
-- Best time to visit: October to March
-- Crowd level: Moderate
-- Weather: Pleasant (20°C - 28°C)
-
-# 💰 BUDGET ESTIMATION (Estimated)
-- Budget Category: Standard Trip
-- Estimated Total Cost: ₹25,000 - ₹40,000
-
-# 🗓 DAY-WISE ITINERARY
-- Day 1: Arrival and Local Sightseeing.
-- Day 2: Visit top landmarks.
-- Day 3: Leisure day and departure.
-
-# ⚠️ SMART TRAVEL TIPS
-- Book in advance for better rates.
-        `);
-      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate itinerary. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Alias for handleGenerate to satisfy user request
-  const handleSearch = handleGenerate;
-
   const toggleWishlist = async (dest: any) => {
     if (!user) {
-      showToast("Please login to save to wishlist!", "info");
+      alert("Please login to save to wishlist!");
       setActiveTab('profile');
       return;
     }
@@ -1673,20 +894,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       try {
         await deleteDoc(doc(db, 'wishlist', existing.id));
       } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `wishlist/${existing.id}`);
+        console.error(err);
       }
     } else {
       try {
         await addDoc(collection(db, 'wishlist'), {
           user_id: user.id,
           dest_id: dest.id,
-          title: dest.destination_name || dest.title,
-          img: dest.destination_image || dest.img,
+          title: dest.title,
+          img: dest.img,
           desc: dest.desc,
           created_at: new Date().toISOString()
         });
       } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, 'wishlist');
+        console.error(err);
       }
     }
   };
@@ -1694,7 +915,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const saveTrip = async () => {
     if (!itinerary) return;
     if (!user) {
-      showToast("Please login to save your trips!", "info");
+      alert("Please login to save your trips!");
       setActiveTab('profile');
       return;
     }
@@ -1712,8 +933,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     try {
       await addDoc(collection(db, 'trips'), tripData);
+      alert("Trip saved to My Trips!");
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'trips');
+      console.error(err);
+      alert("Failed to save trip.");
     }
   };
 
@@ -1722,273 +945,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   };
 
   const currentColor = StyleColors[travelStyle] || StyleColors.standard;
-
-  const renderServiceSearch = () => {
-    const service = BOOKING_SERVICES.find(s => s.id === activeService);
-    if (!service) return null;
-
-    return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-[3rem] p-8 md:p-12 shadow-2xl border border-gray-100 space-y-8 max-w-4xl mx-auto relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[#1E90FF]/5 rounded-full -mr-32 -mt-32 blur-3xl" />
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg", service.color)}>
-              <service.icon size={28} />
-            </div>
-            <div>
-              <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{service.label} Search</h3>
-              <p className="text-gray-400 text-sm font-medium">Find the best {service.label.toLowerCase()} for your trip</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => {
-              setActiveService(null);
-              setServiceResults([]);
-            }}
-            className="p-3 hover:bg-gray-100 rounded-full transition-all text-gray-400 hover:text-[#0A2540]"
-          >
-            <ArrowLeft size={24} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {activeService === 'hotels' || activeService === 'packages' ? (
-            <LocationInput
-              value={serviceSearch.city}
-              onChange={(val: string) => setServiceSearch({...serviceSearch, city: val})}
-              onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, city: place.formatted_address || place.name})}
-              placeholder="Enter City"
-              label="City"
-              icon={MapPin}
-              isLoaded={isLoaded}
-            />
-          ) : (
-            <>
-              <LocationInput
-                value={serviceSearch.from}
-                onChange={(val: string) => setServiceSearch({...serviceSearch, from: val})}
-                onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, from: place.formatted_address || place.name})}
-                placeholder="From City"
-                label="From"
-                icon={MapPin}
-                isLoaded={isLoaded}
-              />
-              <LocationInput
-                value={serviceSearch.to}
-                onChange={(val: string) => setServiceSearch({...serviceSearch, to: val})}
-                onPlaceSelect={(place: any) => setServiceSearch({...serviceSearch, to: place.formatted_address || place.name})}
-                placeholder="To City"
-                label="To"
-                icon={Navigation2}
-                isLoaded={isLoaded}
-              />
-            </>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</span>
-            <div className="flex items-center gap-3">
-              <Calendar size={18} className="text-gray-300" />
-              <input 
-                type="date" 
-                value={serviceSearch.date}
-                onChange={(e) => setServiceSearch({...serviceSearch, date: e.target.value})}
-                className="bg-transparent text-[#0A2540] font-bold outline-none w-full"
-              />
-            </div>
-          </div>
-
-          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-1">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-              {activeService === 'hotels' ? 'Rooms' : 'Passengers'}
-            </span>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Users size={18} className="text-gray-300" />
-                <span className="text-[#0A2540] font-bold">
-                  {activeService === 'hotels' ? serviceSearch.rooms : serviceSearch.passengers}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => {
-                    if (activeService === 'hotels') setServiceSearch({...serviceSearch, rooms: Math.max(1, serviceSearch.rooms - 1)});
-                    else setServiceSearch({...serviceSearch, passengers: Math.max(1, serviceSearch.passengers - 1)});
-                  }}
-                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540]"
-                >
-                  -
-                </button>
-                <button 
-                  onClick={() => {
-                    if (activeService === 'hotels') setServiceSearch({...serviceSearch, rooms: serviceSearch.rooms + 1});
-                    else setServiceSearch({...serviceSearch, passengers: serviceSearch.passengers + 1});
-                  }}
-                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540]"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleServiceSearch}
-            disabled={isSearchingService}
-            className={cn("text-white rounded-2xl py-4 font-black text-lg flex items-center justify-center gap-3 shadow-xl transition-all", service.color)}
-          >
-            {isSearchingService ? <Loader2 className="animate-spin" size={22} /> : <Search size={22} />}
-            {isSearchingService ? "Searching..." : `Search ${service.label}`}
-          </motion.button>
-        </div>
-
-        {/* Results Section */}
-        <AnimatePresence>
-          {serviceResults.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="pt-8 space-y-6 border-t border-gray-100"
-            >
-              <h4 className="text-xl font-bold text-[#0A2540] flex items-center gap-2">
-                <Sparkles size={20} className="text-amber-500" />
-                Available {activeService === 'packages' ? 'Packages' : 'Options'}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {serviceResults.map((item, idx) => (
-                  <motion.div 
-                    key={item.id || idx} 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-gray-50 border border-gray-100 rounded-[2rem] p-6 flex flex-col gap-4 hover:shadow-md transition-all group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg overflow-hidden", service.color)}>
-                          {item.image ? (
-                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            <service.icon size={20} />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-bold text-[#0A2540] line-clamp-1">
-                            {item.name}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-0.5">
-                              {[1, 2, 3, 4, 5].map(star => (
-                                <Sparkles key={star} size={10} className={star <= Math.round(item.rating || 4) ? "text-amber-500 fill-current" : "text-gray-200"} />
-                              ))}
-                            </div>
-                            <span className="text-gray-400 text-[10px] font-bold">{item.rating || '4.0'} Rating</span>
-                            {item.type && (
-                              <span className="text-[10px] font-black uppercase tracking-widest text-[#1E90FF] bg-[#1E90FF]/5 px-2 py-0.5 rounded-md border border-[#1E90FF]/10 ml-1">
-                                {item.type}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[#1E90FF] font-black text-xl">₹{item.price?.toLocaleString() || '0'}</p>
-                        <p className="text-gray-400 text-[10px] uppercase font-black tracking-widest">
-                          {activeService === 'hotels' ? 'Per Night' : 
-                           activeService === 'packages' ? 'Per Person' : 'Per Trip'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {(activeService === 'packages' || activeService === 'hotels' || activeService === 'flights') && (
-                      <div className="space-y-2 py-2 border-t border-gray-100">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                          {activeService === 'flights' ? 'Flight Details' : 'Highlights'}
-                        </p>
-                        <ul className="text-xs text-gray-400 space-y-1">
-                          {activeService === 'hotels' ? (
-                            <>
-                              <li>• {item.address || 'Central Location'}</li>
-                              <li>• Free WiFi & Breakfast</li>
-                              <li>• 24/7 Room Service</li>
-                            </>
-                          ) : activeService === 'flights' ? (
-                            <>
-                              <li className="flex justify-between">
-                                <span>Departure: <span className="text-[#0A2540] font-bold">{item.departure}</span></span>
-                                <span>Arrival: <span className="text-[#0A2540] font-bold">{item.arrival}</span></span>
-                              </li>
-                              <li>• Duration: <span className="text-[#0A2540] font-bold">{item.duration}</span></li>
-                              <li>• {item.type} Class</li>
-                            </>
-                          ) : (
-                            <>
-                              <li>• 3 Days, 2 Nights Stay</li>
-                              <li>• Guided City Tour</li>
-                              <li>• Breakfast & Dinner Included</li>
-                            </>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-
-                    <button 
-                      onClick={() => {
-                        const loc = activeService === 'hotels' || activeService === 'packages' ? serviceSearch.city : serviceSearch.to;
-                        window.open(service.link(loc), '_blank');
-                      }}
-                      className="w-full py-3 bg-white border border-gray-100 rounded-xl text-[#0A2540] font-bold text-sm hover:bg-[#0A2540] hover:text-white transition-all"
-                    >
-                      Book Now
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
-
-              {attractions.length > 0 && (
-                <div className="pt-8 space-y-6">
-                  <h4 className="text-xl font-bold text-[#0A2540] flex items-center gap-2">
-                    <MapPin size={20} className="text-emerald-500" />
-                    Must-Visit Attractions in {serviceSearch.city}
-                  </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {attractions.map((attr) => (
-                      <motion.div 
-                        key={attr.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all group"
-                      >
-                        <div className="h-32 overflow-hidden relative">
-                          <img src={attr.image} alt={attr.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
-                          <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-lg flex items-center gap-1">
-                            <Sparkles size={10} className="text-amber-500 fill-current" />
-                            <span className="text-[10px] font-bold text-[#0A2540]">{attr.rating}</span>
-                          </div>
-                        </div>
-                        <div className="p-3">
-                          <p className="text-xs font-bold text-[#0A2540] line-clamp-1">{attr.name}</p>
-                          <p className="text-[10px] text-gray-400 line-clamp-1">{attr.address}</p>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  };
 
   const renderExplore = () => {
     return (
@@ -2003,13 +959,18 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 1.5 }}
-                src={heroImages[headlineIndex]} 
+                src={[
+                  "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80",
+                  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80",
+                  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80",
+                  "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80"
+                ][headlineIndex]} 
                 alt="Travel Background"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </AnimatePresence>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[4px]" />
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
           </div>
 
           <div className="relative z-10 space-y-10 max-w-5xl w-full">
@@ -2020,7 +981,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 animate={{ opacity: 1, y: 0 }}
                 className="h-20 md:h-24 flex items-center justify-center"
               >
-                <h1 className="text-4xl md:text-7xl font-serif font-black text-white tracking-tight drop-shadow-2xl">
+                <h1 className="text-4xl md:text-7xl font-display font-black text-white tracking-tight drop-shadow-2xl">
                   {headlines[headlineIndex]}
                 </h1>
               </motion.div>
@@ -2036,16 +997,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   key={service.id}
                   whileHover={{ y: -5, scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    const loc = locationInput || 'India';
-                    window.open(service.link(loc), '_blank');
-                  }}
-                  className={cn(
-                    "backdrop-blur-md border px-6 py-3 rounded-2xl flex items-center gap-3 transition-all shadow-lg",
-                    activeService === service.id 
-                      ? "bg-white text-[#0A2540] border-white" 
-                      : "bg-white/10 border-white/20 text-white hover:bg-white hover:text-[#0A2540]"
-                  )}
+                  onClick={() => window.open(service.link(startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
+                  className="bg-white/10 backdrop-blur-md border border-white/20 px-6 py-3 rounded-2xl flex items-center gap-3 text-white hover:bg-white hover:text-[#0A2540] transition-all shadow-lg"
                 >
                   <service.icon size={20} />
                   <span className="font-bold text-sm">{service.label}</span>
@@ -2053,23 +1006,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               ))}
             </div>
 
-            {/* Conditional Rendering of Service Search or Main Search */}
-            <AnimatePresence mode="wait">
-              {activeService ? (
-                <div key="service-search" className="w-full">
-                  {renderServiceSearch()}
-                </div>
-              ) : (
-                <motion.div 
-                  key="main-search"
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -30 }}
-                  className="bg-white/95 backdrop-blur-xl rounded-[3rem] p-6 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 space-y-8 mx-auto"
-                >
+            {/* Premium Search Card */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/95 backdrop-blur-xl rounded-[3rem] p-6 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 space-y-8 mx-auto"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 <LocationInput
-                  value={startLocation || ''}
+                  value={startLocation}
                   onChange={setStartLocation}
                   onPlaceSelect={(place: any) => {
                     if (place.formatted_address) setStartLocation(place.formatted_address);
@@ -2083,7 +1028,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   }}
                   placeholder="Starting City"
                   label="From"
-                  icon={MapPin}
+                  icon={Search}
                   isLoaded={isLoaded}
                   showLocationButton={true}
                   onLocationDetect={detectLocation}
@@ -2091,7 +1036,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 />
 
                 <LocationInput
-                  value={locationInput || ''}
+                  value={locationInput}
                   onChange={setLocationInput}
                   onPlaceSelect={(place: any) => {
                     if (place.formatted_address) setLocationInput(place.formatted_address);
@@ -2121,7 +1066,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </div>
                   <div className="flex items-center gap-4">
                     <button onClick={() => setDuration(Math.max(1, duration - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
-                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{duration || 0}</span>
+                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{duration}</span>
                     <button onClick={() => setDuration(duration + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
                   </div>
                 </div>
@@ -2136,7 +1081,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </div>
                   <div className="flex items-center gap-4">
                     <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
-                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{numPeople || 0}</span>
+                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{numPeople}</span>
                     <button onClick={() => setNumPeople(numPeople + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
                   </div>
                 </div>
@@ -2167,17 +1112,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           : "bg-white border-gray-100 text-gray-500 hover:border-[#FF8A00] hover:text-[#FF8A00]"
                       )}
                     >
-                      {Icon && <Icon size={16} />}
+                      <Icon size={16} />
                       {style.label}
                     </button>
                   );
                 })}
               </div>
             </motion.div>
-          )}
-          </AnimatePresence>
-        </div>
-      </section>
+          </div>
+        </section>
 
         {/* Travel Stats Section */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
@@ -2199,7 +1142,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         <section className="space-y-8 px-4">
           <div className="flex justify-between items-end">
             <div className="space-y-1">
-              <h3 className="text-3xl font-serif font-black text-[#0A2540]">Special Deals</h3>
+              <h3 className="text-3xl font-display font-black text-[#0A2540]">Special Deals</h3>
               <p className="text-gray-500 font-medium">Exclusive offers for your next adventure</p>
             </div>
           </div>
@@ -2225,193 +1168,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           </div>
         </section>
 
-        {/* Budget Based Destination Finder */}
-        <section className="space-y-8 px-4">
-          <div className="bg-[#0A2540] rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl -ml-32 -mb-32" />
-            
-            <div className="relative space-y-8">
-              <div className="text-center space-y-2">
-                <h3 className="text-3xl md:text-4xl font-serif font-black text-white">Find Trips in Your Budget</h3>
-                <p className="text-blue-200 font-medium">Tell us your budget, we'll find the perfect escape</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Starting From</label>
-                  <LocationInput
-                    value={budgetFinderInput.startLocation || ''}
-                    onChange={(val: string) => setBudgetFinderInput({...budgetFinderInput, startLocation: val})}
-                    onPlaceSelect={(place: any) => {
-                      if (place.formatted_address) setBudgetFinderInput({...budgetFinderInput, startLocation: place.formatted_address});
-                      else if (place.name) setBudgetFinderInput({...budgetFinderInput, startLocation: place.name});
-                    }}
-                    placeholder="e.g. Mumbai"
-                    label="From"
-                    icon={MapPin}
-                    isLoaded={isLoaded}
-                    variant="dark"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Total Budget (₹)</label>
-                  <div className="relative">
-                    <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
-                    <input 
-                      type="number"
-                      value={budgetFinderInput.totalBudget || 0}
-                      onChange={(e) => setBudgetFinderInput({...budgetFinderInput, totalBudget: parseInt(e.target.value) || 0})}
-                      className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:bg-white/20 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Travel Type</label>
-                  <select 
-                    value={budgetFinderInput.travelType || 'Solo'}
-                    onChange={(e) => setBudgetFinderInput({...budgetFinderInput, travelType: e.target.value})}
-                    className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 px-4 text-white outline-none focus:bg-white/20 transition-all appearance-none"
-                  >
-                    {["Solo", "Couple", "Family", "Friends"].map(type => <option key={type} value={type} className="bg-[#0A2540]">{type}</option>)}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-blue-200 text-[10px] font-bold uppercase tracking-widest ml-4">Budget Level</label>
-                  <select 
-                    value={budgetFinderInput.budgetLevel || 'Standard'}
-                    onChange={(e) => setBudgetFinderInput({...budgetFinderInput, budgetLevel: e.target.value})}
-                    className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 px-4 text-white outline-none focus:bg-white/20 transition-all appearance-none"
-                  >
-                    {["Standard", "Luxury"].map(l => <option key={l} value={l} className="bg-[#0A2540]">{l}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={findBudgetDestinations}
-                  disabled={isFindingDestinations}
-                  className="bg-[#FF8A00] text-white px-12 py-4 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20 flex items-center gap-3 disabled:opacity-50"
-                >
-                  {isFindingDestinations ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
-                  Find Destinations
-                </motion.button>
-              </div>
-            </div>
-          </div>
-
-          {/* Budget Results */}
-          <AnimatePresence>
-            {budgetResults.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              >
-                {budgetResults.map((result) => (
-                  <motion.div
-                    key={result.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-xl group"
-                  >
-                    <div className="h-48 relative overflow-hidden">
-                      <img src={result.destination_image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
-                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
-                        <span className="text-[#0A2540] font-black text-sm">{currency} {result.totalCost.toLocaleString()}</span>
-                      </div>
-                      <div className="absolute top-4 left-4 bg-blue-600/90 backdrop-blur-md px-3 py-1 rounded-full shadow-lg">
-                        <span className="text-white font-bold text-[10px] uppercase tracking-wider">{result.state}</span>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <div className="space-y-1">
-                        <h4 className="text-xl font-bold text-[#0A2540]">{result.destination_name}</h4>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-0.5">
-                            {[1, 2, 3, 4, 5].map(star => (
-                              <Sparkles key={star} size={10} className={star <= 4 ? "text-amber-500 fill-current" : "text-gray-200"} />
-                            ))}
-                          </div>
-                          <span className="text-gray-400 text-[10px] font-bold">4.5 Rating</span>
-                        </div>
-                        <p className="text-gray-500 text-xs line-clamp-2">{result.desc}</p>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-blue-50 p-3 rounded-xl space-y-1">
-                          <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tight">Travel Cost</span>
-                          <p className="text-[#1E90FF] font-black text-sm">{currency} {result.travelCost.toLocaleString()}</p>
-                        </div>
-                        <div className="bg-emerald-50 p-3 rounded-xl space-y-1">
-                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight">Stay & Food</span>
-                          <p className="text-emerald-600 font-black text-sm">{currency} {(result.hotelCost + result.foodCost).toLocaleString()}</p>
-                        </div>
-                        <div className="bg-purple-50 p-3 rounded-xl space-y-1">
-                          <span className="text-[10px] font-bold text-purple-400 uppercase tracking-tight">Hotel/Night</span>
-                          <p className="text-purple-600 font-black text-sm">{currency} {result.average_hotel_price_per_night.toLocaleString()}</p>
-                        </div>
-                        <div className="bg-orange-50 p-3 rounded-xl space-y-1">
-                          <span className="text-[10px] font-bold text-orange-400 uppercase tracking-tight">Local Transport</span>
-                          <p className="text-orange-600 font-black text-sm">{currency} {result.localTransport.toLocaleString()}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs font-bold text-gray-400 px-1">
-                        <div className="flex items-center gap-1">
-                          <Clock size={12} />
-                          <span>{(result.tripDays || 0).toString()} Days ({result.estimatedTime}h)</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Navigation size={12} />
-                          <span>{(result.distance || 0).toString()} km</span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
-                        {result.suggestedTransport?.map((mode: string, i: number) => {
-                          const Icon = mode === "Flight" ? Plane : mode === "Train" ? TrainFront : mode === "Bus" ? Bus : Car;
-                          return (
-                            <div key={i} className="px-3 py-1.5 rounded-lg bg-gray-50 flex items-center gap-2 text-gray-400 border border-gray-100">
-                              <Icon size={14} />
-                              <span className="text-[10px] font-bold uppercase tracking-widest">{mode}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <button 
-                        onClick={() => {
-                          setLocationInput(result.destination_name);
-                          setTravelStyle(budgetFinderInput.travelType);
-                          setDuration(Number(result.tripDays) || 3);
-                          setSelectedBudgetTrip(result);
-                          handleGenerate(undefined, result);
-                        }}
-                        className="w-full py-4 bg-[#0A2540] text-white rounded-2xl font-black text-sm hover:bg-blue-600 transition-all shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2"
-                      >
-                        View Trip Plan
-                        <ArrowRight size={18} />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
-
         {/* Trending Destinations */}
         <section className="space-y-8 px-4">
           <div className="flex justify-between items-end">
             <div className="space-y-1">
-              <h3 className="text-3xl font-serif font-black text-[#0A2540]">Trending Destinations</h3>
+              <h3 className="text-3xl font-display font-black text-[#0A2540]">Trending Destinations</h3>
               <p className="text-gray-500 font-medium">Most loved places by fellow travelers</p>
             </div>
             <button className="text-[#1E90FF] text-sm font-bold hover:underline transition-all flex items-center gap-2">
@@ -2462,7 +1223,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         {/* Travel Inspiration */}
         <section className="space-y-8 px-4">
           <div className="space-y-1">
-            <h3 className="text-3xl font-serif font-black text-[#0A2540]">Travel Inspiration</h3>
+            <h3 className="text-3xl font-display font-black text-[#0A2540]">Travel Inspiration</h3>
             <p className="text-gray-500 font-medium">Find your next perfect getaway</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -2484,7 +1245,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         {/* Popular Right Now */}
         <section className="bg-[#0A2540] rounded-[4rem] p-12 md:p-20 text-white space-y-12">
           <div className="text-center space-y-4">
-            <h3 className="text-4xl md:text-6xl font-serif font-black tracking-tight">Popular Right Now</h3>
+            <h3 className="text-4xl md:text-6xl font-display font-black tracking-tight">Popular Right Now</h3>
             <p className="text-white/60 text-lg max-w-2xl mx-auto">Discover the most trending spots across the globe this season.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -2621,20 +1382,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <span className="px-4 py-1.5 rounded-full text-[10px] font-bold text-white uppercase tracking-widest bg-emerald-500/20 backdrop-blur-md border border-emerald-500/30 text-emerald-300">
                       AI Optimized
                     </span>
-                    {routeSummary && (
-                      <span className="px-4 py-1.5 rounded-full text-[10px] font-bold text-white uppercase tracking-widest bg-blue-500/20 backdrop-blur-md border border-blue-500/30 text-blue-300">
-                        {routeSummary.distance} • {routeSummary.time}
-                      </span>
-                    )}
                   </motion.div>
-                  <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tight drop-shadow-lg">{locationInput}</h2>
+                  <h2 className="text-4xl md:text-6xl font-bold text-[#0A2540] tracking-tight">{locationInput}</h2>
                 </div>
                 <div className="flex gap-4">
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={saveTrip}
-                    className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-[#0A2540] transition-all shadow-2xl border border-white/20"
+                    className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-[#1E90FF] transition-all shadow-2xl border border-white/20"
                   >
                     <Heart size={20} /> {t.saveTrip}
                   </motion.button>
@@ -2642,7 +1398,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => openInMaps(locationInput)}
-                    className="bg-[#FF8A00] text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-[#FF8A00]/90 transition-all shadow-2xl"
+                    className="bg-[#1E90FF] text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-[#1E90FF]/90 transition-all shadow-2xl"
                   >
                     <MapIcon size={20} /> {t.viewMaps}
                   </motion.button>
@@ -2654,7 +1410,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { id: "budget", label: "Budget Version", icon: Wallet, color: "bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-500 hover:text-white" },
-                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-50 border-blue-100 text-[#0A2540] hover:bg-[#0A2540] hover:text-white" },
+                { id: "standard", label: "Optimize Plan", icon: Briefcase, color: "bg-blue-50 border-blue-100 text-[#1E90FF] hover:bg-[#1E90FF] hover:text-white" },
                 { id: "luxury", label: "Make It Luxury", icon: Crown, color: "bg-purple-50 border-purple-100 text-purple-600 hover:bg-purple-500 hover:text-white" }
               ].map((action) => (
                 <button 
@@ -2674,11 +1430,36 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {/* Itinerary Content */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-8 space-y-10">
-              <ItineraryDisplay 
-                content={itinerary} 
-                isPremium={isPremium} 
-                onUpgrade={upgradeToPremium}
-              />
+                <div className="bg-white rounded-[3rem] p-8 md:p-12 shadow-xl border border-gray-100 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50" />
+                  <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:text-[#0A2540] prose-headings:font-bold prose-p:text-gray-600 prose-li:text-gray-600">
+                    <Markdown>{itinerary}</Markdown>
+                  </div>
+
+                  {/* Booking CTAs after AI Result */}
+                  <div className="mt-12 pt-10 border-t border-gray-100">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 rounded-xl bg-[#1E90FF]/10 flex items-center justify-center">
+                        <Sparkles className="text-[#1E90FF]" size={20} />
+                      </div>
+                      <h3 className="text-3xl font-display font-black text-[#0A2540] tracking-tight">Ready to Book?</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {BOOKING_SERVICES.filter(s => ['hotels', 'flights', 'buses'].includes(s.id)).map(service => (
+                        <motion.button
+                          key={service.id}
+                          whileHover={{ scale: 1.05, y: -5 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => window.open(service.link(startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
+                          className={cn("flex items-center justify-center gap-3 py-5 px-6 rounded-[2rem] text-white font-bold shadow-xl transition-all", service.color)}
+                        >
+                          <service.icon size={20} />
+                          Book {service.id === 'hotels' ? 'Hotel' : service.id === 'flights' ? 'Flight' : 'Bus'}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Sidebar */}
@@ -2716,14 +1497,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <h4 className="text-[#0A2540] font-bold text-2xl tracking-tight">Trip Insights</h4>
                   <div className="space-y-8">
                     {[
-                      { label: "Distance", icon: Navigation, value: routeSummary?.distance || "Calculating...", color: "text-blue-500" },
-                      { label: "Travel Time", icon: Clock, value: routeSummary?.time || "Calculating...", color: "text-orange-500" },
-                      { label: "Best Time", icon: Calendar, value: "Oct - Mar", color: "text-emerald-500" },
-                      { label: "Services", icon: Package, value: "Flight, Train, Bus", color: "text-purple-500" },
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center gap-5 group">
-                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110", item.color.replace('text-', 'bg-') + '/10')}>
-                          <item.icon className={item.color} size={24} />
+                      { label: "Best Time", icon: Clock, value: "Oct - Mar", color: "text-orange-500" },
+                      { label: "Crowd Level", icon: Users, value: "Moderate", color: "text-[#1E90FF]" },
+                      { label: "Weather", icon: Thermometer, value: "Pleasant", color: "text-emerald-500" },
+                      { label: "Photo Spots", icon: Camera, value: "12+ Points", color: "text-pink-500" },
+                      { label: "Shopping", icon: ShoppingBag, value: "Local Crafts", color: "text-purple-500" },
+                      { label: "Pro Tip", icon: Lightbulb, value: "Book early!", color: "text-amber-500" }
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-5 group">
+                        <div className={cn("w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center transition-all group-hover:scale-110 group-hover:bg-white group-hover:shadow-md", item.color)}>
+                          <item.icon size={22} />
                         </div>
                         <div className="space-y-0.5">
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.label}</p>
@@ -2759,15 +1542,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <span className="text-gray-400">₹</span>
                     <input 
                       type="number" 
-                      value={userTotalBudget || 0}
+                      value={userTotalBudget}
                       onChange={async (e) => {
-                        const val = parseInt(e.target.value) || 0;
+                        const val = Number(e.target.value);
                         setUserTotalBudget(val);
                         if (user) {
                           try {
                             await updateDoc(doc(db, 'users', user.id), { totalBudget: val });
                           } catch (err) {
-                            handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
+                            console.error(err);
                           }
                         }
                       }}
@@ -2781,7 +1564,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 const totalEstimate = liveBudget.totalCost;
                 const remaining = userTotalBudget - totalEstimate;
                 const isOverBudget = remaining < 0;
-                const percentage = Math.min(100, (totalEstimate / (userTotalBudget || 1)) * 100) || 0;
+                const percentage = Math.min(100, (totalEstimate / userTotalBudget) * 100);
                 
                 const breakdown = [
                   { label: "Hotels", amount: liveBudget.hotelCost, icon: Briefcase, color: "bg-blue-500" },
@@ -2879,7 +1662,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-[#0A2540] flex items-center justify-center shadow-xl">
-                    <Briefcase className="text-white" size={24} />
+                    <BookingIcon className="text-white" size={24} />
                   </div>
                   <h3 className="text-3xl font-bold text-[#0A2540] tracking-tight">Complete Your Booking</h3>
                 </div>
@@ -2892,7 +1675,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     key={service.id}
                     whileHover={{ y: -10, scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => window.open(service.link(locationInput), '_blank')}
+                    onClick={() => window.open(service.link(startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
                     className="bg-white border border-gray-100 rounded-[2.5rem] p-8 flex flex-col items-center gap-6 hover:shadow-2xl transition-all group relative overflow-hidden"
                   >
                     <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 group-hover:rotate-6", service.color)}>
@@ -2923,25 +1706,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <motion.div 
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
-            className="cursor-pointer mx-auto"
-            onClick={() => setActiveTab('explore')}
+            className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group overflow-hidden p-4"
           >
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#0A2540] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/20 to-transparent opacity-50" />
             <img 
-              src="/travolor-logo.svg" 
+              src="/logo.png" 
               alt="Travolor Logo" 
-              className="h-24 min-w-[200px] w-auto object-contain mx-auto" 
+              className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
               referrerPolicy="no-referrer"
-              onLoad={() => console.log("Auth logo loaded successfully")}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                if (!target.src.includes('placehold.co')) {
-                  target.src = "https://placehold.co/250x80/FFFFFF/0A1F44/png?text=Travolor";
-                }
-              }}
             />
           </motion.div>
           <div className="space-y-1">
-            <h1 className="text-4xl font-serif font-black text-[#0A1F44] tracking-tight">Travolor</h1>
+            <h1 className="text-4xl font-display font-black text-[#0A2540] tracking-tight">Travolor</h1>
             <p className="text-gray-400 font-medium text-sm tracking-wide">Plan Your Perfect Trip</p>
           </div>
         </div>
@@ -2962,12 +1739,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
                 <div className="relative group">
-                  <User className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
+                  <ProfileIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
                   <input 
                     type="text" 
                     required
                     placeholder="John Doe"
-                    value={authForm.name || ''}
+                    value={authForm.name}
                     onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
                     className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                   />
@@ -2983,7 +1760,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   type="text" 
                   required
                   placeholder="name@example.com"
-                  value={authForm.email || ''}
+                  value={authForm.email}
                   onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
                   className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                 />
@@ -2998,7 +1775,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   type={showPassword ? "text" : "password"} 
                   required
                   placeholder="••••••••"
-                  value={authForm.password || ''}
+                  value={authForm.password}
                   onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
                   className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-14 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                 />
@@ -3029,11 +1806,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             </div>
 
             <motion.button
-              whileHover={{ scale: 1.02, backgroundColor: '#0A1F44' }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0A1F44] text-white py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-900/20 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+              className="w-full btn-primary py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] disabled:opacity-50 flex items-center justify-center gap-3"
             >
               {loading ? <Loader2 className="animate-spin" /> : 'Start Your Journey'}
               {!loading && <Plane size={18} className="rotate-45" />}
@@ -3087,7 +1864,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     <div className="space-y-10 pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
         <div className="space-y-2">
-          <h2 className="text-5xl font-serif font-black text-[#0A2540] tracking-tighter">{t.myTrips}</h2>
+          <h2 className="text-5xl font-display font-black text-[#0A2540] tracking-tighter">{t.myTrips}</h2>
           <p className="text-gray-500 font-medium tracking-wide tracking-widest uppercase text-[10px]">Your curated collection of adventures</p>
         </div>
         <div className="flex gap-3">
@@ -3133,7 +1910,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <MapIcon size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">Your map is empty</h3>
+            <h3 className="text-3xl font-display font-black text-[#0A2540] tracking-tight">Your map is empty</h3>
             <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">Start planning your journey and save your dream destinations here. ✈</p>
           </div>
           <motion.button 
@@ -3172,10 +1949,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="p-6 space-y-4 flex-1 flex flex-col">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-2xl font-serif font-bold text-slate-900">{trip.location}</h3>
+                    <h3 className="text-2xl font-display font-bold text-slate-900">{trip.location}</h3>
                     <p className="text-slate-500 text-sm">{trip.start_location} → {trip.location}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{(trip.duration || 0).toString()} Days</p>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{trip.duration} Days</p>
                       <span className="text-slate-200">•</span>
                       <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                         {trip.created_at ? new Date(trip.created_at).toLocaleDateString() : 'Recently'}
@@ -3187,13 +1964,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       onClick={() => {
                         const shareData = {
                           title: `My Trip to ${trip.location}`,
-                          text: `Check out my ${(trip.duration || 0).toString()}-day ${trip.style} trip to ${trip.location} planned with Travolor!`,
+                          text: `Check out my ${trip.duration}-day ${trip.style} trip to ${trip.location} planned with Travolor!`,
                           url: window.location.href
                         };
                         if (navigator.share) {
                           navigator.share(shareData);
                         } else {
-                          showToast("Sharing is not supported on this browser. Copy the URL to share!", "info");
+                          alert("Sharing is not supported on this browser. Copy the URL to share!");
                         }
                       }}
                       className="text-slate-300 hover:text-blue-500 transition-colors"
@@ -3202,10 +1979,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     </button>
                     <button 
                       onClick={async () => {
-                        try {
-                          await deleteDoc(doc(db, 'trips', trip.id));
-                        } catch (err) {
-                          handleFirestoreError(err, OperationType.DELETE, `trips/${trip.id}`);
+                        if (confirm("Are you sure you want to delete this trip?")) {
+                          try {
+                            await deleteDoc(doc(db, 'trips', trip.id));
+                          } catch (err) {
+                            console.error(err);
+                            alert("Failed to delete trip.");
+                          }
                         }
                       }}
                       className="text-slate-300 hover:text-red-500 transition-colors"
@@ -3252,7 +2032,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         </div>
         <div className="flex gap-3">
           <div className="px-6 py-3 bg-white rounded-full border border-gray-100 flex items-center gap-3 shadow-xl">
-            <Briefcase size={16} className="text-[#1E90FF]" />
+            <BookingIcon size={16} className="text-[#1E90FF]" />
             <span className="text-[#0A2540] font-black text-lg tracking-tighter">{bookings.length}</span>
             <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Active</span>
           </div>
@@ -3290,7 +2070,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-emerald-600/10 transition-all duration-700" />
           <div className="w-32 h-32 bg-gray-50 rounded-full flex items-center justify-center mx-auto border border-gray-100 shadow-2xl relative z-10">
-            <Briefcase size={56} className="text-gray-300" />
+            <BookingIcon size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
             <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">No bookings found</h3>
@@ -3318,7 +2098,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#1E90FF]/5 rounded-full -mr-16 -mt-16 blur-2xl" />
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1E90FF] to-indigo-600 flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform relative z-10">
-                <Briefcase size={32} />
+                <BookingIcon size={32} />
               </div>
               <div className="flex-1 space-y-1 relative z-10">
                 <h4 className="font-black text-[#0A2540] text-xl tracking-tight">{booking.title}</h4>
@@ -3338,27 +2118,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {[
-          { id: "hotels", label: "Hotels", icon: Hotel, color: "bg-orange-500", desc: "Find the best stays" },
-          { id: "flights", label: "Flights", icon: Navigation, color: "bg-[#1E90FF]", rotate: "-rotate-45", desc: "Fly anywhere in the world" },
-          { id: "trains", label: "Trains", icon: Navigation, color: "bg-emerald-500", rotate: "rotate-90", desc: "Scenic rail journeys" },
-          { id: "buses", label: "Buses", icon: Navigation, color: "bg-rose-500", desc: "Affordable road travel" },
-          { id: "cabs", label: "Cabs", icon: Navigation, color: "bg-amber-500", desc: "Local & outstation rides" },
-          { id: "packages", label: "Packages", icon: Sparkles, color: "bg-purple-500", desc: "Unforgettable experiences" }
+          { label: "Hotels", icon: Hotel, color: "bg-orange-500", desc: "Find the best stays", url: "https://www.makemytrip.com/hotels/" },
+          { label: "Flights", icon: Navigation, color: "bg-[#1E90FF]", rotate: "-rotate-45", desc: "Fly anywhere in the world", url: "https://www.makemytrip.com/flights/" },
+          { label: "Trains", icon: Navigation, color: "bg-emerald-500", rotate: "rotate-90", desc: "Scenic rail journeys", url: "https://www.confirmtkt.com/" },
+          { label: "Buses", icon: Navigation, color: "bg-rose-500", desc: "Affordable road travel", url: "https://www.redbus.in/" },
+          { label: "Cabs", icon: Navigation, color: "bg-amber-500", desc: "Local & outstation rides", url: "https://www.savaari.com/" },
+          { label: "Activities", icon: Sparkles, color: "bg-purple-500", desc: "Unforgettable experiences", url: "https://www.klook.com/" }
         ].map((item, idx) => (
-          <motion.button 
+          <motion.a 
             key={idx}
-            onClick={() => {
-              const service = BOOKING_SERVICES.find(s => s.id === item.id);
-              if (service) {
-                const loc = locationInput || 'India';
-                window.open(service.link(loc), '_blank');
-              } else {
-                setActiveTab('explore');
-                setActiveService(item.id as any);
-              }
-            }}
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
             whileHover={{ y: -10 }}
-            className="group bg-white border border-gray-100 rounded-[3rem] p-8 shadow-xl hover:shadow-2xl transition-all flex items-center gap-6 relative overflow-hidden text-left w-full"
+            className="group bg-white border border-gray-100 rounded-[3rem] p-8 shadow-xl hover:shadow-2xl transition-all flex items-center gap-6 relative overflow-hidden"
           >
             <div className={cn("absolute top-0 right-0 w-24 h-24 opacity-5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110", item.color)} />
             <div className={cn("w-20 h-20 rounded-3xl flex items-center justify-center text-white shadow-2xl transition-transform group-hover:scale-110 relative z-10", item.color)}>
@@ -3369,7 +2142,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <p className="text-gray-400 text-xs font-medium">{item.desc}</p>
             </div>
             <ArrowRight className="text-gray-200 group-hover:text-[#0A2540] transition-all relative z-10" />
-          </motion.button>
+          </motion.a>
         ))}
       </div>
 
@@ -3429,7 +2202,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       });
       setIsEditingProfile(false);
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -3454,7 +2227,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {editForm.photo ? (
                   <img src={editForm.photo} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <User size={48} className="text-[#1E90FF]" />
+                  <ProfileIcon size={48} className="text-[#1E90FF]" />
                 )}
               </div>
               <label className="absolute bottom-0 right-0 bg-[#1E90FF] text-white p-2.5 rounded-full shadow-lg border-2 border-white hover:scale-110 transition-all cursor-pointer">
@@ -3473,7 +2246,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   type="text" 
-                  value={editForm.name || ''}
+                  value={editForm.name}
                   onChange={(e) => setEditForm({...editForm, name: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
                   placeholder="Your Name"
@@ -3487,7 +2260,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   type="text" 
-                  value={editForm.phone || ''}
+                  value={editForm.phone}
                   onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
                   placeholder="Your Phone"
@@ -3501,7 +2274,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   type="email" 
-                  value={user?.email || ''}
+                  value={user.email}
                   disabled
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-gray-400 font-bold outline-none cursor-not-allowed"
                 />
@@ -3526,149 +2299,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             >
               Cancel
             </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderAdminPanel = () => {
-    if (!isAdminLoggedIn) {
-      return (
-        <div className="min-h-[80vh] flex items-center justify-center px-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white p-8 rounded-[3rem] shadow-2xl border border-gray-100 w-full max-w-md space-y-8"
-          >
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <ShieldCheck size={32} className="text-[#1E90FF]" />
-              </div>
-              <h2 className="text-3xl font-serif font-black text-[#0A2540]">Admin Login</h2>
-              <p className="text-gray-400 text-sm">Secure access to Travolor Dashboard</p>
-            </div>
-
-            <form onSubmit={handleAdminLogin} className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input 
-                      type="email" 
-                      required
-                      value={adminLoginForm.email}
-                      onChange={(e) => setAdminLoginForm({...adminLoginForm, email: e.target.value})}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-[#1E90FF] transition-all font-bold text-[#0A2540]"
-                      placeholder="admin@travolor.com"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input 
-                      type="password" 
-                      required
-                      value={adminLoginForm.password}
-                      onChange={(e) => setAdminLoginForm({...adminLoginForm, password: e.target.value})}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-[#1E90FF] transition-all font-bold text-[#0A2540]"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <button 
-                type="submit"
-                disabled={isAdminLoading}
-                className="w-full bg-[#0A1F44] text-white py-4 rounded-2xl font-black text-lg shadow-xl flex items-center justify-center gap-2"
-              >
-                {isAdminLoading ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
-                Login as Admin
-              </button>
-            </form>
-          </motion.div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-12 pb-24 pt-8">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h2 className="text-4xl font-serif font-black text-[#0A2540]">Admin Dashboard</h2>
-            <p className="text-gray-400 font-medium">Real-time platform insights</p>
-          </div>
-          <button 
-            onClick={() => setIsAdminLoggedIn(false)}
-            className="px-6 py-2 bg-rose-50 text-rose-600 rounded-full font-bold text-sm hover:bg-rose-100 transition-all"
-          >
-            Logout
-          </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { label: "Total Users", value: adminStats?.users || 0, icon: Users, color: "text-blue-500", bg: "bg-blue-50" },
-            { label: "Travel Searches", value: adminStats?.searches || 0, icon: Search, color: "text-emerald-500", bg: "bg-emerald-50" },
-            { label: "API Requests", value: (adminStats?.apiUsage?.amadeus || 0) + (adminStats?.apiUsage?.googleMaps || 0), icon: Zap, color: "text-amber-500", bg: "bg-amber-50" }
-          ].map((stat, i) => (
-            <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
-              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", stat.bg)}>
-                <stat.icon className={stat.color} size={24} />
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs font-black uppercase tracking-widest">{stat.label}</p>
-                <p className="text-3xl font-black text-[#0A2540]">{stat.value.toLocaleString()}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Recent Bookings */}
-        <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-            <h3 className="text-xl font-bold text-[#0A2540]">Recent Bookings</h3>
-            <button onClick={fetchAdminStats} className="text-blue-500 text-sm font-bold hover:underline">Refresh</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-widest">
-                  <th className="px-8 py-4">User</th>
-                  <th className="px-8 py-4">Service</th>
-                  <th className="px-8 py-4">Details</th>
-                  <th className="px-8 py-4">Date</th>
-                  <th className="px-8 py-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {adminStats?.recentBookings?.map((booking: any) => (
-                  <tr key={booking.id} className="hover:bg-gray-50/50 transition-all">
-                    <td className="px-8 py-4 font-bold text-[#0A2540]">{booking.user_name}</td>
-                    <td className="px-8 py-4">
-                      <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                        {booking.type}
-                      </span>
-                    </td>
-                    <td className="px-8 py-4 text-sm text-gray-500">{booking.title}</td>
-                    <td className="px-8 py-4 text-sm text-gray-400">{booking.date}</td>
-                    <td className="px-8 py-4">
-                      <span className="text-emerald-500 font-bold text-sm">{booking.status}</span>
-                    </td>
-                  </tr>
-                ))}
-                {(!adminStats?.recentBookings || adminStats.recentBookings.length === 0) && (
-                  <tr>
-                    <td colSpan={5} className="px-8 py-12 text-center text-gray-400 font-medium">No recent bookings found</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -3700,19 +2330,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <User size={32} className="text-[#1E90FF]" />
+                  <ProfileIcon size={32} className="text-[#1E90FF]" />
                 )}
               </div>
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-lg font-bold text-[#0A2540]">{user.name}</h4>
-                  {isPremium && (
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-600 text-[8px] font-black uppercase tracking-widest rounded-full border border-orange-200 flex items-center gap-1">
-                      <Crown size={8} />
-                      Premium
-                    </span>
-                  )}
-                </div>
+                <h4 className="text-lg font-bold text-[#0A2540]">{user.name}</h4>
                 <p className="text-gray-400 text-xs font-medium">{user.email}</p>
               </div>
               <button 
@@ -3752,7 +2374,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
               { label: "Language", icon: Languages, color: "text-blue-500", value: language, options: ["English", "Marathi", "Hindi"], onChange: setLanguage },
-              { label: "Currency", icon: Wallet, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)"], onChange: setCurrency }
+              { label: "Currency", icon: WalletIcon, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)"], onChange: setCurrency }
             ].map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
                 <div className="flex items-center gap-4">
@@ -3822,8 +2444,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
               { label: "Saved Trips", icon: Globe, color: "text-blue-500", count: savedTrips.length, tab: 'trips' },
-              { label: "Booking History", icon: Briefcase, color: "text-emerald-500", count: bookings.length, tab: 'bookings' },
-              { label: "Payment Methods", icon: Wallet, color: "text-purple-500" }
+              { label: "Booking History", icon: BookingIcon, color: "text-emerald-500", count: bookings.length, tab: 'bookings' },
+              { label: "Payment Methods", icon: WalletIcon, color: "text-purple-500" }
             ].map((item, idx) => (
               <button 
                 key={idx} 
@@ -3854,8 +2476,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
               { label: "Help Center", icon: HelpCircle, color: "text-blue-500" },
-              { label: "Contact Support", icon: Phone, color: "text-emerald-500", detail: adminConfig?.supportPhone },
-              { label: "Email Support", icon: Mail, color: "text-amber-500", detail: adminConfig?.supportEmail },
+              { label: "Contact Support", icon: Phone, color: "text-emerald-500" },
               { label: "Terms & Privacy", icon: ShieldCheck, color: "text-slate-500" }
             ].map((item, idx) => (
               <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
@@ -3865,10 +2486,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </div>
                   <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {item.detail && <span className="text-gray-400 text-xs font-medium">{item.detail}</span>}
-                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
-                </div>
+                <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
               </button>
             ))}
           </div>
@@ -3893,116 +2511,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#0A2540]",
       activeTab === 'explore' ? "bg-white" : "bg-[#F5F7FA]"
     )}>
-      {/* Budget Trip Details Modal */}
-      <AnimatePresence>
-        {selectedBudgetTrip && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-[3rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative"
-            >
-              <button 
-                onClick={() => setSelectedBudgetTrip(null)}
-                className="absolute top-6 right-6 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-all z-10"
-              >
-                <ArrowLeft size={20} />
-              </button>
-
-              <div className="h-64 relative">
-                <img src={selectedBudgetTrip.img} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent" />
-                <div className="absolute bottom-6 left-8">
-                  <h2 className="text-4xl font-serif font-black text-[#0A2540]">{selectedBudgetTrip.destination_name || selectedBudgetTrip.title}</h2>
-                  <p className="text-gray-600 font-medium">Suggested {(selectedBudgetTrip.tripDays || selectedBudgetTrip.days || 0).toString()} Day Trip</p>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-8">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Total Budget', value: `${currency} ${(selectedBudgetTrip.totalCost || 0).toLocaleString()}`, icon: Wallet, color: 'text-orange-500' },
-                    { label: 'Travel Cost', value: `${currency} ${(selectedBudgetTrip.travelCost || 0).toLocaleString()}`, icon: Navigation, color: 'text-blue-500' },
-                    { label: 'Daily Spend', value: `${currency} ${Math.round((selectedBudgetTrip.foodCost || 0) / (selectedBudgetTrip.tripDays || 1) / (selectedBudgetTrip.travelers || 1)).toLocaleString()}/p`, icon: Utensils, color: 'text-emerald-500' },
-                    { label: 'Distance', value: `${selectedBudgetTrip.distance || 0} km`, icon: MapPin, color: 'text-purple-500' }
-                  ].map((item, i) => (
-                    <div key={i} className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <item.icon size={16} className={item.color} />
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">{item.label}</p>
-                      <p className="text-[#0A2540] font-black text-sm">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-xl font-bold text-[#0A2540] flex items-center gap-2">
-                    <Sparkles className="text-orange-500" size={20} />
-                    Suggested Itinerary
-                  </h3>
-                  <div className="space-y-4 border-l-2 border-gray-100 ml-3 pl-6">
-                    {[
-                      { day: 'Day 1', title: 'Arrival & Local Exploration', desc: 'Arrive at destination, check-in to a budget hotel, and explore the city center.' },
-                      { day: 'Day 2', title: 'Major Attractions', desc: 'Visit the most famous landmarks and try local street food specialties.' },
-                      { day: 'Day 3', title: 'Hidden Gems & Departure', desc: 'Explore off-beat spots and shop for local souvenirs before heading back.' }
-                    ].slice(0, Math.ceil(selectedBudgetTrip.tripDays || selectedBudgetTrip.days || 3)).map((step, i) => (
-                      <div key={i} className="relative">
-                        <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-white border-4 border-orange-500 shadow-sm" />
-                        <h4 className="font-bold text-[#0A2540]">{step.day}: {step.title}</h4>
-                        <p className="text-gray-500 text-sm leading-relaxed">{step.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-[#0A2540] flex items-center gap-2">
-                      <Hotel className="text-blue-500" size={18} />
-                      Budget Stays
-                    </h3>
-                    <div className="bg-blue-50 p-4 rounded-2xl space-y-2">
-                      <p className="text-sm font-bold text-[#0A2540]">Recommended: Zostel or Local Guesthouses</p>
-                      <p className="text-xs text-gray-500">Estimated: {currency} {Math.round((selectedBudgetTrip.hotelCost || 0) / Math.max(1, (selectedBudgetTrip.tripDays || 1) - 1)).toLocaleString()} per night</p>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-[#0A2540] flex items-center gap-2">
-                      <Navigation2 className="text-emerald-500" size={18} />
-                      Travel Options
-                    </h3>
-                    <div className="bg-emerald-50 p-4 rounded-2xl space-y-2">
-                      <p className="text-sm font-bold text-[#0A2540]">Best Option: {selectedBudgetTrip.mode || 'Train/Bus'}</p>
-                      <p className="text-xs text-gray-500">Cost: {currency} {(selectedBudgetTrip.travelCost || 0).toLocaleString()} (Round Trip)</p>
-                    </div>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => {
-                    setLocationInput(selectedBudgetTrip.destination_name || selectedBudgetTrip.title);
-                    setDuration(Math.ceil(selectedBudgetTrip.tripDays || selectedBudgetTrip.days || 3));
-                    setSelectedBudgetTrip(null);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="w-full bg-[#FF8A00] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20"
-                >
-                  Plan Full Itinerary with AI
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Header */}
       <header className={cn(
         "pt-6 pb-4 px-6 sticky top-0 z-40 transition-all duration-500",
-        "bg-[#0A1F44] border-b border-white/10 shadow-lg"
+        activeTab === 'explore' 
+          ? "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm" 
+          : "bg-[#0A2540] border-b border-white/10"
       )}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <motion.div 
@@ -4010,29 +2524,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             animate={{ opacity: 1, x: 0 }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="flex items-center cursor-pointer group"
-            onClick={() => {
-              setActiveTab('explore');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-              if (window.location.pathname !== '/') {
-                window.location.href = '/';
-              }
-            }}
+            className="flex items-center gap-3 cursor-pointer group"
+            onClick={() => setActiveTab('explore')}
           >
             <img 
-              src="/travolor-logo.svg" 
+              src="/logo.png" 
               alt="Travolor Logo" 
-              className="h-[60px] min-w-[180px] w-auto object-contain" 
+              className="h-10 w-auto object-contain"
               referrerPolicy="no-referrer"
-              onLoad={() => console.log("Header logo loaded successfully")}
-              onError={(e) => {
-                console.error("Header logo failed to load, trying fallback");
-                const target = e.target as HTMLImageElement;
-                if (!target.src.includes('placehold.co')) {
-                  target.src = "https://placehold.co/250x80/0A1F44/FFFFFF/png?text=Travolor";
-                }
-              }}
             />
+            <span className={cn(
+              "text-xl font-display font-bold tracking-tight transition-colors duration-300",
+              activeTab === 'explore' ? "text-[#0A2540]" : "text-white"
+            )}>Travolor</span>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -4043,13 +2547,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <motion.div 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 rounded-full flex items-center justify-center border cursor-pointer overflow-hidden relative transition-all duration-300 bg-white/10 border-white/20"
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center border cursor-pointer overflow-hidden relative transition-all duration-300",
+                  activeTab === 'explore' ? "bg-gray-100 border-gray-200" : "bg-white/10 border-white/20"
+                )}
                 onClick={() => setActiveTab('profile')}
               >
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <User className="text-white" size={20} />
+                  <ProfileIcon className={activeTab === 'explore' ? "text-[#0A2540]" : "text-white"} size={20} />
                 )}
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-10" />
               </motion.div>
@@ -4058,7 +2565,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveTab('profile')}
-                className="px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider bg-white text-[#0A1F44]"
+                className={cn(
+                  "px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider",
+                  activeTab === 'explore' ? "bg-[#FF8A00] text-white" : "bg-white text-[#0A2540]"
+                )}
               >
                 Login
               </motion.button>
@@ -4083,112 +2593,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {activeTab === 'trips' && renderMyTrips()}
             {activeTab === 'bookings' && renderBookings()}
             {activeTab === 'profile' && renderProfile()}
-            {activeTab === 'admin' && renderAdminPanel()}
           </motion.div>
         </AnimatePresence>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-[#0A1F44] pt-20 pb-12 px-6 mt-20">
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div className="space-y-6">
-              <div 
-                className="flex items-center cursor-pointer" 
-                onClick={() => {
-                  setActiveTab('explore');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <img 
-                  src="/travolor-logo.svg" 
-                  alt="Travolor Logo" 
-                  className="h-12 min-w-[150px] w-auto object-contain" 
-                  referrerPolicy="no-referrer"
-                  onLoad={() => console.log("Footer logo loaded successfully")}
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    if (!target.src.includes('placehold.co')) {
-                      target.src = "https://placehold.co/250x80/0A1F44/FFFFFF/png?text=Travolor";
-                    }
-                  }}
-                />
-              </div>
-              <p className="text-white/60 text-sm leading-relaxed">
-                Making travel smarter, easier, and more accessible with AI-powered planning and real-time insights.
-              </p>
-            </div>
-            
-            <div className="space-y-6">
-              <h4 className="text-white font-bold uppercase tracking-widest text-xs">Quick Links</h4>
-              <ul className="space-y-4 text-white/60 text-sm">
-                <li><button onClick={() => setActiveTab('explore')} className="hover:text-white transition-all">Explore</button></li>
-                <li><button onClick={() => setActiveTab('trips')} className="hover:text-white transition-all">My Trips</button></li>
-                <li><button onClick={() => setActiveTab('bookings')} className="hover:text-white transition-all">Bookings</button></li>
-                <li><button onClick={() => setActiveTab('profile')} className="hover:text-white transition-all">Settings</button></li>
-              </ul>
-            </div>
-
-            <div className="space-y-6">
-              <h4 className="text-white font-bold uppercase tracking-widest text-xs">Support</h4>
-              <ul className="space-y-4 text-white/60 text-sm">
-                <li><span className="flex items-center gap-2"><Mail size={14} /> {adminConfig?.supportEmail || 'support@travolor.com'}</span></li>
-                <li><span className="flex items-center gap-2"><Phone size={14} /> {adminConfig?.supportPhone || '+1 800 TRAVOLOR'}</span></li>
-                <li><button className="hover:text-white transition-all">Help Center</button></li>
-                <li><button className="hover:text-white transition-all">Privacy Policy</button></li>
-              </ul>
-            </div>
-
-            <div className="space-y-6">
-              <h4 className="text-white font-bold uppercase tracking-widest text-xs">Admin</h4>
-              <p className="text-white/60 text-sm">
-                Managed by {adminConfig?.adminName || 'Admin'}<br/>
-                {adminConfig?.companyName || 'Travolor'} Inc.
-              </p>
-              <button 
-                onClick={() => setActiveTab('admin')}
-                className="text-white/40 hover:text-white text-[10px] font-black uppercase tracking-widest border border-white/10 px-4 py-2 rounded-lg transition-all"
-              >
-                Admin Panel
-              </button>
-            </div>
-          </div>
-          
-          <div className="pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
-            <p className="text-white/40 text-xs font-medium">
-              © {new Date().getFullYear()} {adminConfig?.companyName || 'Travolor'}. All rights reserved.
-            </p>
-            <div className="flex items-center gap-6">
-              <Share2 size={18} className="text-white/40 hover:text-white cursor-pointer transition-all" />
-              <Github size={18} className="text-white/40 hover:text-white cursor-pointer transition-all" />
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xs"
-          >
-            <div className={cn(
-              "p-4 rounded-2xl shadow-2xl border flex items-center gap-3",
-              toast.type === 'error' ? "bg-rose-50 border-rose-100 text-rose-600" :
-              toast.type === 'success' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
-              "bg-blue-50 border-blue-100 text-blue-600"
-            )}>
-              {toast.type === 'error' ? <AlertTriangle size={20} /> :
-               toast.type === 'success' ? <Check size={20} /> :
-               <Info size={20} />}
-              <p className="text-sm font-bold">{toast.message}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Sticky Bottom Navigation */}
       <nav className="fixed bottom-6 left-0 right-0 z-50 px-6">
@@ -4196,7 +2603,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           {[
             { id: "explore", icon: Globe, label: "Explore" },
             { id: "trips", icon: MapIcon, label: "Trips" },
-            { id: "bookings", icon: Briefcase, label: "Bookings" },
+            { id: "bookings", icon: BookingIcon, label: "Bookings" },
             { id: "profile", icon: Settings, label: "Settings" }
           ].map((tab) => (
             <button
@@ -4228,30 +2635,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           ))}
         </div>
       </nav>
-
-      {/* Chat Assistant Modal */}
-      <ChatAssistant 
-        isOpen={showChat} 
-        onClose={() => setShowChat(false)} 
-        location={locationInput}
-      />
-
-      {/* Floating Chat Button */}
-      {itinerary && (
-        <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setShowChat(true)}
-          className="fixed bottom-8 right-8 w-16 h-16 bg-[#FF8A00] text-white rounded-full shadow-2xl flex items-center justify-center z-50 group"
-        >
-          <MessageSquare size={28} className="group-hover:rotate-12 transition-transform" />
-          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-bounce">
-            AI
-          </div>
-        </motion.button>
-      )}
     </div>
   );
 }
@@ -4259,30 +2642,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 export default function App() {
   const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY;
   if (mapsKey) {
-    return (
-      <ErrorBoundary>
-        <AppWithMaps mapsKey={mapsKey} />
-      </ErrorBoundary>
-    );
+    return <AppWithMaps mapsKey={mapsKey} />;
   }
-  return (
-    <ErrorBoundary>
-      <AppContent isLoaded={false} />
-    </ErrorBoundary>
-  );
+  return <AppContent isLoaded={false} />;
 }
 
 function AppWithMaps({ mapsKey }: { mapsKey: string }) {
-  const { isLoaded, loadError } = useLoadScript({
+  const { isLoaded } = useLoadScript({
     googleMapsApiKey: mapsKey,
     libraries,
   });
-
-  if (loadError) {
-    console.error("Google Maps load error:", loadError);
-    // Fallback to AppContent without maps features if loading fails (e.g. ApiTargetBlockedMapError)
-    return <AppContent isLoaded={false} />;
-  }
-
   return <AppContent isLoaded={isLoaded} />;
 }

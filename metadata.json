@@ -1,6 +1,6 @@
 {
   "name": "Travolor",
-  "description": "A complete AI-powered travel booking platform. Plan, book, and manage your global journeys with smart itineraries, hotel deals, and real-time travel insights.",
+  "description": "AI-powered travel planner that creates detailed, budget-friendly itineraries for Indian and international destinations. Get realistic cost breakdowns, day-wise plans, and hidden gems.",
   "requestFramePermissions": [
     "geolocation"
   ]
