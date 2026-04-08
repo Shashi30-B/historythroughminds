@@ -1,13 +1,12 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, FirebaseApp } from "firebase/app";
+import { getAuth, Auth } from "firebase/auth";
+import { getFirestore, Firestore } from "firebase/firestore";
 
 // Import the Firebase configuration
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase SDK
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+export const isFirebaseAvailable = !!(firebaseConfig && firebaseConfig.apiKey);
 
-export const isFirebaseAvailable = !!firebaseConfig.apiKey;
+const app = isFirebaseAvailable ? initializeApp(firebaseConfig) : null;
+export const db = app ? getFirestore(app, firebaseConfig.firestoreDatabaseId) : (null as unknown as Firestore);
+export const auth = app ? getAuth(app) : (null as unknown as Auth);

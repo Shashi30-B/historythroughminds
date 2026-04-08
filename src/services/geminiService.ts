@@ -1,6 +1,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let genAI: GoogleGenAI | null = null;
+
+function getGenAI() {
+  if (!genAI) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not defined. Please add it to your environment variables.");
+    }
+    genAI = new GoogleGenAI({ apiKey });
+  }
+  return genAI;
+}
 
 export interface ItineraryRequest {
   location: string;
@@ -13,6 +24,7 @@ export interface ItineraryRequest {
 
 export async function generateItinerary(request: ItineraryRequest) {
   const { location, startLocation, duration, numPeople, travelStyle, language = "en" } = request;
+  const ai = getGenAI();
 
   const prompt = `You are Travolor – a smart AI Global Travel Planner.
   Your role is to create a complete, AUTO-BUDGETED travel plan for any destination in the world, including travel options from the user's starting location.
