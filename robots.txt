@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://travolor.in/sitemap.xml
