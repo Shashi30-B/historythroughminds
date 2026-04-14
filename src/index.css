@@ -11,7 +11,7 @@
     @apply bg-white/90 backdrop-blur-[16px] border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.04)];
   }
   .glass-dark {
-    @apply bg-[#0A2540]/95 text-white backdrop-blur-[16px] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.2)];
+    @apply bg-[#000080]/95 text-white backdrop-blur-[16px] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.2)];
   }
   .shimmer {
     @apply relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent;
@@ -20,13 +20,13 @@
     @apply shadow-[0_0_30px_rgba(30,144,255,0.25)];
   }
   .btn-primary {
-    @apply bg-gradient-to-br from-[#1E90FF] to-[#0A2540] text-white shadow-[0_4px_14px_0_rgba(0,118,255,0.39)] hover:shadow-[0_6px_20px_rgba(0,118,255,0.23)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300;
+    @apply bg-gradient-to-br from-[#1E90FF] to-[#000080] text-white shadow-[0_4px_14px_0_rgba(0,118,255,0.39)] hover:shadow-[0_6px_20px_rgba(0,118,255,0.23)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300;
   }
   .btn-secondary {
-    @apply bg-white text-[#0A2540] border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300 shadow-sm active:scale-[0.98];
+    @apply bg-white text-[#000080] border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300 shadow-sm active:scale-[0.98];
   }
   .text-primary {
-    @apply text-[#0A2540];
+    @apply text-[#000080];
   }
   .text-secondary {
     @apply text-[#4A5568];
@@ -41,7 +41,7 @@
     @apply bg-white rounded-2xl border border-gray-100/80 shadow-[0_10px_40px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)] transition-all duration-500;
   }
   .input-premium {
-    @apply w-full bg-gray-50/50 border border-gray-200 rounded-xl px-5 py-3 text-[#0A2540] placeholder:text-gray-400 focus:bg-white focus:border-[#1E90FF] focus:ring-4 focus:ring-[#1E90FF]/10 outline-none transition-all duration-300;
+    @apply w-full bg-gray-50/50 border border-gray-200 rounded-xl px-5 py-3 text-[#000080] placeholder:text-gray-400 focus:bg-white focus:border-[#1E90FF] focus:ring-4 focus:ring-[#1E90FF]/10 outline-none transition-all duration-300;
   }
 }
 
@@ -52,18 +52,18 @@
 }
 
 body {
-  @apply antialiased bg-[#F8FAFC] text-[#0A2540] min-h-screen font-sans;
+  @apply antialiased bg-[#F8FAFC] text-[#000080] min-h-screen font-sans;
 }
 
-.markdown-body h1 { @apply text-3xl font-display font-extrabold mb-6 mt-8 text-[#0A2540] tracking-tight; }
-.markdown-body h2 { @apply text-2xl font-display font-bold mb-4 mt-6 border-b border-gray-100 pb-2 text-[#0A2540] tracking-tight; }
-.markdown-body h3 { @apply text-xl font-display font-semibold mb-3 mt-5 text-[#0A2540]; }
+.markdown-body h1 { @apply text-3xl font-display font-extrabold mb-6 mt-8 text-[#000080] tracking-tight; }
+.markdown-body h2 { @apply text-2xl font-display font-bold mb-4 mt-6 border-b border-gray-100 pb-2 text-[#000080] tracking-tight; }
+.markdown-body h3 { @apply text-xl font-display font-semibold mb-3 mt-5 text-[#000080]; }
 .markdown-body p { @apply mb-5 leading-relaxed text-[#4A5568] text-base; }
 .markdown-body ul { @apply list-disc pl-6 mb-5 space-y-3 text-[#4A5568]; }
 .markdown-body li { @apply leading-relaxed; }
-.markdown-body strong { @apply text-[#0A2540] font-bold; }
+.markdown-body strong { @apply text-[#000080] font-bold; }
 .markdown-body table { @apply w-full border-collapse mb-8 text-sm text-[#4A5568] rounded-xl overflow-hidden shadow-sm; }
-.markdown-body th { @apply bg-gray-50 border border-gray-100 p-4 text-left font-bold text-[#0A2540]; }
+.markdown-body th { @apply bg-gray-50 border border-gray-100 p-4 text-left font-bold text-[#000080]; }
 .markdown-body td { @apply border border-gray-100 p-4 bg-white; }
 .markdown-body blockquote { @apply border-l-4 border-[#1E90FF] bg-blue-50/50 p-6 italic my-6 rounded-r-2xl text-[#4A5568] font-medium; }
 

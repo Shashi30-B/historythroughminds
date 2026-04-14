@@ -22,13 +22,32 @@ export interface ItineraryRequest {
   language?: string;
 }
 
+export async function getSuggestions(letter: string) {
+  const ai = getGenAI();
+  const prompt = `You are a premium Travel Planner AI autocomplete engine.
+  The user typed the letter: "${letter}".
+  List 5-10 top travel destinations starting with this letter.
+  Format: "Suggested Destinations starting with ${letter}: City1, City2, City3, ..."
+  Keep it professional and high-end.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+    return response.text || "";
+  } catch (error) {
+    console.error("Error getting suggestions:", error);
+    return "";
+  }
+}
+
 export async function generateItinerary(request: ItineraryRequest) {
   const { location, startLocation, duration, numPeople, travelStyle, language = "en" } = request;
   const ai = getGenAI();
 
-  const prompt = `You are Travolor – a smart AI Global Travel Planner.
-  Your role is to create a complete, AUTO-BUDGETED travel plan for any destination in the world, including travel options from the user's starting location.
-  
+  const prompt = `You are a premium Travel Planner AI. Your interface style is inspired by MakeMyTrip, using a Navy Blue (#000080) and White professional theme.
+
   User Details:
   - Starting Location: ${startLocation}
   - Destination: ${location}
@@ -37,92 +56,56 @@ export async function generateItinerary(request: ItineraryRequest) {
   - Travel Style: ${travelStyle}
   
   Language Rule:
-  - If the user input is in Marathi or the requested language is Marathi, reply in Marathi.
-  - Otherwise, reply in English.
-  Current Language: ${language === "mr" ? "Marathi" : "English"}.
-  
-  AI TASK:
-  1. TRAVEL OPTIONS FROM STARTING LOCATION:
-     - Generate best travel options from ${startLocation} to ${location}.
-     - Include:
-       ✈️ Best flight options (estimated time & price)
-       🚆 Train options (if applicable)
-       🚌 Bus options (if applicable)
-       🚗 Self-drive distance and travel time
-     - Show:
-       - Total travel distance
-       - Total travel time
-       - Estimated travel cost (add this to the total budget)
-       - Best departure time
-       - Nearest airport / railway station for both cities.
+  - Tone: Professional, minimalist, and luxury-focused.
+  - Respond in a natural Hinglish (Hindi-English) or Marathi-English mix as requested by the user.
+  - Keep technical terms in English for a premium feel.
+  - Current Language: ${language === "mr" ? "Marathi-English Mix" : "Hinglish"}.
 
-  2. AUTO-CALCULATE the budget for this trip based on the destination, travel style, and travel costs from ${startLocation}.
-  
-  3. Provide a structured travel plan with the following sections using Markdown headers:
-  
-  # 🌍 DESTINATION OVERVIEW
-  - Best time to visit for lowest cost
-  - Crowd level
-  - Weather insight
-  - Visa requirement (if international)
-  - Currency used
-  
-  # ✈️ TRAVEL FROM ${startLocation.toUpperCase()} TO ${location.toUpperCase()}
-  - Detailed travel options as requested above.
-  - Total travel distance: [Distance]
-  - Total travel time: [Time]
-  - Estimated travel cost: [Amount]
-  
-  # 💰 BUDGET ESTIMATION (Auto-Calculated)
-  - Budget Category: [Budget Trip / Standard Trip / Luxury Trip]
-  - Estimated Total Cost: [Amount] (Including travel from ${startLocation})
-  - Cost per person: [Amount]
-  - Cost per day: [Amount]
-  
-  ## 📊 Cost Breakdown
-  - ✈️ Travel from ${startLocation}: [Amount]
-  - 🏨 Hotel cost: [Amount]
-  - 🍽 Food cost: [Amount]
-  - 🚕 Transport cost: [Amount]
-  - 🎟 Activities & entry fees: [Amount]
-  - ➕ Buffer amount: [Amount]
-  
-  # 💡 TRAVEL STRATEGY
-  - [If Budget/Backpacking] Savings tips for budget travellers.
-  - [If Luxury] Upgrade suggestions for a more premium experience.
-  - [General] Optimization tips for this specific destination.
-  
-  # 🗓 DAY-WISE ITINERARY
-  Create a clear plan for each day with:
-  - Day 1: MUST mention travel from ${startLocation} to ${location}.
-  - Morning, Afternoon, Evening, Night
-  - Include: Travel route, estimated distance, and parking availability.
-  
-  # 📍 TOP ATTRACTIONS & EXPERIENCES
-  - Must-visit places in the suggested budget.
-  - Hidden gems.
-  - Nearby experiences.
-  
-  # 🍜 FOOD TO TRY
-  - Famous local food and best budget-friendly/premium eateries.
-  
-  # 🏨 HOTEL SUGGESTIONS (Within Budget)
-  - Suggest 3 specific hotels that fit the calculated budget for ${numPeople} people.
-  
-  # 🚆 TRANSPORT GUIDE
-  - Best transport options (Local/Intercity).
-  
-  # 📸 PHOTO SPOTS & 🛍 SHOPPING
-  - Instagram-worthy locations.
-  - What to buy.
-  
-  # ⚠️ SMART TRAVEL TIPS
-  - Practical tips for this location.
-  
+  UI & CONTENT RULES:
+  1. NO GENERIC CONTENT: Do not show "Trending Destinations", "Inspiration", or "Special Deals" unless explicitly asked. Focus only on the trip requested by the user.
+  2. NAVY BLUE THEME FOCUS: Present information in a way that suits a dark navy blue UI. Use bold white text for headers and clear lists.
+  3. BUTTON DESIGN: Assume the 'Start Journey' button is a "Gradient Royal Blue" color.
+  4. HYPER-LOCAL: For Maharashtra trips, suggest specific local spots and food.
+  5. NO FLUFF: Keep the response clean, professional, and direct. Use professional icons like ✈️, 🏨, 🍴.
+
+  STRUCTURE:
+  - # 🌍 Trip Overview
+    - Destination: **${location}**
+    - Duration: **${duration} Days**
+    - Style: **${travelStyle}**
+
+  - # ✈️ Flights
+    | Airline | Departure | Arrival | Price | Link |
+    |---------|-----------|---------|-------|------|
+    | [Airline Name] | [Time] | [Time] | [Price] | [Book](https://www.skyscanner.com/transport/flights/${startLocation}/${location}) |
+
+  - # 🏨 Hotels
+    | Category | Hotel Name | Rating | USP | Link |
+    |----------|------------|--------|-----|------|
+    | Budget | [Name] | [Rating] | [USP] | [Book](https://www.booking.com/searchresults.html?ss=${location}) |
+    | Mid-range | [Name] | [Rating] | [USP] | [Book](https://www.booking.com/searchresults.html?ss=${location}) |
+    | Luxury | [Name] | [Rating] | [USP] | [Book](https://www.booking.com/searchresults.html?ss=${location}) |
+
+  - # 🗓 Day-by-Day Itinerary
+    | Day | Time | Activity | Local Food |
+    |-----|------|----------|------------|
+    | Day 1 | Morning | [Activity] | [Dish] |
+    | Day 1 | Afternoon | [Activity] | [Dish] |
+    | Day 1 | Evening | [Activity] | [Dish] |
+
+  - # 💰 Total Cost Estimate
+    | Category | Estimated Cost |
+    |----------|----------------|
+    | Flights | [Amount] |
+    | Hotels | [Amount] |
+    | Food | [Amount] |
+    | Activities | [Amount] |
+    | **Total** | **[Total Amount]** |
+
   💎 OUTPUT STYLE:
-  - Use emojis, headings, and proper spacing.
-  - Use cards/tables for budget breakdown if possible.
-  - Keep it structured and easy to read.`;
+  - Use **Markdown tables** for itineraries, flights, and hotels.
+  - Use **bold headers** for sections.
+  - Professional icons only.`;
 
   try {
     const response = await ai.models.generateContent({

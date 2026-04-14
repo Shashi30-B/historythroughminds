@@ -23,7 +23,7 @@ import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
-import { generateItinerary } from './services/geminiService';
+import { generateItinerary, getSuggestions } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
 
 const libraries: ("places")[] = ["places"];
@@ -58,7 +58,7 @@ function cn(...inputs: ClassValue[]) {
 
 const StyleColors: Record<string, { bg: string; text: string; border: string; light: string }> = {
   budget: { bg: "bg-emerald-600", text: "text-emerald-600", border: "border-emerald-200", light: "bg-emerald-50" },
-  standard: { bg: "bg-[#1E90FF]", text: "text-[#1E90FF]", border: "border-blue-200", light: "bg-blue-50" },
+  standard: { bg: "bg-[#000080]", text: "text-[#000080]", border: "border-blue-200", light: "bg-blue-50" },
   luxury: { bg: "bg-purple-600", text: "text-purple-600", border: "border-purple-200", light: "bg-purple-50" },
   backpacking: { bg: "bg-orange-600", text: "text-orange-600", border: "border-orange-200", light: "bg-orange-50" },
   family: { bg: "bg-teal-600", text: "text-teal-600", border: "border-teal-200", light: "bg-teal-50" },
@@ -80,7 +80,7 @@ const IconMap: Record<string, any> = {
 
 const BOOKING_SERVICES = [
   { id: 'hotels', label: 'Hotels', icon: Hotel, color: 'bg-[#1E90FF]', link: (from: string, to: string) => `https://www.makemytrip.com/hotels/hotel-listing/?city=${encodeURIComponent(to)}` },
-  { id: 'flights', label: 'Flights', icon: Plane, color: 'bg-[#0A2540]', link: (from: string, to: string) => `https://www.makemytrip.com/flight/search?itinerary=${encodeURIComponent(from)}-${encodeURIComponent(to)}-${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')}&tripType=O&paxType=A-1_C-0_I-0&intl=false&cabinClass=E` },
+  { id: 'flights', label: 'Flights', icon: Plane, color: 'bg-[#000080]', link: (from: string, to: string) => `https://www.makemytrip.com/flight/search?itinerary=${encodeURIComponent(from)}-${encodeURIComponent(to)}-${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')}&tripType=O&paxType=A-1_C-0_I-0&intl=false&cabinClass=E` },
   { id: 'trains', label: 'Trains', icon: TrainFront, color: 'bg-red-600', link: (from: string, to: string) => `https://www.makemytrip.com/railways/listing?srcCity=${encodeURIComponent(from)}&destCity=${encodeURIComponent(to)}&date=${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')}` },
   { id: 'buses', label: 'Buses', icon: Bus, color: 'bg-rose-500', link: (from: string, to: string) => `https://www.redbus.in/search?fromCityName=${encodeURIComponent(from)}&toCityName=${encodeURIComponent(to)}` },
   { id: 'cabs', label: 'Cabs', icon: Car, color: 'bg-amber-500', link: (from: string, to: string) => `https://www.makemytrip.com/cabs/listing/?fromCity=${encodeURIComponent(from)}&toCity=${encodeURIComponent(to)}` },
@@ -185,7 +185,9 @@ const LocationInput = ({
   isLocating
 }: any) => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const [service, setService] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<any>(null);
 
@@ -197,7 +199,27 @@ const LocationInput = ({
   }, [isLoaded]);
 
   React.useEffect(() => {
-    if (service && value && value.length > 0 && !value.includes(',')) {
+    if (value && value.length === 1) {
+      const fetchAiSuggestions = async () => {
+        setIsAiLoading(true);
+        const result = await getSuggestions(value);
+        if (result) {
+          // Parse "Suggested Destinations starting with M: Mumbai, Mahabaleshwar, ..."
+          const citiesPart = result.split(':')[1];
+          if (citiesPart) {
+            const cities = citiesPart.split(',').map(c => c.trim());
+            setAiSuggestions(cities);
+            setShowSuggestions(true);
+          }
+        }
+        setIsAiLoading(false);
+      };
+      fetchAiSuggestions();
+    } else {
+      setAiSuggestions([]);
+    }
+
+    if (service && value && value.length > 1 && !value.includes(',')) {
       const timeoutId = setTimeout(() => {
         service.getPlacePredictions(
           { 
@@ -279,7 +301,7 @@ const LocationInput = ({
           onClick={onLocationDetect}
           className={cn(
             "absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-100 transition-all",
-            isLocating ? "animate-spin text-[#1E90FF]" : "text-gray-300 hover:text-[#0A2540]"
+            isLocating ? "animate-spin text-[#1E90FF]" : "text-gray-300 hover:text-[#000080]"
           )}
         >
           <Navigation2 size={18} />
@@ -287,13 +309,36 @@ const LocationInput = ({
       )}
 
       <AnimatePresence>
-        {showSuggestions && suggestions.length > 0 && (
+        {showSuggestions && (suggestions.length > 0 || aiSuggestions.length > 0) && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
             className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] overflow-hidden max-h-64 overflow-y-auto"
           >
+            {isAiLoading && (
+              <div className="px-6 py-4 flex items-center gap-3 border-b border-gray-50">
+                <Loader2 size={16} className="animate-spin text-[#1E90FF]" />
+                <span className="text-gray-400 text-xs font-medium">AI is thinking...</span>
+              </div>
+            )}
+            {aiSuggestions.map((city, idx) => (
+              <div
+                key={`ai-${idx}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(city);
+                  setShowSuggestions(false);
+                }}
+                className="px-6 py-4 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+              >
+                <Sparkles size={16} className="text-[#1E90FF]" />
+                <div className="flex flex-col">
+                  <span className="text-[#000080] font-bold text-sm">{city}</span>
+                  <span className="text-gray-400 text-[10px] font-medium">Premium Suggestion</span>
+                </div>
+              </div>
+            ))}
             {suggestions.map((s) => (
               <div
                 key={s.place_id}
@@ -305,7 +350,7 @@ const LocationInput = ({
               >
                 <MapPin size={16} className="text-gray-400" />
                 <div className="flex flex-col">
-                  <span className="text-[#0A2540] font-bold text-sm">{s.structured_formatting.main_text}</span>
+                  <span className="text-[#000080] font-bold text-sm">{s.structured_formatting.main_text}</span>
                   <span className="text-gray-400 text-[10px] font-medium">{s.structured_formatting.secondary_text}</span>
                 </div>
               </div>
@@ -998,7 +1043,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   whileHover={{ y: -5, scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => window.open(service.link(startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
-                  className="bg-white/10 backdrop-blur-md border border-white/20 px-6 py-3 rounded-2xl flex items-center gap-3 text-white hover:bg-white hover:text-[#0A2540] transition-all shadow-lg"
+                  className="bg-white/10 backdrop-blur-md border border-white/20 px-6 py-3 rounded-2xl flex items-center gap-3 text-white hover:bg-white hover:text-[#000080] transition-all shadow-lg"
                 >
                   <service.icon size={20} />
                   <span className="font-bold text-sm">{service.label}</span>
@@ -1061,13 +1106,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <Calendar className="text-gray-400" size={20} />
                     <div className="flex flex-col text-left">
                       <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Duration</span>
-                      <span className="text-[#0A2540] font-bold">Days</span>
+                      <span className="text-[#000080] font-bold">Days</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button onClick={() => setDuration(Math.max(1, duration - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
-                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{duration}</span>
-                    <button onClick={() => setDuration(duration + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
+                    <button onClick={() => setDuration(Math.max(1, duration - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#000080] hover:border-[#000080] transition-all font-bold shadow-sm">-</button>
+                    <span className="text-[#000080] font-bold text-lg w-6 text-center">{duration}</span>
+                    <button onClick={() => setDuration(duration + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#000080] hover:border-[#000080] transition-all font-bold shadow-sm">+</button>
                   </div>
                 </div>
 
@@ -1076,22 +1121,22 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <Users className="text-gray-400" size={20} />
                     <div className="flex flex-col text-left">
                       <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Travelers</span>
-                      <span className="text-[#0A2540] font-bold">People</span>
+                      <span className="text-[#000080] font-bold">People</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">-</button>
-                    <span className="text-[#0A2540] font-bold text-lg w-6 text-center">{numPeople}</span>
-                    <button onClick={() => setNumPeople(numPeople + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A2540] hover:border-[#0A2540] transition-all font-bold shadow-sm">+</button>
+                    <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#000080] hover:border-[#000080] transition-all font-bold shadow-sm">-</button>
+                    <span className="text-[#000080] font-bold text-lg w-6 text-center">{numPeople}</span>
+                    <button onClick={() => setNumPeople(numPeople + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#000080] hover:border-[#000080] transition-all font-bold shadow-sm">+</button>
                   </div>
                 </div>
 
                 <motion.button
-                  whileHover={{ scale: 1.02, backgroundColor: '#FF6B00' }}
+                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleGenerate()}
                   disabled={loading}
-                  className="bg-[#FF8A00] text-white rounded-2xl py-4 font-black text-lg flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-orange-500/20 transition-colors"
+                  className="btn-primary rounded-2xl py-4 font-black text-lg flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" size={22} /> : <Zap size={22} className="fill-current" />}
                   {loading ? "Planning..." : "Start Journey"}
@@ -1108,8 +1153,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       className={cn(
                         "flex items-center gap-2.5 px-6 py-3 rounded-full border text-sm font-bold transition-all",
                         travelStyle === style.id 
-                          ? "bg-[#0A2540] border-[#0A2540] text-white shadow-lg" 
-                          : "bg-white border-gray-100 text-gray-500 hover:border-[#FF8A00] hover:text-[#FF8A00]"
+                          ? "bg-[#000080] border-[#000080] text-white shadow-lg" 
+                          : "bg-white border-gray-100 text-gray-500 hover:border-[#1E90FF] hover:text-[#1E90FF]"
                       )}
                     >
                       <Icon size={16} />
@@ -1132,198 +1177,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               transition={{ delay: i * 0.1 }}
               className="bg-white/50 backdrop-blur-sm border border-white/20 p-8 rounded-[2.5rem] text-center space-y-2 shadow-sm"
             >
-              <h4 className="text-4xl font-black text-[#0A2540] tracking-tighter">{stat.value}</h4>
+              <h4 className="text-4xl font-black text-[#000080] tracking-tighter">{stat.value}</h4>
               <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">{stat.label}</p>
             </motion.div>
           ))}
         </section>
 
-        {/* Special Deals Slider */}
-        <section className="space-y-8 px-4">
-          <div className="flex justify-between items-end">
-            <div className="space-y-1">
-              <h3 className="text-3xl font-display font-black text-[#0A2540]">Special Deals</h3>
-              <p className="text-gray-500 font-medium">Exclusive offers for your next adventure</p>
-            </div>
-          </div>
-          <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
-            {SPECIAL_DEALS.map((deal) => (
-              <motion.div
-                key={deal.id}
-                whileHover={{ y: -5 }}
-                className="min-w-[300px] bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl flex flex-col gap-6 group cursor-pointer"
-              >
-                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg", deal.color)}>
-                  <deal.icon size={28} />
-                </div>
-                <div className="space-y-2">
-                  <h4 className="text-xl font-bold text-[#0A2540]">{deal.title}</h4>
-                  <p className="text-gray-500 text-sm leading-relaxed">{deal.desc}</p>
-                </div>
-                <button className="text-[#FF8A00] font-black text-xs uppercase tracking-widest flex items-center gap-2 group-hover:gap-3 transition-all">
-                  Claim Offer <ArrowRight size={16} />
-                </button>
-              </motion.div>
-            ))}
-          </div>
-        </section>
 
-        {/* Trending Destinations */}
-        <section className="space-y-8 px-4">
-          <div className="flex justify-between items-end">
-            <div className="space-y-1">
-              <h3 className="text-3xl font-display font-black text-[#0A2540]">Trending Destinations</h3>
-              <p className="text-gray-500 font-medium">Most loved places by fellow travelers</p>
-            </div>
-            <button className="text-[#1E90FF] text-sm font-bold hover:underline transition-all flex items-center gap-2">
-              View All <ArrowRight size={16} />
-            </button>
-          </div>
-          
-          <div className="flex gap-6 overflow-x-auto pb-8 px-2 scrollbar-hide snap-x">
-            {TRENDING_DESTINATIONS.map((dest) => (
-              <motion.div
-                key={dest.id}
-                whileHover={{ y: -10 }}
-                onClick={() => setLocationInput(dest.title)}
-                className="min-w-[280px] md:min-w-[320px] h-[450px] relative rounded-[3rem] overflow-hidden shadow-2xl group cursor-pointer snap-start border border-white/20"
-              >
-                <img 
-                  src={dest.img} 
-                  alt={dest.title} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                  referrerPolicy="no-referrer" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                
-                <div className="absolute bottom-0 left-0 right-0 p-8 space-y-2">
-                  <h4 className="text-2xl font-bold text-white">{dest.title}</h4>
-                  <p className="text-white/70 text-sm">{dest.desc}</p>
-                </div>
 
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleWishlist(dest);
-                  }}
-                  className={cn(
-                    "absolute top-6 right-6 w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg z-20",
-                    wishlist.some(w => w.dest_id === dest.id) 
-                      ? "bg-red-500 border-red-400 text-white" 
-                      : "bg-white/20 border-white/30 text-white hover:bg-white/40"
-                  )}
-                >
-                  <Heart size={20} className={wishlist.some(w => w.dest_id === dest.id) ? "fill-current" : ""} />
-                </button>
-              </motion.div>
-            ))}
-          </div>
-        </section>
 
-        {/* Travel Inspiration */}
-        <section className="space-y-8 px-4">
-          <div className="space-y-1">
-            <h3 className="text-3xl font-display font-black text-[#0A2540]">Travel Inspiration</h3>
-            <p className="text-gray-500 font-medium">Find your next perfect getaway</p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {TRAVEL_INSPIRATION.map((item) => (
-              <motion.div
-                key={item.id}
-                whileHover={{ scale: 1.05 }}
-                className="relative h-64 rounded-[2.5rem] overflow-hidden shadow-xl cursor-pointer group"
-              >
-                <img src={item.img} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  <span className="text-white font-black text-lg text-center px-4">{item.title}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* Popular Right Now */}
-        <section className="bg-[#0A2540] rounded-[4rem] p-12 md:p-20 text-white space-y-12">
-          <div className="text-center space-y-4">
-            <h3 className="text-4xl md:text-6xl font-display font-black tracking-tight">Popular Right Now</h3>
-            <p className="text-white/60 text-lg max-w-2xl mx-auto">Discover the most trending spots across the globe this season.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { title: 'Swiss Alps', category: 'Nature', img: 'https://images.unsplash.com/photo-1531310197839-ccf54634509e?auto=format&fit=crop&w=400&q=80' },
-              { title: 'Tokyo Streets', category: 'Urban', img: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=400&q=80' },
-              { title: 'Santorini', category: 'Coastal', img: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=400&q=80' }
-            ].map((item, i) => (
-              <div key={i} className="space-y-4 group cursor-pointer">
-                <div className="h-80 rounded-[3rem] overflow-hidden">
-                  <img src={item.img} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
-                </div>
-                <div className="px-4">
-                  <span className="text-[#FF8A00] text-[10px] font-black uppercase tracking-widest">{item.category}</span>
-                  <h4 className="text-2xl font-bold">{item.title}</h4>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-      {/* Trending Destinations - Horizontal Scroll */}
-      {!itinerary && !loading && (
-        <section className="space-y-6">
-          <div className="flex justify-between items-end px-2">
-            <div className="space-y-1">
-              <h3 className="text-2xl font-bold text-[#0A2540]">Trending Now</h3>
-              <p className="text-gray-500 text-sm">Most loved destinations by fellow travelers</p>
-            </div>
-            <button className="text-[#1E90FF] text-sm font-bold hover:underline transition-all flex items-center gap-2">
-              View All <ArrowRight size={16} />
-            </button>
-          </div>
-          
-          <div className="flex gap-6 overflow-x-auto pb-8 px-2 scrollbar-hide snap-x">
-            {TRENDING_DESTINATIONS.map((dest) => (
-              <motion.div
-                key={dest.id}
-                whileHover={{ y: -8 }}
-                onClick={() => setLocationInput(dest.title)}
-                className="min-w-[280px] md:min-w-[320px] h-[400px] relative rounded-3xl overflow-hidden shadow-lg group cursor-pointer snap-start border border-gray-100"
-              >
-                <img 
-                  src={dest.img} 
-                  alt={dest.title} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                  referrerPolicy="no-referrer" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleWishlist(dest);
-                  }}
-                  className={cn(
-                    "absolute top-4 right-4 w-10 h-10 rounded-full backdrop-blur-md border flex items-center justify-center transition-all shadow-lg z-20",
-                    wishlist.some(w => w.dest_id === dest.id) 
-                      ? "bg-red-500 border-red-400 text-white" 
-                      : "bg-white/20 border-white/30 text-white hover:bg-white/40"
-                  )}
-                >
-                  <Heart size={18} className={wishlist.some(w => w.dest_id === dest.id) ? "fill-current" : ""} />
-                </button>
-
-                <div className="absolute bottom-6 left-6 right-6 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-[#1E90FF] rounded-full text-[8px] font-bold text-white uppercase tracking-wider">Trending</span>
-                    <span className="px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[8px] font-bold text-white uppercase tracking-wider">4.8 ★</span>
-                  </div>
-                  <h4 className="text-white font-bold text-2xl">{dest.title}</h4>
-                  <p className="text-white/80 text-xs font-medium line-clamp-1">{dest.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* Results Section */}
       <AnimatePresence mode="wait">
@@ -1341,11 +1203,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 className="w-24 h-24 border-4 border-gray-100 border-t-[#1E90FF] rounded-full shadow-xl"
               />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Compass size={32} className="text-[#0A2540] animate-bounce" />
+                <Compass size={32} className="text-[#000080] animate-bounce" />
               </div>
             </div>
             <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold text-[#0A2540]">Crafting your adventure...</h3>
+              <h3 className="text-2xl font-bold text-[#000080]">Crafting your adventure...</h3>
               <p className="text-gray-500 text-sm font-medium">AI is finding the best local gems for you</p>
             </div>
           </motion.div>
@@ -1383,7 +1245,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       AI Optimized
                     </span>
                   </motion.div>
-                  <h2 className="text-4xl md:text-6xl font-bold text-[#0A2540] tracking-tight">{locationInput}</h2>
+                  <h2 className="text-4xl md:text-6xl font-bold text-[#000080] tracking-tight">{locationInput}</h2>
                 </div>
                 <div className="flex gap-4">
                   <motion.button 
@@ -1432,7 +1294,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="lg:col-span-8 space-y-10">
                 <div className="bg-white rounded-[3rem] p-8 md:p-12 shadow-xl border border-gray-100 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50" />
-                  <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:text-[#0A2540] prose-headings:font-bold prose-p:text-gray-600 prose-li:text-gray-600">
+                  <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:text-[#000080] prose-headings:font-bold prose-p:text-gray-600 prose-li:text-gray-600">
                     <Markdown>{itinerary}</Markdown>
                   </div>
 
@@ -1442,7 +1304,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       <div className="w-10 h-10 rounded-xl bg-[#1E90FF]/10 flex items-center justify-center">
                         <Sparkles className="text-[#1E90FF]" size={20} />
                       </div>
-                      <h3 className="text-3xl font-display font-black text-[#0A2540] tracking-tight">Ready to Book?</h3>
+                      <h3 className="text-3xl font-display font-black text-[#000080] tracking-tight">Ready to Book?</h3>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {BOOKING_SERVICES.filter(s => ['hotels', 'flights', 'buses'].includes(s.id)).map(service => (
@@ -1465,7 +1327,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               {/* Sidebar */}
               <aside className="lg:col-span-4 space-y-8">
                 {/* Budget Summary Card */}
-                <div className="bg-[#0A2540] rounded-[3rem] p-8 md:p-10 shadow-xl text-white relative overflow-hidden group">
+                <div className="bg-[#000080] rounded-[3rem] p-8 md:p-10 shadow-xl text-white relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 opacity-70">Budget Summary</h4>
                   <div className="space-y-8">
@@ -1494,7 +1356,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
                 {/* Quick Info Cards */}
                 <div className="bg-white rounded-[3rem] p-8 md:p-10 shadow-xl border border-gray-100 space-y-10">
-                  <h4 className="text-[#0A2540] font-bold text-2xl tracking-tight">Trip Insights</h4>
+                  <h4 className="text-[#000080] font-bold text-2xl tracking-tight">Trip Insights</h4>
                   <div className="space-y-8">
                     {[
                       { label: "Best Time", icon: Clock, value: "Oct - Mar", color: "text-orange-500" },
@@ -1510,7 +1372,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         </div>
                         <div className="space-y-0.5">
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.label}</p>
-                          <p className="text-sm font-bold text-[#0A2540]">{item.value}</p>
+                          <p className="text-sm font-bold text-[#000080]">{item.value}</p>
                         </div>
                       </div>
                     ))}
@@ -1527,11 +1389,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             >
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-[#0A2540] flex items-center justify-center shadow-xl">
+                  <div className="w-14 h-14 rounded-2xl bg-[#000080] flex items-center justify-center shadow-xl">
                     <Wallet className="text-white" size={28} />
                   </div>
                   <div>
-                    <h3 className="text-3xl font-bold text-[#0A2540] tracking-tight">Trip Budget Tracker</h3>
+                    <h3 className="text-3xl font-bold text-[#000080] tracking-tight">Trip Budget Tracker</h3>
                     <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Real-time cost analysis</p>
                   </div>
                 </div>
@@ -1554,7 +1416,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           }
                         }
                       }}
-                      className="bg-transparent text-[#0A2540] font-bold text-xl w-32 outline-none focus:text-[#1E90FF] transition-colors"
+                      className="bg-transparent text-[#000080] font-bold text-xl w-32 outline-none focus:text-[#1E90FF] transition-colors"
                     />
                   </div>
                 </div>
@@ -1581,7 +1443,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         <motion.p 
                           key={totalEstimate}
                           initial={{ scale: 1.1, color: "#1E90FF" }}
-                          animate={{ scale: 1, color: "#0A2540" }}
+                          animate={{ scale: 1, color: "#000080" }}
                           className="text-4xl font-bold tracking-tighter"
                         >
                           {formatPrice(totalEstimate)}
@@ -1647,7 +1509,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           </div>
                           <div>
                             <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{item.label}</p>
-                            <p className="text-[#0A2540] font-bold">{formatPrice(item.amount)}</p>
+                            <p className="text-[#000080] font-bold">{formatPrice(item.amount)}</p>
                           </div>
                         </div>
                       ))}
@@ -1661,10 +1523,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <div className="space-y-8">
               <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#0A2540] flex items-center justify-center shadow-xl">
+                  <div className="w-12 h-12 rounded-2xl bg-[#000080] flex items-center justify-center shadow-xl">
                     <BookingIcon className="text-white" size={24} />
                   </div>
-                  <h3 className="text-3xl font-bold text-[#0A2540] tracking-tight">Complete Your Booking</h3>
+                  <h3 className="text-3xl font-bold text-[#000080] tracking-tight">Complete Your Booking</h3>
                 </div>
                 <p className="text-gray-400 text-xs font-bold uppercase tracking-widest hidden md:block">Best prices guaranteed</p>
               </div>
@@ -1681,7 +1543,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 group-hover:rotate-6", service.color)}>
                       <service.icon className="text-white" size={28} />
                     </div>
-                    <span className="text-[#0A2540] font-bold text-xs uppercase tracking-[0.2em]">{service.label}</span>
+                    <span className="text-[#000080] font-bold text-xs uppercase tracking-[0.2em]">{service.label}</span>
                     <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-full -mr-8 -mt-8" />
                   </motion.button>
                 ))}
@@ -1708,7 +1570,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             animate={{ scale: 1 }}
             className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group overflow-hidden p-4"
           >
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#0A2540] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
             <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/20 to-transparent opacity-50" />
             <img 
               src="/logo.png" 
@@ -1718,7 +1580,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             />
           </motion.div>
           <div className="space-y-1">
-            <h1 className="text-4xl font-display font-black text-[#0A2540] tracking-tight">Travolor</h1>
+            <h1 className="text-4xl font-display font-black text-[#000080] tracking-tight">Travolor</h1>
             <p className="text-gray-400 font-medium text-sm tracking-wide">Plan Your Perfect Trip</p>
           </div>
         </div>
@@ -1739,14 +1601,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
                 <div className="relative group">
-                  <ProfileIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
+                  <ProfileIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={18} />
                   <input 
                     type="text" 
                     required
                     placeholder="John Doe"
                     value={authForm.name}
                     onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
-                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#000080] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                   />
                 </div>
               </div>
@@ -1755,14 +1617,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Email or Mobile Number</label>
               <div className="relative group">
-                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
+                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={18} />
                 <input 
                   type="text" 
                   required
                   placeholder="name@example.com"
                   value={authForm.email}
                   onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
-                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
+                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#000080] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                 />
               </div>
             </div>
@@ -1770,19 +1632,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Password</label>
               <div className="relative group">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#0A1F44] transition-colors" size={18} />
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={18} />
                 <input 
                   type={showPassword ? "text" : "password"} 
                   required
                   placeholder="••••••••"
                   value={authForm.password}
                   onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-14 py-4 text-[#0A1F44] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
+                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-14 py-4 text-[#000080] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
                 />
                 <button 
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0A1F44] transition-colors"
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#000080] transition-colors"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -1795,7 +1657,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   onClick={() => setRememberMe(!rememberMe)}
                   className={cn(
                     "w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center",
-                    rememberMe ? "bg-[#0A1F44] border-[#0A1F44]" : "border-gray-200 group-hover:border-gray-300"
+                    rememberMe ? "bg-[#000080] border-[#000080]" : "border-gray-200 group-hover:border-gray-300"
                   )}
                 >
                   {rememberMe && <Check size={14} className="text-white" />}
@@ -1827,7 +1689,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <button 
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full bg-white border border-gray-100 text-[#0A1F44] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+              className="w-full bg-white border border-gray-100 text-[#000080] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -1839,7 +1701,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             </button>
             <button 
               disabled={loading}
-              className="w-full bg-white border border-gray-100 text-[#0A1F44] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+              className="w-full bg-white border border-gray-100 text-[#000080] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
             >
               <Phone size={18} className="text-emerald-500" />
               Continue with Phone OTP
@@ -1851,7 +1713,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           {authMode === 'login' ? "New user?" : "Already have an account?"}
           <button 
             onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-            className="ml-2 text-[#0A1F44] font-black hover:text-orange-500 transition-colors"
+            className="ml-2 text-[#000080] font-black hover:text-orange-500 transition-colors"
           >
             {authMode === 'login' ? 'Sign Up' : 'Login'}
           </button>
@@ -1864,13 +1726,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     <div className="space-y-10 pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
         <div className="space-y-2">
-          <h2 className="text-5xl font-display font-black text-[#0A2540] tracking-tighter">{t.myTrips}</h2>
+          <h2 className="text-5xl font-display font-black text-[#000080] tracking-tighter">{t.myTrips}</h2>
           <p className="text-gray-500 font-medium tracking-wide tracking-widest uppercase text-[10px]">Your curated collection of adventures</p>
         </div>
         <div className="flex gap-3">
           <div className="px-6 py-3 bg-white rounded-full border border-gray-100 flex items-center gap-3 shadow-xl">
             <Globe size={16} className="text-[#1E90FF]" />
-            <span className="text-[#0A2540] font-black text-lg tracking-tighter">{savedTrips.length}</span>
+            <span className="text-[#000080] font-black text-lg tracking-tighter">{savedTrips.length}</span>
             <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Total</span>
           </div>
         </div>
@@ -1887,7 +1749,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <Lock size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{t.loginRequired}</h3>
+            <h3 className="text-3xl font-serif font-black text-[#000080] tracking-tight">{t.loginRequired}</h3>
             <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">{t.loginToAccess}</p>
           </div>
           <motion.button 
@@ -1910,7 +1772,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <MapIcon size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-display font-black text-[#0A2540] tracking-tight">Your map is empty</h3>
+            <h3 className="text-3xl font-display font-black text-[#000080] tracking-tight">Your map is empty</h3>
             <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">Start planning your journey and save your dream destinations here. ✈</p>
           </div>
           <motion.button 
@@ -2027,13 +1889,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     <div className="space-y-10 pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
         <div className="space-y-2">
-          <h2 className="text-5xl font-serif font-black text-[#0A2540] tracking-tighter">{t.bookings}</h2>
+          <h2 className="text-5xl font-serif font-black text-[#000080] tracking-tighter">{t.bookings}</h2>
           <p className="text-gray-500 font-medium tracking-wide tracking-widest uppercase text-[10px]">Manage your travel arrangements in one place</p>
         </div>
         <div className="flex gap-3">
           <div className="px-6 py-3 bg-white rounded-full border border-gray-100 flex items-center gap-3 shadow-xl">
             <BookingIcon size={16} className="text-[#1E90FF]" />
-            <span className="text-[#0A2540] font-black text-lg tracking-tighter">{bookings.length}</span>
+            <span className="text-[#000080] font-black text-lg tracking-tighter">{bookings.length}</span>
             <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Active</span>
           </div>
         </div>
@@ -2050,7 +1912,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <Lock size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">{t.loginRequired}</h3>
+            <h3 className="text-3xl font-serif font-black text-[#000080] tracking-tight">{t.loginRequired}</h3>
             <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">{t.loginToAccess}</p>
           </div>
           <motion.button 
@@ -2073,7 +1935,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <BookingIcon size={56} className="text-gray-300" />
           </div>
           <div className="space-y-3 relative z-10">
-            <h3 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">No bookings found</h3>
+            <h3 className="text-3xl font-serif font-black text-[#000080] tracking-tight">No bookings found</h3>
             <p className="text-gray-500 max-w-sm mx-auto leading-relaxed font-medium">You haven't made any bookings yet. Start planning your next trip!</p>
           </div>
           <motion.button 
@@ -2101,7 +1963,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <BookingIcon size={32} />
               </div>
               <div className="flex-1 space-y-1 relative z-10">
-                <h4 className="font-black text-[#0A2540] text-xl tracking-tight">{booking.title}</h4>
+                <h4 className="font-black text-[#000080] text-xl tracking-tight">{booking.title}</h4>
                 <div className="flex items-center gap-3">
                   <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">{booking.date}</span>
                   <span className="w-1 h-1 rounded-full bg-gray-200" />
@@ -2138,10 +2000,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <item.icon size={36} className={item.rotate} />
             </div>
             <div className="flex-1 relative z-10">
-              <h3 className="text-2xl font-serif font-black text-[#0A2540] tracking-tight">{item.label}</h3>
+              <h3 className="text-2xl font-serif font-black text-[#000080] tracking-tight">{item.label}</h3>
               <p className="text-gray-400 text-xs font-medium">{item.desc}</p>
             </div>
-            <ArrowRight className="text-gray-200 group-hover:text-[#0A2540] transition-all relative z-10" />
+            <ArrowRight className="text-gray-200 group-hover:text-[#000080] transition-all relative z-10" />
           </motion.a>
         ))}
       </div>
@@ -2152,12 +2014,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         className="bg-white border border-gray-100 rounded-[3rem] p-12 text-center relative overflow-hidden group shadow-xl"
       >
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#1E90FF]/5 to-indigo-600/5 opacity-50" />
-        <h4 className="text-3xl font-serif font-black text-[#0A2540] mb-3 tracking-tight relative z-10">Need help with booking?</h4>
+        <h4 className="text-3xl font-serif font-black text-[#000080] mb-3 tracking-tight relative z-10">Need help with booking?</h4>
         <p className="text-gray-500 text-lg mb-8 max-w-md mx-auto relative z-10 font-medium">Our travel experts are available 24/7 to assist you with your journey.</p>
         <motion.button 
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
-          className="bg-[#0A2540] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
+          className="bg-[#000080] text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-sm shadow-xl hover:glow-blue transition-all relative z-10"
         >
           Contact Support
         </motion.button>
@@ -2214,9 +2076,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <div className="space-y-8 pb-24 px-4 md:px-0">
         <div className="flex items-center gap-4 pt-8">
           <button onClick={() => setIsEditingProfile(false)} className="p-2 hover:bg-gray-100 rounded-full transition-all">
-            <ArrowLeft size={24} className="text-[#0A2540]" />
+            <ArrowLeft size={24} className="text-[#000080]" />
           </button>
-          <h2 className="text-3xl font-serif font-black text-[#0A2540] tracking-tight">Edit Profile</h2>
+          <h2 className="text-3xl font-serif font-black text-[#000080] tracking-tight">Edit Profile</h2>
         </div>
 
         <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
@@ -2248,7 +2110,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   type="text" 
                   value={editForm.name}
                   onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
                   placeholder="Your Name"
                 />
               </div>
@@ -2262,7 +2124,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   type="text" 
                   value={editForm.phone}
                   onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#0A2540] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all"
                   placeholder="Your Phone"
                 />
               </div>
@@ -2289,7 +2151,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               whileTap={{ scale: 0.98 }}
               onClick={updateProfile}
               disabled={loading}
-              className="w-full bg-[#0A2540] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:glow-blue transition-all disabled:opacity-50"
+              className="w-full bg-[#000080] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:glow-blue transition-all disabled:opacity-50"
             >
               {loading ? "Saving..." : "Save Changes"}
             </motion.button>
@@ -2313,15 +2175,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       <div className="space-y-12 pb-24 px-4 md:px-0">
         {/* Header Section */}
         <div className="text-center space-y-2 pt-8">
-          <h2 className="text-4xl font-serif font-black text-[#0A2540] tracking-tight">Settings</h2>
+          <h2 className="text-4xl font-serif font-black text-[#000080] tracking-tight">Settings</h2>
           <p className="text-gray-400 text-sm font-medium">Manage your account and preferences</p>
         </div>
 
         {/* Account Section */}
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
-            <User className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">Account</h3>
+            <User className="text-[#000080]" size={20} />
+            <h3 className="text-lg font-bold text-[#000080]">Account</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {/* Profile Summary */}
@@ -2334,7 +2196,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="text-lg font-bold text-[#0A2540]">{user.name}</h4>
+                <h4 className="text-lg font-bold text-[#000080]">{user.name}</h4>
                 <p className="text-gray-400 text-xs font-medium">{user.email}</p>
               </div>
               <button 
@@ -2354,11 +2216,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
                   </div>
-                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {item.detail && <span className="text-gray-400 text-xs font-medium">{item.detail}</span>}
-                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#000080] transition-all" />
                 </div>
               </button>
             ))}
@@ -2368,8 +2230,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         {/* Preferences Section */}
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
-            <Settings className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">Preferences</h3>
+            <Settings className="text-[#000080]" size={20} />
+            <h3 className="text-lg font-bold text-[#000080]">Preferences</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
@@ -2381,12 +2243,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
                   </div>
-                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
                 </div>
                 <select 
                   value={item.value}
                   onChange={(e) => item.onChange(e.target.value)}
-                  className="bg-gray-50 text-[#0A2540] font-bold px-4 py-2 rounded-xl outline-none cursor-pointer text-xs border border-gray-100 focus:border-[#1E90FF] transition-all"
+                  className="bg-gray-50 text-[#000080] font-bold px-4 py-2 rounded-xl outline-none cursor-pointer text-xs border border-gray-100 focus:border-[#1E90FF] transition-all"
                 >
                   {item.options.map(opt => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -2401,7 +2263,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                   <Bell size={20} className="text-amber-500" />
                 </div>
-                <span className="text-[#0A2540] font-bold text-sm">Notifications</span>
+                <span className="text-[#000080] font-bold text-sm">Notifications</span>
               </div>
               <button 
                 onClick={() => setNotificationsEnabled(!notificationsEnabled)}
@@ -2423,11 +2285,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                   {isDarkMode ? <Moon size={20} className="text-indigo-500" /> : <Sun size={20} className="text-orange-500" />}
                 </div>
-                <span className="text-[#0A2540] font-bold text-sm">Theme</span>
+                <span className="text-[#000080] font-bold text-sm">Theme</span>
               </div>
               <button 
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className="bg-gray-50 px-4 py-2 rounded-xl text-[#0A2540] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all border border-gray-100"
+                className="bg-gray-50 px-4 py-2 rounded-xl text-[#000080] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all border border-gray-100"
               >
                 {isDarkMode ? "Dark" : "Light"}
               </button>
@@ -2438,8 +2300,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         {/* Travel Section */}
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
-            <MapIcon className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">Travel</h3>
+            <MapIcon className="text-[#000080]" size={20} />
+            <h3 className="text-lg font-bold text-[#000080]">Travel</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
@@ -2456,11 +2318,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
                   </div>
-                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {item.count !== undefined && <span className="bg-blue-50 text-[#1E90FF] text-[10px] font-black px-2 py-0.5 rounded-full">{item.count}</span>}
-                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#000080] transition-all" />
                 </div>
               </button>
             ))}
@@ -2470,8 +2332,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         {/* Support Section */}
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-4">
-            <HelpCircle className="text-[#0A2540]" size={20} />
-            <h3 className="text-lg font-bold text-[#0A2540]">Support</h3>
+            <HelpCircle className="text-[#000080]" size={20} />
+            <h3 className="text-lg font-bold text-[#000080]">Support</h3>
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
@@ -2484,9 +2346,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
                   </div>
-                  <span className="text-[#0A2540] font-bold text-sm">{item.label}</span>
+                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
                 </div>
-                <ArrowRight size={16} className="text-gray-200 group-hover:text-[#0A2540] transition-all" />
+                <ArrowRight size={16} className="text-gray-200 group-hover:text-[#000080] transition-all" />
               </button>
             ))}
           </div>
@@ -2508,7 +2370,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   return (
     <div className={cn(
-      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#0A2540]",
+      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#000080]",
       activeTab === 'explore' ? "bg-white" : "bg-[#F5F7FA]"
     )}>
       {/* Header */}
@@ -2516,7 +2378,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         "pt-6 pb-4 px-6 sticky top-0 z-40 transition-all duration-500",
         activeTab === 'explore' 
           ? "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm" 
-          : "bg-[#0A2540] border-b border-white/10"
+          : "bg-[#000080] border-b border-white/10"
       )}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <motion.div 
@@ -2535,7 +2397,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             />
             <span className={cn(
               "text-xl font-display font-bold tracking-tight transition-colors duration-300",
-              activeTab === 'explore' ? "text-[#0A2540]" : "text-white"
+              activeTab === 'explore' ? "text-[#000080]" : "text-white"
             )}>Travolor</span>
           </motion.div>
           <motion.div
@@ -2556,7 +2418,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 {user.photo ? (
                   <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ProfileIcon className={activeTab === 'explore' ? "text-[#0A2540]" : "text-white"} size={20} />
+                  <ProfileIcon className={activeTab === 'explore' ? "text-[#000080]" : "text-white"} size={20} />
                 )}
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-10" />
               </motion.div>
@@ -2567,7 +2429,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 onClick={() => setActiveTab('profile')}
                 className={cn(
                   "px-6 py-2 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-sm uppercase tracking-wider",
-                  activeTab === 'explore' ? "bg-[#FF8A00] text-white" : "bg-white text-[#0A2540]"
+                  activeTab === 'explore' ? "btn-primary" : "bg-white text-[#000080]"
                 )}
               >
                 Login
@@ -2622,7 +2484,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 size={20} 
                 className={cn(
                   "transition-all duration-300 relative z-10",
-                  activeTab === tab.id ? "text-[#1E90FF] scale-110" : "text-gray-400 group-hover:text-[#0A2540]"
+                  activeTab === tab.id ? "text-[#1E90FF] scale-110" : "text-gray-400 group-hover:text-[#000080]"
                 )} 
               />
               <span className={cn(
