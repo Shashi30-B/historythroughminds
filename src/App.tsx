@@ -243,8 +243,38 @@ const LocationInput = ({
         );
       }, 200);
       return () => clearTimeout(timeoutId);
-    } else if (!service && value && value.length > 0 && !value.includes(',')) {
-      // Fallback if service is not available
+    } else if (!service && value && value.length > 1 && !value.includes(',')) {
+      // Fetch suggestions from our backend travel API server proxy when client-side is blocked
+      const timeoutId = setTimeout(() => {
+        fetch(`/api/search/autocomplete?input=${encodeURIComponent(value)}`)
+          .then(res => {
+            if (!res.ok) throw new Error("API failed");
+            return res.json();
+          })
+          .then(data => {
+            if (Array.isArray(data) && data.length > 0) {
+              const formatted = data.map((item: any) => ({
+                place_id: item.id || item.place_id,
+                description: item.description,
+                structured_formatting: { main_text: item.main_text || item.description }
+              }));
+              setSuggestions(formatted);
+              setShowSuggestions(true);
+            } else {
+              throw new Error("No predictions");
+            }
+          })
+          .catch(() => {
+            // Offline local fallback list
+            const filtered = FALLBACK_CITIES.filter(c => 
+              c.description.toLowerCase().includes(value.toLowerCase())
+            );
+            setSuggestions(filtered);
+            setShowSuggestions(filtered.length > 0);
+          });
+      }, 200);
+      return () => clearTimeout(timeoutId);
+    } else if (!service && value && value.length === 1 && !value.includes(',')) {
       const filtered = FALLBACK_CITIES.filter(c => 
         c.description.toLowerCase().includes(value.toLowerCase())
       );
@@ -2502,17 +2532,45 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 }
 
 export default function App() {
-  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY;
-  if (mapsKey) {
-    return <AppWithMaps mapsKey={mapsKey} />;
+  const [mapsAuthFailed, setMapsAuthFailed] = useState(false);
+
+  useEffect(() => {
+    // Intercept Google Maps key auth failures (such as restricted keys causing ApiTargetBlockedMapError)
+    (window as any).gm_authFailure = () => {
+      console.warn("Google Maps SDK failed to authorize or load. Falling back to background search proxy.");
+      setMapsAuthFailed(true);
+    };
+    return () => {
+      try {
+        delete (window as any).gm_authFailure;
+      } catch (e) {}
+    };
+  }, []);
+
+  const mapsKey = 
+    process.env.GOOGLE_MAPS_PLATFORM_KEY ||
+    process.env.VITE_GOOGLE_MAPS_API_KEY ||
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
+    import.meta.env.VITE_MAPS_API_KEY;
+
+  if (mapsKey && !mapsAuthFailed) {
+    return <AppWithMaps mapsKey={mapsKey} setMapsAuthFailed={setMapsAuthFailed} />;
   }
   return <AppContent isLoaded={false} />;
 }
 
-function AppWithMaps({ mapsKey }: { mapsKey: string }) {
-  const { isLoaded } = useLoadScript({
+function AppWithMaps({ mapsKey, setMapsAuthFailed }: { mapsKey: string; setMapsAuthFailed: (failed: boolean) => void }) {
+  const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: mapsKey,
     libraries,
   });
+
+  useEffect(() => {
+    if (loadError) {
+      console.warn("Google Maps script loading failed:", loadError);
+      setMapsAuthFailed(true);
+    }
+  }, [loadError, setMapsAuthFailed]);
+
   return <AppContent isLoaded={isLoaded} />;
 }
