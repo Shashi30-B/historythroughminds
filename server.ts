@@ -4,11 +4,21 @@ import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = new Database("travel_app.db");
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 // Initialize DB
 db.exec(`
@@ -659,6 +669,264 @@ async function startServer() {
       { id: 1, name: "Sleeper AC", price: Math.floor(distance * 3), rating: 4.9, type: "AC" },
       { id: 2, name: "Sleeper Non-AC", price: Math.floor(distance * 2), rating: 4.2, type: "Non-AC" }
     ]);
+  });
+
+  // Gemini API Routes
+  app.post("/api/gemini/generate-itinerary", async (req, res) => {
+    const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch } = req.body;
+    
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY missing on server");
+      return res.status(500).json({ error: "GEMINI_API_KEY is not defined on the server." });
+    }
+
+    const prompt = `You are an expert AI Travel Planner for "Travolor". Your goal is to generate highly practical, exciting, and easy-to-read travel itineraries based on the user's input.
+
+Do not use JSON. Output the response in beautifully formatted Markdown (plain text) using headings, bullet points, and bold text.
+
+User Request Details:
+- Starting Location: ${startLocation}
+- Destination: ${location}
+- Duration: ${duration} Days
+- Travel Style / Budget Category: ${travelStyle} (e.g. Budget, Moderate, Luxury)
+- Number of Travelers: ${numPeople}
+- Language Preference: Please write the entire response and itinerary ONLY in the ${language} language. Write all headings, descriptions, tip titles, and day names in ${language}.
+
+Follow this exact structure for every response:
+
+🌍 [Destination Name] Travel Itinerary
+⏱️ Duration: [Number of days]
+💰 Budget Category: [Budget/Moderate/Luxury] | Approx Cost: [Amount in INR]
+
+🗓️ Day-by-Day Plan:
+
+Day 1: [Theme/Title of the Day]
+
+Morning: [Activity name and short description] - [Approx Cost]
+
+Afternoon: [Activity name and short description] - [Approx Cost]
+
+Evening: [Activity name and short description] - [Approx Cost]
+
+🚕 Transport Tip: [How to get around for the day]
+
+(Repeat the above structure for all ${duration} days. Do not skip any day.)
+
+💡 Travolor Pro-Tips for [Destination]:
+
+[Important travel tip 1]
+
+[Important travel tip 2]
+
+[Local food recommendation]
+
+Rules:
+1. Replace all bracketed items (like [Destination Name], [Amount in INR], [Activity name and short description]) with real, actual details for the requested trip. Do not keep the brackets in the final output.
+2. Be direct, enthusiastic, and provide practical advice.
+3. Do NOT add ANY conversational filler or introduction/conclusion commentary before or after the itinerary. Start immediately with "🌍 [Destination Name] Travel Itinerary" and end exactly after the local food recommendation.
+4. Calculate approx costs in Indian Rupees (INR).`;
+
+    // Configure model selection based on thinking/grounding requested
+    const useHighThinking = enableThinking === true || travelStyle === "luxury";
+    const model = useHighThinking ? "gemini-3.1-pro-preview" : "gemini-3.5-flash";
+    
+    // Configure tools: If search grounding is requested, or if standard-flash is utilized to ensure fresh sources
+    const tools: any[] = [];
+    if (useSearch === true || !useHighThinking) {
+      tools.push({ googleSearch: {} });
+    }
+
+    const config: any = {};
+    if (tools.length > 0) {
+      config.tools = tools;
+    }
+    if (useHighThinking) {
+      config.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+    }
+
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: config
+      });
+
+      // Extract search grounding metadata sources
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      const sources = groundingChunks?.map((chunk: any) => {
+        if (chunk.web) {
+          return { title: chunk.web.title, uri: chunk.web.uri };
+        }
+        return null;
+      }).filter(Boolean) || [];
+
+      res.json({ 
+        text: response.text || "Sorry, I couldn't generate the plan.",
+        sources: sources,
+        modelUsed: model,
+        grounded: sources.length > 0
+      });
+    } catch (error: any) {
+      console.error("Server error generating itinerary:", error);
+      res.status(500).json({ error: error.message || "Failed to generate itinerary" });
+    }
+  });
+
+  // Multi-Turn Chatbot with Grounding and Mode configuration
+  app.post("/api/gemini/chat", async (req, res) => {
+    const { messages, userLocation, mode = "general", botRole = "copilot", language = "English" } = req.body;
+
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY missing on server");
+      return res.status(500).json({ error: "GEMINI_API_KEY is not defined on the server." });
+    }
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "messages array is required." });
+    }
+
+    // Determine model based on complexity mode requested
+    // gemini-3.1-pro-preview for particularly complex tasks
+    // gemini-3.5-flash for general tasks
+    // gemini-3.1-flash-lite for tasks that should happen fast
+    let selectedModel = "gemini-3.5-flash";
+    if (mode === "complex" || mode === "reasoning") {
+      selectedModel = "gemini-3.1-pro-preview";
+    } else if (mode === "fast") {
+      selectedModel = "gemini-3.1-flash-lite";
+    }
+
+    // Set specialized chatbot roles / system instruction
+    let systemInstruction = "You are Travolor Travel Co-pilot, a friendly, ultra-knowledgeable, and professional travel assistant. Help the user plan journeys, suggest restaurants, advise on budgets, and provide local tips.";
+    if (botRole === "foodie") {
+      systemInstruction = "You are the Travolor Culinary Specialist. Your goal is to guide users to the finest local cuisines, street food, hidden restaurants, historical eateries, and dining tips for any city in the world.";
+    } else if (botRole === "historian") {
+      systemInstruction = "You are the Travolor Historical Guide. Share ancient tales, architectural secrets, monument histories, and cultural significance behind popular landmarks and cities the user asks about.";
+    } else if (botRole === "budget") {
+      systemInstruction = "You are the Travolor Budget Hack Advisor. Provide extreme money-saving tips, affordable transport alternatives, free attractions, cheap eats, and savvy itinerary optimizations.";
+    }
+
+    systemInstruction += ` CRITICAL: You must answer and write your responses ONLY in the ${language} language. Write all suggestions, travel advice, headings, and friendly comments in ${language}.`;
+
+    // Configure tools: dynamic detection or explicit request
+    const lastUserMessage = messages[messages.length - 1]?.text || "";
+    const lowerMessage = lastUserMessage.toLowerCase();
+    
+    const tools: any[] = [];
+    const config: any = {
+      systemInstruction
+    };
+
+    // Use Maps Grounding if query focuses on "places to visit, restaurants, hotels near, route, map, coordinates, directory, nearby"
+    const requiresMaps = lowerMessage.includes("near me") || 
+                         lowerMessage.includes("restaurant") || 
+                         lowerMessage.includes("hotel") || 
+                         lowerMessage.includes("place") || 
+                         lowerMessage.includes("where is") || 
+                         lowerMessage.includes("nearby") ||
+                         lowerMessage.includes("map");
+
+    if (requiresMaps && selectedModel !== "gemini-3.1-flash-lite") {
+      tools.push({ googleMaps: {} });
+      if (userLocation && userLocation.lat && userLocation.lng) {
+        config.toolConfig = {
+          retrievalConfig: {
+            latLng: {
+              latitude: Number(userLocation.lat),
+              longitude: Number(userLocation.lng)
+            }
+          }
+        };
+      }
+    } else if (selectedModel !== "gemini-3.1-flash-lite") {
+      // Use Search Grounding as default for current events or real-time info
+      tools.push({ googleSearch: {} });
+    }
+
+    if (tools.length > 0) {
+      config.tools = tools;
+    }
+
+    // Enable high thinking mode for gemini-3.1-pro-preview if requested
+    if (selectedModel === "gemini-3.1-pro-preview") {
+      config.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+    }
+
+    try {
+      // Map frontend messages format to standard role-parts structure
+      // role must be 'user' or 'model'
+      const history = messages.slice(0, -1).map((m: any) => ({
+        role: m.role === "assistant" || m.role === "model" ? "model" as const : "user" as const,
+        parts: [{ text: m.text }]
+      }));
+
+      // Initialize stateless multi-turn chat using config
+      const chat = ai.chats.create({
+        model: selectedModel,
+        history: history,
+        config: config
+      });
+
+      const response = await chat.sendMessage({ message: lastUserMessage });
+
+      // Extract Grounding Chunks (URLs, Places, reviews, etc.)
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      const sources: any[] = [];
+      if (groundingChunks) {
+        for (const chunk of groundingChunks) {
+          if (chunk.web) {
+            sources.push({
+              type: "web",
+              title: chunk.web.title,
+              uri: chunk.web.uri
+            });
+          } else if (chunk.maps) {
+            sources.push({
+              type: "maps",
+              title: chunk.maps.title || "Directions / Place Link",
+              uri: chunk.maps.uri,
+              reviewSnippets: chunk.maps.placeAnswerSources?.reviewSnippets || []
+            });
+          }
+        }
+      }
+
+      res.json({
+        text: response.text || "I apologize, but I could not formulate a response at this moment.",
+        sources: sources,
+        modelUsed: selectedModel,
+        grounded: sources.length > 0
+      });
+    } catch (error: any) {
+      console.error("Chatbot generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to communicate with Travolor Assistant" });
+    }
+  });
+
+  app.post("/api/gemini/get-suggestions", async (req, res) => {
+    const { letter } = req.body;
+    
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY missing on server");
+      return res.status(500).json({ error: "GEMINI_API_KEY is not defined on the server." });
+    }
+
+    const prompt = `You are a premium Travel Planner AI autocomplete engine.
+The user typed the letter: "${letter}".
+List 5-10 top travel destinations starting with this letter.
+Format: "Suggested Destinations starting with ${letter}: City1, City2, City3, ..."
+Keep it professional and high-end.`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+      });
+      res.json({ text: response.text || "" });
+    } catch (error: any) {
+      console.error("Server error getting suggestions:", error);
+      res.status(500).json({ error: error.message || "Failed to get suggestions" });
+    }
   });
 
   // API 404 handler

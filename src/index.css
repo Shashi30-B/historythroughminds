@@ -52,7 +52,137 @@
 }
 
 body {
-  @apply antialiased bg-[#F8FAFC] text-[#000080] min-h-screen font-sans;
+  @apply antialiased bg-[#F8FAFC] text-[#000080] min-h-screen font-sans transition-colors duration-300;
+}
+
+/* --- Dark Mode Premium Theme Overrides --- */
+
+.dark body {
+  @apply bg-[#050711] text-[#E2E8F0];
+}
+
+/* Glass & Glass-dark */
+.dark .glass {
+  @apply bg-[#0C1027]/90 text-white backdrop-blur-[16px] border border-[#1E295D]/40 shadow-[0_8px_32px_rgba(0,0,0,0.5)];
+}
+.dark .glass-dark {
+  @apply bg-[#070A1E]/95 text-white backdrop-blur-[16px] border border-[#1E295D]/40 shadow-[0_8px_32px_rgba(0,0,0,0.6)];
+}
+
+/* Cards & Containers */
+.dark .premium-card {
+  @apply bg-[#0D1230] border border-[#1E295D]/40 shadow-[0_10px_40px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_50px_rgba(30,144,255,0.1)] transition-all duration-500;
+}
+
+.dark .bg-white {
+  @apply bg-[#0B0F28];
+}
+
+.dark .bg-gray-50 {
+  @apply bg-[#0E1332];
+}
+
+.dark .bg-gray-50\/30 {
+  @apply bg-[#0D1230]/40;
+}
+
+/* Inputs & Form Fields */
+.dark .input-premium {
+  @apply w-full bg-[#0E1332]/60 border border-[#1E295D]/55 text-white placeholder:text-gray-500 focus:bg-[#0B0F28] focus:border-[#1E90FF] focus:ring-4 focus:ring-[#1E90FF]/15 outline-none transition-all duration-300;
+}
+
+/* Buttons */
+.dark .btn-secondary {
+  @apply bg-[#0E1332] text-[#93C5FD] border border-[#1E295D]/70 hover:bg-[#131A44] hover:border-[#3B82F6] hover:text-white transition-all duration-300 shadow-sm active:scale-[0.98];
+}
+
+/* Borders & Dividers */
+.dark .border-gray-50 {
+  @apply border-[#1E295D]/30;
+}
+
+.dark .border-gray-100 {
+  @apply border-[#1E295D]/40;
+}
+
+.dark .border-gray-250, .dark .border-gray-200 {
+  @apply border-[#1E295D]/50;
+}
+
+/* Text Element Color Schemes */
+.dark .text-[#000080] {
+  @apply text-[#93C5FD];
+}
+
+.dark .text-primary {
+  @apply text-[#60A5FA];
+}
+
+.dark .text-secondary {
+  @apply text-[#94A3B8];
+}
+
+.dark .text-muted {
+  @apply text-[#64748B];
+}
+
+.dark .text-gray-400 {
+  @apply text-slate-400;
+}
+
+.dark .text-gray-500 {
+  @apply text-slate-400;
+}
+
+.dark .text-gray-600 {
+  @apply text-slate-300;
+}
+
+.dark .text-gray-900 {
+  @apply text-slate-100;
+}
+
+.dark .hover\:bg-gray-50:hover {
+  @apply hover:bg-[#0E1332]/60;
+}
+
+.dark .hover\:bg-blue-50:hover {
+  @apply hover:bg-[#1E90FF]/10;
+}
+
+.dark .shadow-sm {
+  @apply shadow-[0_4px_20px_rgba(0,0,0,0.4)];
+}
+
+/* Markdown overrides for dark mode */
+.dark .markdown-body h1, 
+.dark .markdown-body h2, 
+.dark .markdown-body h3, 
+.dark .markdown-body strong {
+  @apply text-[#F8FAFC];
+}
+
+.dark .markdown-body p, 
+.dark .markdown-body ul, 
+.dark .markdown-body li {
+  @apply text-[#CBD5E1];
+}
+
+.dark .markdown-body td {
+  @apply bg-[#0B0F28]/40 border-[#1E295D]/40;
+}
+
+.dark .markdown-body th {
+  @apply bg-[#0E1332] border-[#1E295D]/50 text-white;
+}
+
+.dark .markdown-body blockquote {
+  @apply bg-[#1E295D]/20 border-[#1E90FF] text-[#CBD5E1];
+}
+
+/* Shimmer tweak for Dark Mode */
+.dark .shimmer {
+  @apply relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/5 before:to-transparent;
 }
 
 .markdown-body h1 { @apply text-3xl font-display font-extrabold mb-6 mt-8 text-[#000080] tracking-tight; }

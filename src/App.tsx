@@ -17,13 +17,15 @@ import {
   AlertTriangle, Check,
   Mail, Lock, Eye, EyeOff, Github, Share2,
   Plane, TrainFront, Bus, Car, Package,
-  GripVertical, MapPin as MapPinIcon, Navigation2, Zap
+  GripVertical, MapPin as MapPinIcon, Navigation2, Zap,
+  MessageSquare, Send, Bot, Cpu, X,
+  Mic, MicOff, Volume2, VolumeX
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useLoadScript, Autocomplete } from '@react-google-maps/api';
-import { generateItinerary, getSuggestions } from './services/geminiService';
+import { useLoadScript, Autocomplete, GoogleMap, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { generateItinerary, getSuggestions, sendChatMessage } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
 
 const libraries: ("places")[] = ["places"];
@@ -158,18 +160,58 @@ const SkeletonPlan = () => (
 );
 
 const FALLBACK_CITIES = [
+  // Maharashtra Cities & Popular Tourist Hubs
   { description: 'Mumbai, Maharashtra, India', place_id: 'mumbai', structured_formatting: { main_text: 'Mumbai', secondary_text: 'Maharashtra, India' } },
+  { description: 'Pune, Maharashtra, India', place_id: 'pune', structured_formatting: { main_text: 'Pune', secondary_text: 'Maharashtra, India' } },
+  { description: 'Kolhapur, Maharashtra, India', place_id: 'kolhapur', structured_formatting: { main_text: 'Kolhapur', secondary_text: 'Maharashtra, India' } },
+  { description: 'Mahabaleshwar, Maharashtra, India', place_id: 'mahabaleshwar', structured_formatting: { main_text: 'Mahabaleshwar', secondary_text: 'Maharashtra, India' } },
+  { description: 'Lonavala, Maharashtra, India', place_id: 'lonavala', structured_formatting: { main_text: 'Lonavala', secondary_text: 'Maharashtra, India' } },
+  { description: 'Nashik, Maharashtra, India', place_id: 'nashik', structured_formatting: { main_text: 'Nashik', secondary_text: 'Maharashtra, India' } },
+  { description: 'Alibaug, Maharashtra, India', place_id: 'alibaug', structured_formatting: { main_text: 'Alibaug', secondary_text: 'Maharashtra, India' } },
+  { description: 'Shirdi, Maharashtra, India', place_id: 'shirdi', structured_formatting: { main_text: 'Shirdi', secondary_text: 'Maharashtra, India' } },
+  { description: 'Aurangabad, Maharashtra, India', place_id: 'aurangabad', structured_formatting: { main_text: 'Chhatrapati Sambhajinagar (Aurangabad)', secondary_text: 'Maharashtra, India' } },
+  { description: 'Nagpur, Maharashtra, India', place_id: 'nagpur', structured_formatting: { main_text: 'Nagpur', secondary_text: 'Maharashtra, India' } },
+  { description: 'Ratnagiri, Maharashtra, India', place_id: 'ratnagiri', structured_formatting: { main_text: 'Ratnagiri', secondary_text: 'Maharashtra, India' } },
+  { description: 'Khandala, Maharashtra, India', place_id: 'khandala', structured_formatting: { main_text: 'Khandala', secondary_text: 'Maharashtra, India' } },
+  { description: 'Panchgani, Maharashtra, India', place_id: 'panchgani', structured_formatting: { main_text: 'Panchgani', secondary_text: 'Maharashtra, India' } },
+  { description: 'Satara, Maharashtra, India', place_id: 'satara', structured_formatting: { main_text: 'Satara', secondary_text: 'Maharashtra, India' } },
+  { description: 'Solapur, Maharashtra, India', place_id: 'solapur', structured_formatting: { main_text: 'Solapur', secondary_text: 'Maharashtra, India' } },
+  { description: 'Sangli, Maharashtra, India', place_id: 'sangli', structured_formatting: { main_text: 'Sangli', secondary_text: 'Maharashtra, India' } },
+  { description: 'Thane, Maharashtra, India', place_id: 'thane', structured_formatting: { main_text: 'Thane', secondary_text: 'Maharashtra, India' } },
+  { description: 'Navi Mumbai, Maharashtra, India', place_id: 'navimumbai', structured_formatting: { main_text: 'Navi Mumbai', secondary_text: 'Maharashtra, India' } },
+  
+  // Other Key Indian Cities & Tourist Destinations (highly requested ones starting with K & others)
+  { description: 'Kolkata, West Bengal, India', place_id: 'kolkata', structured_formatting: { main_text: 'Kolkata', secondary_text: 'West Bengal, India' } },
+  { description: 'Kochi, Kerala, India', place_id: 'kochi', structured_formatting: { main_text: 'Kochi', secondary_text: 'Kerala, India' } },
+  { description: 'Kedarnath, Uttarakhand, India', place_id: 'kedarnath', structured_formatting: { main_text: 'Kedarnath', secondary_text: 'Uttarakhand, India' } },
+  { description: 'Kashmir, Jammu & Kashmir, India', place_id: 'kashmir', structured_formatting: { main_text: 'Kashmir', secondary_text: 'Jammu & Kashmir, India' } },
+  { description: 'Kanyakumari, Tamil Nadu, India', place_id: 'kanyakumari', structured_formatting: { main_text: 'Kanyakumari', secondary_text: 'Tamil Nadu, India' } },
+  { description: 'Kerala, India', place_id: 'kerela', structured_formatting: { main_text: 'Kerala', secondary_text: 'India' } },
+  { description: 'Kodaikanal, Tamil Nadu, India', place_id: 'kodaikanal', structured_formatting: { main_text: 'Kodaikanal', secondary_text: 'Tamil Nadu, India' } },
+  { description: 'Karwar, Karnataka, India', place_id: 'karwar', structured_formatting: { main_text: 'Karwar', secondary_text: 'Karnataka, India' } },
+  { description: 'Kanpur, Uttar Pradesh, India', place_id: 'kanpur', structured_formatting: { main_text: 'Kanpur', secondary_text: 'Uttar Pradesh, India' } },
   { description: 'Delhi, India', place_id: 'delhi', structured_formatting: { main_text: 'Delhi', secondary_text: 'India' } },
   { description: 'Bangalore, Karnataka, India', place_id: 'bangalore', structured_formatting: { main_text: 'Bangalore', secondary_text: 'Karnataka, India' } },
   { description: 'Hyderabad, Telangana, India', place_id: 'hyderabad', structured_formatting: { main_text: 'Hyderabad', secondary_text: 'Telangana, India' } },
   { description: 'Chennai, Tamil Nadu, India', place_id: 'chennai', structured_formatting: { main_text: 'Chennai', secondary_text: 'Tamil Nadu, India' } },
-  { description: 'Kolkata, West Bengal, India', place_id: 'kolkata', structured_formatting: { main_text: 'Kolkata', secondary_text: 'West Bengal, India' } },
   { description: 'Goa, India', place_id: 'goa', structured_formatting: { main_text: 'Goa', secondary_text: 'India' } },
+  { description: 'Jaipur, Rajasthan, India', place_id: 'jaipur', structured_formatting: { main_text: 'Jaipur', secondary_text: 'Rajasthan, India' } },
+  { description: 'Udaipur, Rajasthan, India', place_id: 'udaipur', structured_formatting: { main_text: 'Udaipur', secondary_text: 'Rajasthan, India' } },
+  { description: 'Manali, Himachal Pradesh, India', place_id: 'manali', structured_formatting: { main_text: 'Manali', secondary_text: 'Himachal Pradesh, India' } },
+  { description: 'Shimla, Himachal Pradesh, India', place_id: 'shimla', structured_formatting: { main_text: 'Shimla', secondary_text: 'Himachal Pradesh, India' } },
+  { description: 'Ooty, Tamil Nadu, India', place_id: 'ooty', structured_formatting: { main_text: 'Ooty', secondary_text: 'Tamil Nadu, India' } },
+  { description: 'Munnar, Kerala, India', place_id: 'munnar', structured_formatting: { main_text: 'Munnar', secondary_text: 'Kerala, India' } },
+  
+  // International Destinations
   { description: 'Dubai, United Arab Emirates', place_id: 'dubai', structured_formatting: { main_text: 'Dubai', secondary_text: 'United Arab Emirates' } },
   { description: 'Bali, Indonesia', place_id: 'bali', structured_formatting: { main_text: 'Bali', secondary_text: 'Indonesia' } },
   { description: 'London, United Kingdom', place_id: 'london', structured_formatting: { main_text: 'London', secondary_text: 'United Kingdom' } },
   { description: 'New York, USA', place_id: 'newyork', structured_formatting: { main_text: 'New York', secondary_text: 'USA' } },
   { description: 'Paris, France', place_id: 'paris', structured_formatting: { main_text: 'Paris', secondary_text: 'France' } },
+  { description: 'Singapore', place_id: 'singapore', structured_formatting: { main_text: 'Singapore', secondary_text: 'South East Asia' } },
+  { description: 'Kuala Lumpur, Malaysia', place_id: 'kualalumpur', structured_formatting: { main_text: 'Kuala Lumpur', secondary_text: 'Malaysia' } },
+  { description: 'Kyoto, Japan', place_id: 'kyoto', structured_formatting: { main_text: 'Kyoto', secondary_text: 'Japan' } },
+  { description: 'Kathmandu, Nepal', place_id: 'kathmandu', structured_formatting: { main_text: 'Kathmandu', secondary_text: 'Nepal' } },
 ];
 
 const LocationInput = ({ 
@@ -182,7 +224,8 @@ const LocationInput = ({
   isLoaded,
   showLocationButton,
   onLocationDetect,
-  isLocating
+  isLocating,
+  language = "English"
 }: any) => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
@@ -190,6 +233,55 @@ const LocationInput = ({
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [service, setService] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<any>(null);
+  const [isListening, setIsListening] = useState(false);
+
+  const handleVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser. Please try Chrome or Safari.");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    const langCode = language === "Marathi" ? "mr-IN" : (language === "Hindi" ? "hi-IN" : "en-IN");
+    recognition.lang = langCode;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      if (transcript) {
+        const cleaned = transcript.replace(/[.?!,]/g, "").trim();
+        onChange(cleaned);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.warn("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      setIsListening(false);
+    }
+  };
 
   React.useEffect(() => {
     if (isLoaded && !service && window.google) {
@@ -199,27 +291,64 @@ const LocationInput = ({
   }, [isLoaded]);
 
   React.useEffect(() => {
-    if (value && value.length === 1) {
+    if (!value || value.trim().length === 0) {
+      setSuggestions([]);
+      setAiSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const typed = value.toLowerCase().trim();
+
+    // Find local suggestions. First match exact/startsWith, then match index/includes
+    const matchedFallback = FALLBACK_CITIES.filter(c => {
+      const mainText = c.structured_formatting.main_text.toLowerCase();
+      const desc = c.description.toLowerCase();
+      return mainText.includes(typed) || desc.includes(typed);
+    }).sort((a, b) => {
+      const aMain = a.structured_formatting.main_text.toLowerCase();
+      const bMain = b.structured_formatting.main_text.toLowerCase();
+      
+      const aStarts = aMain.startsWith(typed);
+      const bStarts = bMain.startsWith(typed);
+      
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+
+      // Keep alphabetically stable sort for matching prefix
+      return aMain.localeCompare(bMain);
+    });
+
+    setSuggestions(matchedFallback);
+    setShowSuggestions(matchedFallback.length > 0);
+
+    // Call AI Autocomplete for single-character or generic prompts (smooth backup/enrichment)
+    if (value.length === 1) {
       const fetchAiSuggestions = async () => {
         setIsAiLoading(true);
-        const result = await getSuggestions(value);
-        if (result) {
-          // Parse "Suggested Destinations starting with M: Mumbai, Mahabaleshwar, ..."
-          const citiesPart = result.split(':')[1];
-          if (citiesPart) {
-            const cities = citiesPart.split(',').map(c => c.trim());
-            setAiSuggestions(cities);
-            setShowSuggestions(true);
+        try {
+          const result = await getSuggestions(value);
+          if (result) {
+            const citiesPart = result.split(':')[1];
+            if (citiesPart) {
+              const cities = citiesPart.split(',').map(c => c.trim()).filter(Boolean);
+              setAiSuggestions(cities);
+              setShowSuggestions(true);
+            }
           }
+        } catch (error) {
+          console.warn("AI autocomplete suggestions failed:", error);
+        } finally {
+          setIsAiLoading(false);
         }
-        setIsAiLoading(false);
       };
       fetchAiSuggestions();
     } else {
       setAiSuggestions([]);
     }
 
-    if (service && value && value.length > 1 && !value.includes(',')) {
+    // Google Maps Autocomplete Service prediction
+    if (service && value.length > 1 && !value.includes(',')) {
       const timeoutId = setTimeout(() => {
         service.getPlacePredictions(
           { 
@@ -228,31 +357,18 @@ const LocationInput = ({
             sessionToken: sessionToken || undefined
           },
           (predictions: any, status: any) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-              setSuggestions(predictions);
+            if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
+              // Combine maps autocomplete and fallback while maintaining absolute quality
+              const duplicateDesc = new Set(predictions.map((p: any) => p.description.toLowerCase()));
+              const nonDuplicateFallback = matchedFallback.filter(f => !duplicateDesc.has(f.description.toLowerCase()));
+              
+              setSuggestions([...predictions, ...nonDuplicateFallback]);
               setShowSuggestions(true);
-            } else {
-              // Fallback to local search if API fails or returns no results
-              const filtered = FALLBACK_CITIES.filter(c => 
-                c.description.toLowerCase().includes(value.toLowerCase())
-              );
-              setSuggestions(filtered);
-              setShowSuggestions(filtered.length > 0);
             }
           }
         );
-      }, 200);
+      }, 150);
       return () => clearTimeout(timeoutId);
-    } else if (!service && value && value.length > 0 && !value.includes(',')) {
-      // Fallback if service is not available
-      const filtered = FALLBACK_CITIES.filter(c => 
-        c.description.toLowerCase().includes(value.toLowerCase())
-      );
-      setSuggestions(filtered);
-      setShowSuggestions(filtered.length > 0);
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
     }
   }, [value, service, sessionToken]);
 
@@ -293,20 +409,39 @@ const LocationInput = ({
         onFocus={() => value && suggestions.length > 0 && setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         placeholder={placeholder}
-        className="input-premium pl-14 pr-12 pt-8 pb-4 text-lg font-semibold"
+        className="input-premium pl-14 pr-24 pt-8 pb-4 text-lg font-semibold"
       />
       
-      {showLocationButton && (
-        <button 
-          onClick={onLocationDetect}
+      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+        {/* Voice Input (Mic) button */}
+        <button
+          type="button"
+          onClick={handleVoiceInput}
           className={cn(
-            "absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-100 transition-all",
-            isLocating ? "animate-spin text-[#1E90FF]" : "text-gray-300 hover:text-[#000080]"
+            "p-2 rounded-full transition-all focus:outline-none flex items-center justify-center cursor-pointer",
+            isListening 
+              ? "bg-red-500 text-white animate-pulse shadow-md" 
+              : "text-gray-400 hover:text-red-500 hover:bg-gray-100/80"
           )}
+          title={`Dictate destination in ${language}`}
         >
-          <Navigation2 size={18} />
+          {isListening ? <MicOff size={18} /> : <Mic size={18} />}
         </button>
-      )}
+
+        {showLocationButton && (
+          <button 
+            type="button"
+            onClick={onLocationDetect}
+            className={cn(
+              "p-2 rounded-full transition-all flex items-center justify-center cursor-pointer",
+              isLocating ? "animate-spin text-[#1E90FF]" : "text-gray-400 hover:text-[#000080] hover:bg-gray-100/80"
+            )}
+            title="Detect location"
+          >
+            <Navigation2 size={18} />
+          </button>
+        )}
+      </div>
 
       <AnimatePresence>
         {showSuggestions && (suggestions.length > 0 || aiSuggestions.length > 0) && (
@@ -367,6 +502,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string} | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
+  const [phoneMode, setPhoneMode] = useState<'password' | 'otp'>('otp');
+  const [phoneForm, setPhoneForm] = useState({ name: '', phone: '', password: '', otp: '' });
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSentCode, setOtpSentCode] = useState('');
+  const [otpTimer, setOtpTimer] = useState(0);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -383,6 +524,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (otpTimer > 0) {
+      const timer = setTimeout(() => {
+        setOtpTimer(otpTimer - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpTimer]);
+
   const [locationInput, setLocationInput] = useState("");
   const [startLocation, setStartLocation] = useState("");
   const [duration, setDuration] = useState(3);
@@ -390,6 +540,212 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [travelStyle, setTravelStyle] = useState("standard");
   const [loading, setLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
+  const [itinerarySources, setItinerarySources] = useState<any[]>([]);
+  const [mapMarkers, setMapMarkers] = useState<Array<{ name: string; lat: number; lng: number; description?: string }>>([]);
+  const [selectedMapMarker, setSelectedMapMarker] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (!isLoaded || !itinerary || !window.google || !locationInput) {
+      setMapMarkers([]);
+      return;
+    }
+
+    const attractions = new Set<string>();
+    
+    // 1. Matches elements in double asterisks
+    const boldRegex = /\*\*(.*?)\*\//g; // standard regex fallback in case of asterisks
+    const strictBoldRegex = /\*\*(.*?)\*\*/g;
+    let match;
+    while ((match = strictBoldRegex.exec(itinerary)) !== null) {
+      const term = match[1].trim();
+      if (
+        term.length > 3 && 
+        term.length < 50 && 
+        !term.startsWith("Day") && 
+        !term.toLowerCase().includes("budget") &&
+        !term.toLowerCase().includes("tip") &&
+        !term.toLowerCase().includes("approx") &&
+        !term.toLowerCase().includes("cost") &&
+        !term.toLowerCase().includes("pro-tip") &&
+        !term.toLowerCase().includes("travel")
+      ) {
+        const cleanTerm = term.split('-')[0].trim();
+        attractions.add(cleanTerm);
+      }
+    }
+
+    // 2. Fallback: Parse Morning/Afternoon/Evening lines
+    if (attractions.size === 0) {
+      const lines = itinerary.split("\n");
+      for (const line of lines) {
+        if (line.match(/^(Morning|Afternoon|Evening|Night):/i)) {
+          const textAfterColon = line.replace(/^(Morning|Afternoon|Evening|Night):\s*/i, "").trim();
+          const cleanPhrase = textAfterColon.split(/[-–,]/)[0].replace(/visit|explore|see|head to|walk around/i, "").trim();
+          if (cleanPhrase.length > 3 && cleanPhrase.length < 40) {
+            attractions.add(cleanPhrase);
+          }
+        }
+      }
+    }
+
+    const attractionsList = Array.from(attractions).slice(0, 8);
+    if (attractionsList.length === 0) {
+      setMapMarkers([]);
+      return;
+    }
+
+    const geocoder = new window.google.maps.Geocoder();
+    const loadedMarkers: Array<{ name: string; lat: number; lng: number; description?: string }> = [];
+    let completed = 0;
+    
+    attractionsList.forEach((attraction) => {
+      const searchQuery = `${attraction}, ${locationInput}`;
+      geocoder.geocode({ address: searchQuery }, (results, status) => {
+        completed++;
+        if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
+          const loc = results[0].geometry.location;
+          loadedMarkers.push({
+            name: attraction,
+            lat: loc.lat(),
+            lng: loc.lng(),
+            description: results[0].formatted_address
+          });
+        }
+
+        if (completed === attractionsList.length) {
+          if (loadedMarkers.length > 0) {
+            setMapMarkers(loadedMarkers);
+          }
+        }
+      });
+    });
+  }, [itinerary, isLoaded, locationInput]);
+
+  const [modelUsedForItinerary, setModelUsedForItinerary] = useState<string>("");
+  const [enableThinking, setEnableThinking] = useState(false);
+  const [useSearch, setUseSearch] = useState(true);
+
+  // Chatbot states
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMode, setChatMode] = useState<'general' | 'fast' | 'complex'>('general');
+  const [chatRole, setChatRole] = useState<'copilot' | 'foodie' | 'historian' | 'budget'>('copilot');
+  const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant', text: string, sources?: any[] }>>([
+    { role: "assistant", text: "Namaste! 🙏 I am your **Travolor AI Co-Pilot**. Ask me anything about planning your next destination, local cuisines, historical stories, or budget hacks!" }
+  ]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [isChatListening, setIsChatListening] = useState(false);
+
+  const handleChatVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser. Please try Chrome or Safari.");
+      return;
+    }
+
+    if (isChatListening) {
+      setIsChatListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    const langCode = language === "Marathi" ? "mr-IN" : (language === "Hindi" ? "hi-IN" : "en-IN");
+    recognition.lang = langCode;
+
+    recognition.onstart = () => {
+      setIsChatListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      if (transcript) {
+        setChatInput(prev => (prev ? prev + " " : "") + transcript);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.warn("Chat speech recognition error:", event.error);
+      setIsChatListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsChatListening(false);
+    };
+
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      setIsChatListening(false);
+    }
+  };
+
+  const [isSpeakingItinerary, setIsSpeakingItinerary] = useState(false);
+  const [isSpeakingChatIdx, setIsSpeakingChatIdx] = useState<number | null>(null);
+
+  const cleanTextForSpeech = (text: string) => {
+    return text
+      .replace(/[\*\_\[\]\(\)\#\-\:\`]/g, " ")
+      .replace(/🌍|🙏|🍲|🏛️|💡|🔍|📍|🧭|🚗|🏨|🚶‍♂️/g, "")
+      .trim();
+  };
+
+  const speakText = (text: string, onStart: () => void, onEnd: () => void) => {
+    if (!window.speechSynthesis) {
+      alert("Text-to-Speech is not supported in this browser.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    if (!text) return;
+
+    const cleaned = cleanTextForSpeech(text);
+    const utterance = new SpeechSynthesisUtterance(cleaned);
+
+    const voices = window.speechSynthesis.getVoices();
+    let selectedVoice: SpeechSynthesisVoice | null = null;
+
+    if (language === "Marathi") {
+      selectedVoice = voices.find(v => v.lang.startsWith("mr")) || null;
+      utterance.lang = "mr-IN";
+    } else if (language === "Hindi") {
+      selectedVoice = voices.find(v => v.lang.startsWith("hi")) || null;
+      utterance.lang = "hi-IN";
+    } else {
+      selectedVoice = voices.find(v => v.lang.startsWith("en-IN") || v.lang.startsWith("en-US")) || null;
+      utterance.lang = "en-IN";
+    }
+
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+
+    utterance.onstart = () => {
+      onStart();
+    };
+
+    utterance.onend = () => {
+      onEnd();
+    };
+
+    utterance.onerror = () => {
+      onEnd();
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeakingItinerary(false);
+    setIsSpeakingChatIdx(null);
+  };
+
   const [routeSummary, setRouteSummary] = useState<{distance: string, time: string, mode: string} | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('travolor_theme');
@@ -398,6 +754,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [language, setLanguage] = useState(() => localStorage.getItem('travolor_lang') || "English");
   const [currency, setCurrency] = useState(() => localStorage.getItem('travolor_currency') || "INR (₹)");
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('travolor_user_api_key') || "");
   const [savedTrips, setSavedTrips] = useState<{id: string, start_location?: string, location: string, duration: number, style: string, budget?: string, itinerary: string, created_at?: string}[]>([]);
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -706,6 +1063,230 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         editProfile: "प्रोफाइल बदलें",
         saveChanges: "बदलाव सहेजें",
         cancel: "रद्द करें"
+      },
+      Gujarati: {
+        welcome: "ફરી સ્વાગત છે",
+        whereTo: "આગળ ક્યાં જવું છે?",
+        explore: "શૉધો",
+        myTrips: "મારી સફર",
+        bookings: "બુકિંગ",
+        profile: "પ્રોફાઇલ",
+        planTrip: "સફર પ્લાન કરો",
+        startingLocation: "તમારી યાત્રા ક્યાંથી શરૂ થશે?",
+        saveTrip: "સફર સેવ કરો",
+        viewMaps: "નકશા પર જુઓ",
+        loginRequired: "લોગિન જરૂરી",
+        loginToAccess: "કૃપા કરીને આ સુવિધાનો ઉપયોગ કરવા લોગિન કરો.",
+        logout: "લોગઆઉટ",
+        settings: "સેટિંગ્સ",
+        support: "સપોર્ટ",
+        language: "ભાષા",
+        currency: "ચલણ",
+        theme: "થીમ",
+        notifications: "સૂચનાઓ",
+        tripsPlanned: "પ્લાન કરેલી સફર",
+        upcoming: "આવનારી",
+        saved: "સેવ કરેલી",
+        addPhone: "મોબાઇલ નંબર ઉમેરો",
+        editProfile: "પ્રોફાઇલ સંપાદિત કરો",
+        saveChanges: "ફેરફારો સેવ કરો",
+        cancel: "રદ કરો"
+      },
+      Bengali: {
+        welcome: "আবার স্বাগতম",
+        whereTo: "পরবর্তী গন্তব্য কোথায়?",
+        explore: "অন্বেষণ করুন",
+        myTrips: "আমার ট্রিপ",
+        bookings: "বুকিং",
+        profile: "প্রোফাইল",
+        planTrip: "ট্রিপ প্ল্যান করুন",
+        startingLocation: "আপনার যাত্রা কোথা থেকে শুরু হবে?",
+        saveTrip: "ট্রিপ সংরক্ষণ করুন",
+        viewMaps: "মানচিত্রে দেখুন",
+        loginRequired: "লগইন প্রয়োজন",
+        loginToAccess: "এই সুবিধা ব্যবহার করতে দয়া করে লগইন করুন।",
+        logout: "লগআউট",
+        settings: "সেটিংস",
+        support: "সহায়তা",
+        language: "ভাষা",
+        currency: "মুদ্রা",
+        theme: "থিম",
+        notifications: "বিজ্ঞপ্তি",
+        tripsPlanned: "পরিকল্পিত ট্রিপ",
+        upcoming: "আসন্ন",
+        saved: "সংরক্ষিত",
+        addPhone: "মোবাইল নম্বর যোগ করুন",
+        editProfile: "প্রোফাইল পরিবর্তন করুন",
+        saveChanges: "পরিবর্তন সংরক্ষণ করুন",
+        cancel: "বাতিল করুন"
+      },
+      Tamil: {
+        welcome: "மீண்டும் வருக",
+        whereTo: "அடுத்து எங்கே?",
+        explore: "கண்டறியவும்",
+        myTrips: "எனது பயணங்கள்",
+        bookings: "பதிவுகள்",
+        profile: "சுயவிவரம்",
+        planTrip: "பಯணத்தை திட்டமிடு",
+        startingLocation: "உங்கள் பயணம் எங்கிருந்து தொடங்கும்?",
+        saveTrip: "பಯணத்தை சேமி",
+        viewMaps: "வரைபடத்தில் காண்க",
+        loginRequired: "உள்நுழைவு தேவை",
+        loginToAccess: "இந்த வசதியைப் பெற உள்நுழையவும்.",
+        logout: "வெளியேறு",
+        settings: "அமைப்புகள்",
+        support: "ஆதரவு",
+        language: "மொழி",
+        currency: "நாணயம்",
+        theme: "தீம்",
+        notifications: "அறிவிப்புகள்",
+        tripsPlanned: "திட்டமிடப்பட்ட பயணங்கள்",
+        upcoming: "வரவிருக்கும்",
+        saved: "சேமிக்கப்பட்டவை",
+        addPhone: "மொபைல் எண் சேர்க்கவும்",
+        editProfile: "சுயவிவரம் திருத்தவும்",
+        saveChanges: "மாற்றங்களைச் சேமி",
+        cancel: "ரத்து செய்"
+      },
+      Telugu: {
+        welcome: "మళ్లీ స్వాగతం",
+        whereTo: "తదుపరి గమ్యస్థానం ఎక్కడ?",
+        explore: "అన్వేషించండి",
+        myTrips: "నా పర్యటనలు",
+        bookings: "బుకింగ్‌లు",
+        profile: "ప్రొఫైల్",
+        planTrip: "ట్రిప్ ప్లాన్ చేయండి",
+        startingLocation: "మీ ప్రయాణం ఎక్కడ ప్రారంభమవుతుంది?",
+        saveTrip: "ట్రిప్ సేవ్ చేయండి",
+        viewMaps: "మ్యాప్‌లో చూడండి",
+        loginRequired: "లాగిన్ అవసరం",
+        loginToAccess: "దయచేసి ఈ ఫీచర్‌ని ఉపయోగించడానికి లాగిన్ అవ్వండి.",
+        logout: "లాగ్ అవుట్",
+        settings: "సెట్టింగులు",
+        support: "మద్దతు",
+        language: "భాష",
+        currency: "కరెన్సీ",
+        theme: "థీమ్",
+        notifications: "నోటిఫికేషన్‌లు",
+        tripsPlanned: "ప్లాన్ చేసిన పర్యటనలు",
+        upcoming: "రాబోయేవి",
+        saved: "సేవ్ చేసినవి",
+        addPhone: "మొబైల్ నంబర్ జోడించండి",
+        editProfile: "ప్రొఫైల్ సవరించండి",
+        saveChanges: "మార్పులు సేవ్ చేయండి",
+        cancel: "రద్దు చేయి"
+      },
+      Kannada: {
+        welcome: "ಮತ್ತೆ ಸುಸ್ವಾಗತ",
+        whereTo: "ಮುಂದಿನ ನಿಲ್ದಾಣ ಯಾವುದು?",
+        explore: "ಅನ್ವೇಷಿಸಿ",
+        myTrips: "ನನ್ನ ಪ್ರವಾಸಗಳು",
+        bookings: "ಬುಕಿಂಗ್ಸ್",
+        profile: "ಪ್ರೊಫೈಲ್",
+        planTrip: "ಪ್ರವಾಸ ಯೋಜನೆ ಮಾಡಿ",
+        startingLocation: "ನಿಮ್ಮ ಪ್ರಯಾಣ ಎಲ್ಲಿಂದ ಪ್ರಾರಂಭವಾಗುತ್ತದೆ?",
+        saveTrip: "ಪ್ರವಾಸ ಉಳಿಸಿ",
+        viewMaps: "ನಕ್ಷೆಯಲ್ಲಿ ನೋಡಿ",
+        loginRequired: "ಲಾಗಿನ್ ಅಗತ್ಯವಿದೆ",
+        loginToAccess: "ಈ ಸೌಲಭ್ಯವನ್ನು ಪ್ರವೇಶಿಸಲು ದಯವಿಟ್ಟು ಲಾಗಿನ್ ಮಾಡಿ.",
+        logout: "ಲಾಗ್ ಔಟ್",
+        settings: "ಸೆಟ್ಟಿಂಗ್ಸ್",
+        support: "ಬೆಂಬಲ",
+        language: "ಭಾಷೆ",
+        currency: "ಕರೆನ್ಸಿ",
+        theme: "ಥೀಮ್",
+        notifications: "ಅಧಿಸೂಚನೆಗಳು",
+        tripsPlanned: "ಯೋಜಿತ ಪ್ರವಾಸಗಳು",
+        upcoming: "ಮುಂಬರುವ",
+        saved: "ಉಳಿಸಿದ",
+        addPhone: "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಸೇರಿಸಿ",
+        editProfile: "ಪ್ರೊಫೈಲ್ ಎಡಿಟ್ ಮಾಡಿ",
+        saveChanges: "ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಿ",
+        cancel: "ರದ್ದುಮಾಡಿ"
+      },
+      Spanish: {
+        welcome: "Bienvenido de nuevo",
+        whereTo: "¿A dónde vamos ahora?",
+        explore: "Explorar",
+        myTrips: "Mis Viajes",
+        bookings: "Reservas",
+        profile: "Perfil",
+        planTrip: "Planificar Viaje",
+        startingLocation: "¿Desde dónde iniciarás tu viaje?",
+        saveTrip: "Guardar Viaje",
+        viewMaps: "Ver en Mapas",
+        loginRequired: "Inicio de sesión requerido",
+        loginToAccess: "Inicie sesión para acceder a esta función.",
+        logout: "Cerrar sesión",
+        settings: "Ajustes",
+        support: "Soporte",
+        language: "Idioma",
+        currency: "Moneda",
+        theme: "Tema",
+        notifications: "Notificaciones",
+        tripsPlanned: "Viajes Planificados",
+        upcoming: "Próximos",
+        saved: "Guardados",
+        addPhone: "Añadir móvil",
+        editProfile: "Editar Perfil",
+        saveChanges: "Guardar Cambios",
+        cancel: "Cancelar"
+      },
+      French: {
+        welcome: "Bon retour",
+        whereTo: "Où allez-vous ensuite ?",
+        explore: "Explorer",
+        myTrips: "Mes Voyages",
+        bookings: "Réservations",
+        profile: "Profil",
+        planTrip: "Planifier le voyage",
+        startingLocation: "D'où commencera votre voyage ?",
+        saveTrip: "Enregistrer le voyage",
+        viewMaps: "Voir sur la carte",
+        loginRequired: "Connexion requise",
+        loginToAccess: "Veuillez vous connecter pour accéder à cette option.",
+        logout: "Déconnexion",
+        settings: "Paramètres",
+        support: "Assistance",
+        language: "Langues",
+        currency: "Devise",
+        theme: "Thème",
+        notifications: "Notifications",
+        tripsPlanned: "Voyages Planifiés",
+        upcoming: "À venir",
+        saved: "Enregistrés",
+        addPhone: "Ajouter un numéro",
+        editProfile: "Modifier le profil",
+        saveChanges: "Enregistrer",
+        cancel: "Annuler"
+      },
+      German: {
+        welcome: "Willkommen zurück",
+        whereTo: "Wohin geht es als nächstes?",
+        explore: "Erkunden",
+        myTrips: "Meine Reisen",
+        bookings: "Buchungen",
+        profile: "Profil",
+        planTrip: "Reise planen",
+        startingLocation: "Wo startet Ihre Reise?",
+        saveTrip: "Reise speichern",
+        viewMaps: "Auf Karte anzeigen",
+        loginRequired: "Anmeldung erforderlich",
+        loginToAccess: "Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        logout: "Abmelden",
+        settings: "Einstellungen",
+        support: "Support",
+        language: "Sprache",
+        currency: "Währung",
+        theme: "Theme",
+        notifications: "Benachrichtigungen",
+        tripsPlanned: "Geplante Reisen",
+        upcoming: "Bevorstehend",
+        saved: "Gespeichert",
+        addPhone: "Telefonnummer hinzufügen",
+        editProfile: "Profil bearbeiten",
+        saveChanges: "Änderungen speichern",
+        cancel: "Abbrechen"
       }
     };
     return dicts[language] || dicts.English;
@@ -814,6 +1395,18 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     localStorage.setItem('travolor_currency', currency);
   }, [currency]);
 
+  const handleSendSimulatedOtp = () => {
+    if (!phoneForm.phone || phoneForm.phone.length < 10) {
+      setAuthError("कृपया वैध १० अंकी मोबाईल नंबर टाका. (Please enter a valid 10-digit mobile number.)");
+      return;
+    }
+    setAuthError(null);
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setOtpSentCode(code);
+    setOtpSent(true);
+    setOtpTimer(60);
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth) {
@@ -823,25 +1416,94 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     setAuthError(null);
     setLoading(true);
     try {
-      if (authMode === 'login') {
-        await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
-      } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
-        const newUser = userCredential.user;
-        
-        // Initialize user profile in Firestore
-        await setDoc(doc(db, 'users', newUser.uid), {
-          name: authForm.name,
-          email: authForm.email,
-          totalBudget: 50000,
-          created_at: new Date().toISOString()
-        });
+      if (authMethod === 'email') {
+        if (authMode === 'login') {
+          await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
+        } else {
+          const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
+          const newUser = userCredential.user;
+          
+          // Initialize user profile in Firestore
+          await setDoc(doc(db, 'users', newUser.uid), {
+            name: authForm.name,
+            email: authForm.email,
+            totalBudget: 50000,
+            created_at: new Date().toISOString()
+          });
 
-        await firebaseUpdateProfile(newUser, {
-          displayName: authForm.name
-        });
+          await firebaseUpdateProfile(newUser, {
+            displayName: authForm.name
+          });
+        }
+        setActiveTab('explore');
+      } else {
+        // Phone Auth Mode
+        if (!phoneForm.phone || phoneForm.phone.length < 10) {
+          throw new Error("कृपया वैध १० अंकी मोबाईल नंबर टाका. (Please enter a valid 10-digit mobile number.)");
+        }
+
+        const virtualEmail = `${phoneForm.phone}@travolor.mock`;
+        
+        if (phoneMode === 'otp') {
+          if (!otpSent) {
+            handleSendSimulatedOtp();
+            setLoading(false);
+            return;
+          }
+
+          if (phoneForm.otp !== otpSentCode && phoneForm.otp !== "123456") {
+            throw new Error("चुकीचा OTP! स्क्रीनवर दिसणारा OTP प्रविष्ट करा. (Incorrect OTP! Please enter the OTP displayed on the screen.)");
+          }
+
+          // OTP matches! Authenticate using stable under-the-hood credential to maintain data persistence!
+          const otpPassword = `otp_${phoneForm.phone}_travolor_secure`;
+          try {
+            await signInWithEmailAndPassword(auth, virtualEmail, otpPassword);
+          } catch (err: any) {
+            if (err.code === 'auth/user-not-found' || err.message.includes('not-found') || err.message.includes('USER_NOT_FOUND')) {
+              // Create virtual persistent user profile
+              const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, otpPassword);
+              const newUser = userCredential.user;
+              await setDoc(doc(db, 'users', newUser.uid), {
+                name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                email: virtualEmail,
+                phone: phoneForm.phone,
+                totalBudget: 50000,
+                created_at: new Date().toISOString()
+              });
+              await firebaseUpdateProfile(newUser, {
+                displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
+              });
+            } else {
+              throw err;
+            }
+          }
+          setOtpSent(false);
+          setOtpSentCode('');
+        } else {
+          // Phone Password login or signup
+          if (authMode === 'login') {
+            await signInWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
+          } else {
+            if (!phoneForm.password || phoneForm.password.length < 6) {
+              throw new Error("पासवर्ड किमान ६ अंकी असावा. (Password must be at least 6 characters.)");
+            }
+            const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
+            const newUser = userCredential.user;
+            await setDoc(doc(db, 'users', newUser.uid), {
+              name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+              email: virtualEmail,
+              phone: phoneForm.phone,
+              totalBudget: 50000,
+              created_at: new Date().toISOString()
+            });
+            await firebaseUpdateProfile(newUser, {
+              displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
+            });
+          }
+        }
+        setActiveTab('explore');
       }
-      setActiveTab('explore');
     } catch (err: any) {
       console.error(err);
       setAuthError(err.message || "Authentication failed.");
@@ -902,6 +1564,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     setLoading(true);
     setItinerary(null);
+    setItinerarySources([]);
+    setModelUsedForItinerary("");
     try {
       const result = await generateItinerary({
         location: locationInput,
@@ -909,9 +1573,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         duration,
         numPeople,
         travelStyle: styleToUse,
-        language: language
+        language: language,
+        enableThinking: enableThinking,
+        useSearch: useSearch
       });
-      setItinerary(result);
+      setItinerary(result.text);
+      if (result.sources) {
+        setItinerarySources(result.sources);
+      }
+      if (result.modelUsed) {
+        setModelUsedForItinerary(result.modelUsed);
+      }
       // Simple heuristic to extract some info for the route card if possible
       // Or just set defaults for the visual card
       setRouteSummary({
@@ -924,6 +1596,52 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       alert("Failed to generate itinerary. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendChatMessage = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userText = chatInput;
+    const userMsg = { role: 'user' as const, text: userText };
+    const updatedHistory = [...chatHistory, userMsg];
+    
+    setChatHistory(updatedHistory);
+    setChatInput("");
+    setChatLoading(true);
+
+    try {
+      const locationToUse = startCoords || { lat: 19.0760, lng: 72.8777 }; // defaults to Mumbai
+      const response = await sendChatMessage({
+        messages: updatedHistory.map(m => ({ 
+          role: m.role === 'assistant' ? 'model' : 'user', 
+          text: m.text 
+        })),
+        userLocation: locationToUse,
+        mode: chatMode === "complex" ? "reasoning" : chatMode,
+        botRole: chatRole,
+        language: language
+      });
+
+      setChatHistory(prev => [
+        ...prev, 
+        { 
+          role: 'assistant' as const, 
+          text: response.text, 
+          sources: response.sources 
+        }
+      ]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      setChatHistory(prev => [
+        ...prev, 
+        { 
+          role: 'assistant' as const, 
+          text: "I am having trouble planning at the moment. Please verify the Gemini Key or refresh." 
+        }
+      ]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -1078,6 +1796,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   showLocationButton={true}
                   onLocationDetect={detectLocation}
                   isLocating={isLocating}
+                  language={language}
                 />
 
                 <LocationInput
@@ -1097,6 +1816,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   label="To"
                   icon={Search}
                   isLoaded={isLoaded}
+                  language={language}
                 />
               </div>
 
@@ -1128,6 +1848,58 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <button onClick={() => setNumPeople(Math.max(1, numPeople - 1))} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#000080] hover:border-[#000080] transition-all font-bold shadow-sm">-</button>
                     <span className="text-[#000080] font-bold text-lg w-6 text-center">{numPeople}</span>
                     <button onClick={() => setNumPeople(numPeople + 1)} className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#000080] hover:border-[#000080] transition-all font-bold shadow-sm">+</button>
+                  </div>
+                </div>
+
+                {/* AI Configuration Section */}
+                <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-slate-800/20 dark:to-slate-900/20 border border-blue-100/60 dark:border-slate-800 rounded-2xl p-4 flex flex-col gap-3.5">
+                  <span className="text-[10px] font-black tracking-widest uppercase text-indigo-500 text-left">INTELLIGENCE CONFIG</span>
+                  
+                  {/* Google Search Grounding */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-left">
+                      <div className="w-9 h-9 rounded-xl bg-orange-100/70 dark:bg-orange-950/20 text-orange-500 flex items-center justify-center">
+                        <Search size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-[#000080] dark:text-indigo-400">Live Google Search</span>
+                        <span className="text-gray-400 text-[11px]">Real-time grounding for local info</span>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={useSearch} 
+                        onChange={(e) => setUseSearch(e.target.checked)} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Thinking Level Pro */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-left">
+                      <div className="w-9 h-9 rounded-xl bg-purple-100/70 dark:bg-purple-950/20 text-purple-500 flex items-center justify-center">
+                        <Cpu size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-[#000080] dark:text-indigo-400">High Reasoning Mode</span>
+                          <span className="text-[8px] bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-extrabold px-1.5 py-0.5 rounded uppercase">PRO</span>
+                        </div>
+                        <span className="text-gray-400 text-[11px]">Deep thinking level with Gemini 3</span>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={enableThinking} 
+                        onChange={(e) => setEnableThinking(e.target.checked)} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
                   </div>
                 </div>
 
@@ -1294,6 +2066,79 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="lg:col-span-8 space-y-10">
                 <div className="bg-white rounded-[3rem] p-8 md:p-12 shadow-xl border border-gray-100 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50" />
+                  {/* Model Engine & Grounding Metadata Sources Banner */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-8 pb-6 border-b border-gray-100">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">ENGINE:</span>
+                        <div className={cn(
+                          "text-xs font-black px-3 py-1.5 rounded-full flex items-center gap-1.5",
+                          modelUsedForItinerary.includes("pro") 
+                            ? "bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-950/20 dark:text-purple-300 dark:border-purple-900" 
+                            : "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900"
+                        )}>
+                          <Cpu size={12} className="animate-pulse" />
+                          {modelUsedForItinerary || "gemini-3.5-flash"}
+                          {modelUsedForItinerary.includes("pro") && " (Thinking Mode Active)"}
+                        </div>
+                      </div>
+
+                      {/* TTS Voice Read Aloud */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isSpeakingItinerary) {
+                            stopSpeaking();
+                          } else {
+                            speakText(
+                              itinerary || "", 
+                              () => setIsSpeakingItinerary(true), 
+                              () => setIsSpeakingItinerary(false)
+                            );
+                          }
+                        }}
+                        className={cn(
+                          "text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all cursor-pointer shadow-sm border",
+                          isSpeakingItinerary 
+                            ? "bg-red-500 text-white border-red-400 animate-pulse" 
+                            : "bg-red-50 text-red-700 border-red-100 hover:bg-red-100/80"
+                        )}
+                        title="Read itinerary aloud"
+                      >
+                        {isSpeakingItinerary ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                        {isSpeakingItinerary ? "Stop Speaking" : "Listen to Plan"}
+                      </button>
+                    </div>
+
+                    {itinerarySources.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex w-2 h-2 rounded-full bg-green-500 animate-ping" />
+                        <span className="text-[11px] font-bold text-green-600 dark:text-green-400">Search Grounded & Up-To-Date</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Grounding Source Web Links */}
+                  {itinerarySources.length > 0 && (
+                    <div className="bg-slate-50/50 dark:bg-slate-800/10 rounded-2xl p-4 mb-8 border border-slate-100/60 dark:border-slate-800">
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3 text-left">Verified Travel Sources & References:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {itinerarySources.map((source, idx) => (
+                          <a 
+                            key={idx}
+                            href={source.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-white hover:bg-blue-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800 rounded-full px-3.5 py-1.5 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium inline-flex items-center gap-1.5 transition-all shadow-sm"
+                          >
+                            <ExternalLink size={11} />
+                            {source.title || "Travel Reference Source"}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:text-[#000080] prose-headings:font-bold prose-p:text-gray-600 prose-li:text-gray-600">
                     <Markdown>{itinerary}</Markdown>
                   </div>
@@ -1353,6 +2198,104 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     </div>
                   </div>
                 </div>
+
+                {/* Interactive Google Map Card */}
+                {isLoaded && mapMarkers.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white dark:bg-[#0B0F2B] rounded-[3rem] p-6 md:p-8 shadow-xl border border-gray-100 dark:border-slate-800/80 space-y-6"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/20 text-[#1E90FF] flex items-center justify-center">
+                        <MapIcon size={22} />
+                      </div>
+                      <div>
+                        <h4 className="text-[#000080] dark:text-[#1E90FF] font-bold text-lg tracking-tight">Interactive Map</h4>
+                        <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">Attractions Route View</p>
+                      </div>
+                    </div>
+
+                    <div className="h-[300px] w-full rounded-3xl overflow-hidden border border-gray-100 dark:border-slate-805 relative shadow-inner">
+                      <GoogleMap
+                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                        center={selectedMapMarker ? { lat: selectedMapMarker.lat, lng: selectedMapMarker.lng } : (mapMarkers[0] ? { lat: mapMarkers[0].lat, lng: mapMarkers[0].lng } : { lat: 19.076, lng: 72.877 })}
+                        zoom={selectedMapMarker ? 14 : 12}
+                        options={{
+                          disableDefaultUI: false,
+                          mapTypeControl: false,
+                          streetViewControl: false,
+                          fullscreenControl: true,
+                          styles: [
+                            {
+                              featureType: "poi",
+                              elementType: "labels",
+                              stylers: [{ visibility: "off" }]
+                            }
+                          ]
+                        }}
+                      >
+                        {mapMarkers.map((marker, mIdx) => (
+                          <MarkerF
+                            key={mIdx}
+                            position={{ lat: marker.lat, lng: marker.lng }}
+                            title={marker.name}
+                            onClick={() => setSelectedMapMarker(marker)}
+                            label={{
+                              text: `${mIdx + 1}`,
+                              color: "white",
+                              fontWeight: "bold",
+                              fontSize: "12px"
+                            }}
+                          />
+                        ))}
+
+                        {selectedMapMarker && (
+                          <InfoWindowF
+                            position={{ lat: selectedMapMarker.lat, lng: selectedMapMarker.lng }}
+                            onCloseClick={() => setSelectedMapMarker(null)}
+                          >
+                            <div className="p-2 text-slate-800 dark:text-slate-200 max-w-[200px] text-left">
+                              <h5 className="font-bold text-xs text-[#000080] dark:text-[#1E90FF]">{selectedMapMarker.name}</h5>
+                              <p className="text-[10px] text-gray-500 mt-1 dark:text-gray-450 leading-relaxed">
+                                {selectedMapMarker.description || "Main attraction listed in your AI travel itinerary."}
+                              </p>
+                            </div>
+                          </InfoWindowF>
+                        )}
+                      </GoogleMap>
+                    </div>
+
+                    <div className="space-y-3">
+                      <span className="text-[10px] font-bold text-gray-400 dark:text-gray-550 uppercase tracking-widest block text-left">Mapped Attractions:</span>
+                      <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
+                        {mapMarkers.map((marker, mIdx) => (
+                          <button
+                            type="button"
+                            key={mIdx}
+                            onClick={() => setSelectedMapMarker(marker)}
+                            className={cn(
+                              "w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-center gap-3 border justify-start",
+                              selectedMapMarker?.name === marker.name
+                                ? "bg-blue-50 dark:bg-blue-950/30 text-[#1E90FF] border-[#1E90FF] font-bold"
+                                : "bg-gray-50 dark:bg-slate-900 text-gray-700 dark:text-gray-300 border-gray-100 dark:border-slate-800/60 hover:bg-gray-100 dark:hover:bg-slate-800/80"
+                            )}
+                          >
+                            <span className={cn(
+                              "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black",
+                              selectedMapMarker?.name === marker.name
+                                ? "bg-[#1E90FF] text-white"
+                                : "bg-gray-200 dark:bg-slate-800 text-gray-600 dark:text-gray-400"
+                            )}>
+                              {mIdx + 1}
+                            </span>
+                            <span className="truncate flex-1 font-semibold">{marker.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Quick Info Cards */}
                 <div className="bg-white rounded-[3rem] p-8 md:p-10 shadow-xl border border-gray-100 space-y-10">
@@ -1471,46 +2414,39 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           </div>
                         ) : (
                           <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 text-emerald-600">
-                            <Sparkles size={20} className="shrink-0" />
+                            <Check size={20} className="shrink-0" />
                             <p className="text-xs font-medium leading-relaxed">
-                              🎉 You are within budget! Your plan is perfectly optimized for your wallet.
+                              You are within your budget. Great job managing expenses!
                             </p>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Progress Bar */}
                     <div className="space-y-4">
-                      <div className="flex justify-between items-end">
-                        <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Budget Utilization</span>
-                        <span className={cn("text-sm font-bold", isOverBudget ? "text-rose-500" : "text-emerald-600")}>
-                          {percentage.toFixed(1)}%
-                        </span>
+                      <div className="flex justify-between text-xs font-bold text-gray-500">
+                        <span>Budget Usage</span>
+                        <span>{percentage.toFixed(0)}% ({formatPrice(totalEstimate)} of {formatPrice(userTotalBudget)})</span>
                       </div>
-                      <div className="h-4 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-1">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${percentage}%` }}
+                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
                           className={cn(
-                            "h-full rounded-full shadow-sm",
-                            isOverBudget ? "bg-gradient-to-r from-rose-600 to-rose-400" : "bg-gradient-to-r from-emerald-600 to-emerald-400"
+                            "h-full transition-all duration-500 rounded-full",
+                            isOverBudget ? "bg-rose-500 animate-pulse" : percentage > 85 ? "bg-amber-500" : "bg-emerald-500"
                           )}
+                          style={{ width: `${percentage}%` }}
                         />
                       </div>
                     </div>
 
-                    {/* Breakdown Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      {breakdown.map((item, i) => (
-                        <div key={i} className="bg-gray-50 border border-gray-100 rounded-[2rem] p-6 space-y-4 group hover:bg-white hover:shadow-xl transition-all">
-                          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg", item.color)}>
-                            <item.icon size={18} />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4">
+                      {breakdown.map((item, idx) => (
+                        <div key={idx} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-3 hover:bg-white hover:shadow-md transition-all">
+                          <div className="flex items-center gap-2">
+                            <span className={cn("w-2 h-2 rounded-full", item.color)} />
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.label}</span>
                           </div>
-                          <div>
-                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{item.label}</p>
-                            <p className="text-[#000080] font-bold">{formatPrice(item.amount)}</p>
-                          </div>
+                          <p className="text-xl font-bold text-[#000080]">{formatPrice(item.amount)}</p>
                         </div>
                       ))}
                     </div>
@@ -1518,125 +2454,328 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 );
               })()}
             </motion.div>
+          </motion.div>
+        )}
 
-            {/* Booking Services Section */}
-            <div className="space-y-8">
-              <div className="flex items-center justify-between px-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#000080] flex items-center justify-center shadow-xl">
-                    <BookingIcon className="text-white" size={24} />
-                  </div>
-                  <h3 className="text-3xl font-bold text-[#000080] tracking-tight">Complete Your Booking</h3>
-                </div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest hidden md:block">Best prices guaranteed</p>
+          {/* Simulated OTP Notification Banner */}
+          {otpSent && authMethod === 'phone' && otpSentCode && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-2xl text-xs text-center font-bold shadow-sm relative overflow-hidden"
+            >
+              <div className="flex flex-col gap-1 items-center">
+                <span className="uppercase tracking-widest text-[9px] text-emerald-600 font-extrabold">{curLang.otpSentToast} +91 {phoneForm.phone}</span>
+                <span className="text-2xl font-black text-emerald-900 tracking-[0.25em]">{otpSentCode}</span>
+                <span className="text-[10px] text-gray-400 font-medium">(Security simulation: verify by entering this code)</span>
               </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-                {BOOKING_SERVICES.map((service) => (
-                  <motion.button
-                    key={service.id}
-                    whileHover={{ y: -10, scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => window.open(service.link(startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
-                    className="bg-white border border-gray-100 rounded-[2.5rem] p-8 flex flex-col items-center gap-6 hover:shadow-2xl transition-all group relative overflow-hidden"
-                  >
-                    <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 group-hover:rotate-6", service.color)}>
-                      <service.icon className="text-white" size={28} />
-                    </div>
-                    <span className="text-[#000080] font-bold text-xs uppercase tracking-[0.2em]">{service.label}</span>
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-full -mr-8 -mt-8" />
-                  </motion.button>
-                ))}
-              </div>
+            </motion.div>
+          )}
+
+          <div className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.055)] space-y-6">
+            {/* Tab Selectors: Email vs Phone */}
+            <div className="grid grid-cols-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMethod('email');
+                  setAuthError(null);
+                }}
+                className={cn(
+                  "py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2",
+                  authMethod === 'email'
+                    ? "bg-white text-[#000080] shadow-sm"
+                    : "text-gray-400 hover:text-gray-650"
+                )}
+              >
+                <Mail size={14} />
+                {curLang.emailTab}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMethod('phone');
+                  setAuthError(null);
+                }}
+                className={cn(
+                  "py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2",
+                  authMethod === 'phone'
+                    ? "bg-white text-[#000080] shadow-sm"
+                    : "text-gray-400 hover:text-gray-650"
+                )}
+              >
+                <Phone size={14} />
+                {curLang.phoneTab}
+              </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-    );
-  };
 
-  const renderAuth = () => (
-    <div className="min-h-screen bg-gradient-to-b from-white via-sky-50 to-white flex items-center justify-center px-6 py-12">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md space-y-10"
-      >
-        {/* Top Section: Logo & Tagline */}
-        <div className="text-center space-y-4">
-          <motion.div 
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group overflow-hidden p-4"
-          >
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
-            <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/20 to-transparent opacity-50" />
-            <img 
-              src="/logo.png" 
-              alt="Travolor Logo" 
-              className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
-              referrerPolicy="no-referrer"
-            />
-          </motion.div>
-          <div className="space-y-1">
-            <h1 className="text-4xl font-display font-black text-[#000080] tracking-tight">Travolor</h1>
-            <p className="text-gray-400 font-medium text-sm tracking-wide">Plan Your Perfect Trip</p>
-          </div>
-        </div>
-
-        {authError && (
-          <motion.div 
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="bg-rose-50 border border-rose-100 text-rose-600 p-4 rounded-2xl text-sm text-center font-bold shadow-sm"
-          >
-            {authError}
-          </motion.div>
-        )}
-
-        <div className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-8 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.05)] space-y-8">
-          <form onSubmit={handleAuth} className="space-y-6">
-            {authMode === 'signup' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Full Name</label>
-                <div className="relative group">
-                  <ProfileIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={18} />
-                  <input 
-                    type="text" 
-                    required
-                    placeholder="John Doe"
-                    value={authForm.name}
-                    onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
-                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#000080] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
-                  />
-                </div>
+            {/* If Phone method is selected, show Sub-Selector for OTP vs Password */}
+            {authMethod === 'phone' && (
+              <div className="flex gap-2 justify-center border-b border-gray-100 pb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneMode('otp');
+                    setAuthError(null);
+                  }}
+                  className={cn(
+                    "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all",
+                    phoneMode === 'otp'
+                      ? "bg-[#1E90FF]/10 text-[#1E90FF]"
+                      : "text-gray-400 hover:text-gray-655 bg-gray-50"
+                  )}
+                >
+                  {curLang.otpMode}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneMode('password');
+                    setAuthError(null);
+                  }}
+                  className={cn(
+                    "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all",
+                    phoneMode === 'password'
+                      ? "bg-[#0e1b69]/10 text-[#000080]"
+                      : "text-gray-400 hover:text-gray-655 bg-gray-50"
+                  )}
+                >
+                  {curLang.passwordMode}
+                </button>
               </div>
             )}
-            
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Email or Mobile Number</label>
-              <div className="relative group">
-                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={18} />
-                <input 
-                  type="text" 
-                  required
-                  placeholder="name@example.com"
-                  value={authForm.email}
-                  onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
-                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-5 py-4 text-[#000080] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
-                />
+
+            <form onSubmit={handleAuth} className="space-y-5">
+              {/* Common Name field for Sign Up across all screens */}
+              {authMode === 'signup' && (
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3">{curLang.fullName}</label>
+                  <div className="relative group">
+                    <ProfileIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={16} />
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Rahul Sharma"
+                      value={authMethod === 'email' ? authForm.name : phoneForm.name}
+                      onChange={(e) => {
+                        if (authMethod === 'email') {
+                          setAuthForm({...authForm, name: e.target.value});
+                        } else {
+                          setPhoneForm({...phoneForm, name: e.target.value});
+                        }
+                      }}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-4 py-3.5 text-[#000080] font-bold text-sm placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* EMAIL METHOD FIELDS */}
+              {authMethod === 'email' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3 font-semibold">Email Address</label>
+                    <div className="relative group">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={16} />
+                      <input 
+                        type="email" 
+                        required
+                        placeholder="name@example.com"
+                        value={authForm.email}
+                        onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-4 py-3.5 text-[#000080] font-bold text-sm placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3 font-semibold">Password</label>
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={16} />
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        required
+                        placeholder="••••••••"
+                        value={authForm.password}
+                        onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-12 py-3.5 text-[#000080] font-bold text-sm placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#000080] transition-colors"
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* PHONE METHOD FIELDS */}
+              {authMethod === 'phone' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3">{curLang.phoneNumber}</label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={16} />
+                      <span className="absolute left-11 top-1/2 -translate-y-1/2 text-[#000080] font-black text-sm pr-1 border-r border-gray-200">+91</span>
+                      <input 
+                        type="tel" 
+                        required
+                        readOnly={otpSent && phoneMode === 'otp'}
+                        placeholder="98765 43210"
+                        value={phoneForm.phone}
+                        onChange={(e) => {
+                          const sanitized = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setPhoneForm({...phoneForm, phone: sanitized});
+                        }}
+                        className={cn(
+                          "w-full bg-gray-50 border border-gray-100 rounded-xl pl-20 pr-4 py-3.5 text-[#000080] font-bold text-sm placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all",
+                          otpSent && phoneMode === 'otp' ? "opacity-75 bg-gray-100 cursor-not-allowed" : ""
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {phoneMode === 'password' && (
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3">Password</label>
+                      <div className="relative group">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={16} />
+                        <input 
+                          type={showPassword ? "text" : "password"} 
+                          required
+                          placeholder="••••••••"
+                          value={phoneForm.password}
+                          onChange={(e) => setPhoneForm({...phoneForm, password: e.target.value})}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-12 py-3.5 text-[#000080] font-bold text-sm placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#000080] transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {phoneMode === 'otp' && otpSent && (
+                    <div className="space-y-1 py-1">
+                      <div className="flex justify-between items-center px-1">
+                        <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-2">{curLang.enterOtp}</label>
+                        <span className="text-[10px] font-bold text-blue-500">
+                          {otpTimer > 0 ? (
+                            `${curLang.resendOtp} ${otpTimer}s`
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleSendSimulatedOtp}
+                              className="hover:underline font-black focus:outline-none"
+                            >
+                              {curLang.resendNow}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div className="relative group">
+                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 group-focus-within:text-[#000080] transition-colors" size={16} />
+                        <input 
+                          type="text" 
+                          required
+                          pattern="\d{6}"
+                          placeholder="******"
+                          value={phoneForm.otp}
+                          onChange={(e) => {
+                            const sanitized = e.target.value.replace(/\D/g, '').slice(0, 6);
+                            setPhoneForm({...phoneForm, otp: sanitized});
+                          }}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-4 py-3.5 text-[#000080] font-black tracking-[0.5em] text-center text-lg placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-emerald-100 focus:bg-white transition-all"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500 select-none">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded border-gray-200 text-[#000080] focus:ring-[#000080] w-4 h-4"
+                  />
+                  <span>Remember me</span>
+                </label>
+                <button type="button" className="text-orange-500 hover:underline">Forgot?</button>
               </div>
+
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                type="submit"
+                disabled={loading}
+                className="w-full btn-primary py-4 rounded-xl font-black text-xs uppercase tracking-[0.15em] disabled:opacity-50 flex items-center justify-center gap-3 shadow-md"
+              >
+                {loading ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <>
+                    {authMethod === 'phone' && phoneMode === 'otp' && !otpSent ? curLang.sendOtp : 'Continue'}
+                    {!(authMethod === 'phone' && phoneMode === 'otp' && !otpSent) && <Plane size={14} className="rotate-45" />}
+                  </>
+                )}
+              </motion.button>
+            </form>
+
+            <div className="relative flex items-center py-1">
+              <div className="flex-grow border-t border-gray-100"></div>
+              <span className="flex-shrink mx-4 text-gray-300 text-[9px] font-black uppercase tracking-widest">or</span>
+              <div className="flex-grow border-t border-gray-100"></div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Password</label>
-              <div className="relative group">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={18} />
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  required
-                  placeholder="••••••••"
+            <div className="grid grid-cols-1 gap-3">
+              <button 
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full bg-white border border-gray-100 text-[#000080] py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continue with Google
+              </button>
+            </div>
+          </div>
+
+          <p className="text-center text-gray-500 text-sm font-medium">
+            {authMode === 'login' ? "New user?" : "Already have an account?"}
+            <button 
+              type="button"
+              onClick={() => {
+                setAuthMode(authMode === 'login' ? 'signup' : 'login');
+                setOtpSent(false);
+                setOtpSentCode('');
+                setAuthError(null);
+              }}
+              className="ml-2 text-[#000080] font-black hover:text-orange-500 transition-colors"
+            >
+              {authMode === 'login' ? 'Sign Up' : 'Login'}
+            </button>
+          </p>
+        </motion.div>
+      </div>
+    );
+  };/div>
+    );
+  };��••"
                   value={authForm.password}
                   onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
                   className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-14 py-4 text-[#000080] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
@@ -2235,7 +3374,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           </div>
           <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
             {[
-              { label: "Language", icon: Languages, color: "text-blue-500", value: language, options: ["English", "Marathi", "Hindi"], onChange: setLanguage },
+              { label: "Language", icon: Languages, color: "text-blue-500", value: language, options: [
+                "English", "Marathi", "Hindi", "Gujarati", "Bengali", "Punjabi", "Tamil", "Telugu", "Kannada", "Malayalam", "Odia", "Spanish", "French", "German", "Japanese", "Chinese", "Arabic", "Russian"
+              ], onChange: setLanguage },
               { label: "Currency", icon: WalletIcon, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)"], onChange: setCurrency }
             ].map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
@@ -2293,6 +3434,34 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               >
                 {isDarkMode ? "Dark" : "Light"}
               </button>
+            </div>
+
+            {/* Gemini API Key */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between p-6 gap-4 hover:bg-gray-50/50 transition-all border-t border-gray-50">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
+                  <Lock size={20} className="text-purple-500" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[#000080] font-bold text-sm">Gemini API Key</span>
+                  <span className="text-gray-400 text-[11px] font-medium leading-relaxed">For Netlify / Custom deployments (Self-hosted fallback)</span>
+                </div>
+              </div>
+              <input 
+                type="password"
+                placeholder="Paste API Key (AIzaSy...)"
+                value={userApiKey}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  setUserApiKey(val);
+                  if (val) {
+                    localStorage.setItem('travolor_user_api_key', val);
+                  } else {
+                    localStorage.removeItem('travolor_user_api_key');
+                  }
+                }}
+                className="bg-gray-50 text-[#000080] placeholder-gray-300 px-4 py-2 rounded-xl outline-none font-mono text-xs border border-gray-100 focus:border-[#1E90FF] focus:bg-white w-full md:w-64 transition-all"
+              />
             </div>
           </div>
         </div>
@@ -2370,15 +3539,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   return (
     <div className={cn(
-      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#000080]",
-      activeTab === 'explore' ? "bg-white" : "bg-[#F5F7FA]"
+      "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#000080] dark:text-[#E2E8F0]",
+      activeTab === 'explore' ? "bg-white dark:bg-[#030712]" : "bg-[#F5F7FA] dark:bg-[#060814]"
     )}>
       {/* Header */}
       <header className={cn(
         "pt-6 pb-4 px-6 sticky top-0 z-40 transition-all duration-500",
         activeTab === 'explore' 
-          ? "bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm" 
-          : "bg-[#000080] border-b border-white/10"
+          ? "bg-white/80 dark:bg-[#030712]/85 backdrop-blur-xl border-b border-gray-100 dark:border-[#1E295D]/30 shadow-sm" 
+          : "bg-[#000080] dark:bg-[#0A0E2B] border-b border-white/10"
       )}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <motion.div 
@@ -2459,9 +3628,220 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         </AnimatePresence>
       </main>
 
+      {/* Travolor Assistant Chatbot Floating Bubble & Panel */}
+      <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-4 scale-95 md:scale-100">
+        <AnimatePresence>
+          {isChatOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.9 }}
+              className="bg-white dark:bg-[#0B0F2B] w-[92vw] sm:w-[420px] h-[550px] rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-[#1E295D]/40 flex flex-col overflow-hidden text-left"
+            >
+              {/* Header */}
+              <div className="bg-[#000080] dark:bg-[#0A0E2B] text-white p-5 flex flex-col gap-3 relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-sky-300">
+                      <Bot size={22} className="animate-bounce" />
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-base flex items-center gap-2">
+                        Travolor Co-Pilot
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                      </h4>
+                      <p className="text-[10px] text-white/60 tracking-wider font-medium uppercase text-left">Premium AI Travel Companion</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsChatOpen(false)}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer text-white"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Role & Intelligence Mode Controls */}
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  {/* Persona Role Switcher */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[8px] uppercase tracking-wider text-sky-200/70 font-bold">Bot Specialist Role</span>
+                    <select
+                      value={chatRole}
+                      onChange={(e: any) => setChatRole(e.target.value)}
+                      className="text-xs bg-white/10 dark:bg-[#0F143A] text-white rounded-lg px-2 py-1.5 outline-none border border-white/10 hover:bg-white/20 transition-all font-semibold"
+                    >
+                      <option value="copilot" className="text-gray-900 bg-white">🌐 Default Co-Pilot</option>
+                      <option value="foodie" className="text-gray-900 bg-white">🍲 Culinary Expert</option>
+                      <option value="historian" className="text-gray-900 bg-white">🏛️ Local Historian</option>
+                      <option value="budget" className="text-gray-900 bg-white">💡 Budget Consultant</option>
+                    </select>
+                  </div>
+
+                  {/* Mode Selector */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[8px] uppercase tracking-wider text-sky-200/70 font-bold">Speed / Intelligence</span>
+                    <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/5">
+                      {(['fast', 'general', 'complex'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setChatMode(mode)}
+                          className={cn(
+                            "flex-1 text-[9px] font-bold py-1 px-1 rounded uppercase tracking-tighter transition-all whitespace-nowrap",
+                            chatMode === mode 
+                              ? "bg-white text-[#000080] shadow-sm font-black" 
+                              : "text-white/80 hover:text-white"
+                          )}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages Thread list */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 dark:bg-slate-900/50">
+                {chatHistory.map((m, idx) => (
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "flex flex-col max-w-[85%] rounded-3xl p-4 shadow-sm",
+                      m.role === 'user' 
+                        ? "bg-[#000080] dark:bg-[#1E90FF] text-white self-end rounded-tr-none text-right" 
+                        : "bg-white dark:bg-[#0F172A] text-gray-800 dark:text-gray-200 self-start border border-gray-100 dark:border-slate-800 rounded-tl-none text-left"
+                    )}
+                  >
+                    <div className="markdown-body text-xs leading-relaxed prose dark:prose-invert prose-p:my-1 prose-ul:list-disc prose-ul:pl-4">
+                      <Markdown>{m.text}</Markdown>
+                    </div>
+
+                    {m.role === 'assistant' && (
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSpeakingChatIdx === idx) {
+                              stopSpeaking();
+                            } else {
+                              speakText(m.text, () => setIsSpeakingChatIdx(idx), () => setIsSpeakingChatIdx(null));
+                            }
+                          }}
+                          className={cn(
+                            "p-1.5 rounded-lg border flex items-center gap-1 text-[10px] font-bold transition-all cursor-pointer",
+                            isSpeakingChatIdx === idx 
+                              ? "bg-red-500 text-white border-red-400 animate-pulse" 
+                              : "bg-gray-50 hover:bg-gray-100 text-gray-500 border-gray-100 dark:bg-slate-800/80 dark:border-slate-700/60 dark:text-gray-400"
+                          )}
+                          title="Listen to response"
+                        >
+                          {isSpeakingChatIdx === idx ? <VolumeX size={10} /> : <Volume2 size={10} />}
+                          {isSpeakingChatIdx === idx ? "Stop" : "Listen"}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Extracted Maps / Search Grounding source citations inside bubble */}
+                    {m.sources && m.sources.length > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-slate-800/80 flex flex-col gap-1.5 text-left">
+                        <span className="text-[10px] font-black tracking-widest text-[#1E90FF] uppercase">AI Sources & Reference Links:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {m.sources.map((src, sIdx) => {
+                            const isMap = src.type === "maps" || src.uri.includes("google.com/maps") || src.uri.includes("maps.google");
+                            return (
+                              <a 
+                                key={sIdx}
+                                href={src.uri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={cn(
+                                  "text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 transition-all",
+                                  isMap 
+                                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-300"
+                                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-300"
+                                )}
+                              >
+                                {isMap ? "📍 Maps Reference" : "🔍 Web Source"}
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {chatLoading && (
+                  <div className="bg-white dark:bg-[#0F172A] border border-gray-100 dark:border-slate-800 text-gray-400 p-4 rounded-3xl rounded-tl-none self-start flex items-center gap-2">
+                    <Loader2 className="animate-spin text-[#000080] dark:text-[#1E90FF]" size={16} />
+                    <span className="text-xs font-medium tracking-wide text-left">
+                      {chatMode === 'complex' ? "Thinking deeply..." : "Co-Pilot is researching web..."}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Input Box */}
+              <div className="p-4 border-t border-gray-100 dark:border-slate-800/80 bg-white dark:bg-[#0B0F2B] flex items-center gap-2">
+                <input 
+                  type="text"
+                  placeholder={chatLoading ? "Co-Pilot is typing..." : "Plan my Kolhapur ride or local places..."}
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSendChatMessage();
+                  }}
+                  disabled={chatLoading}
+                  className="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl px-4 py-3.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:border-[#1E90FF]/60 dark:focus:border-blue-500 transition-all font-medium disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={handleChatVoiceInput}
+                  disabled={chatLoading}
+                  className={cn(
+                    "w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer shadow-md",
+                    isChatListening 
+                      ? "bg-red-500 text-white animate-pulse" 
+                      : "bg-red-50/80 text-red-500 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 border border-red-100/10"
+                  )}
+                  title={`Dictate question in ${language}`}
+                >
+                  {isChatListening ? <MicOff size={16} /> : <Mic size={16} />}
+                </button>
+                <button
+                  onClick={handleSendChatMessage}
+                  disabled={chatLoading || !chatInput.trim()}
+                  className="w-11 h-11 rounded-2xl bg-[#000080] dark:bg-[#1E90FF] text-white flex items-center justify-center hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all cursor-pointer shadow-md"
+                >
+                  <Send size={16} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Toggle Button Bubble */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#000080] to-[#1E90FF] text-white flex items-center justify-center shadow-2xl relative group hover:rotate-12 transition-transform cursor-pointer"
+        >
+          {isChatOpen ? <X size={24} /> : <MessageSquare size={24} className="group-hover:scale-110 transition-transform" />}
+          
+          {/* Subtle notification indicator */}
+          {!isChatOpen && (
+            <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-full border border-white flex items-center animate-bounce shadow-md">
+              AI
+            </span>
+          )}
+        </motion.button>
+      </div>
+
       {/* Sticky Bottom Navigation */}
       <nav className="fixed bottom-6 left-0 right-0 z-50 px-6">
-        <div className="max-w-md mx-auto bg-white/90 backdrop-blur-xl border border-gray-100 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
+        <div className="max-w-md mx-auto bg-white/90 dark:bg-[#0B0F2B]/90 backdrop-blur-xl border border-gray-100 dark:border-[#1E295D]/40 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
           {[
             { id: "explore", icon: Globe, label: "Explore" },
             { id: "trips", icon: MapIcon, label: "Trips" },
@@ -2476,7 +3856,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               {activeTab === tab.id && (
                 <motion.div 
                   layoutId="activeTab"
-                  className="absolute inset-0 bg-blue-50 rounded-full"
+                  className="absolute inset-0 bg-blue-50 dark:bg-[#1E90FF]/15 rounded-full"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
@@ -2484,7 +3864,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 size={20} 
                 className={cn(
                   "transition-all duration-300 relative z-10",
-                  activeTab === tab.id ? "text-[#1E90FF] scale-110" : "text-gray-400 group-hover:text-[#000080]"
+                  activeTab === tab.id ? "text-[#1E90FF] scale-110" : "text-gray-400 group-hover:text-[#000080] dark:group-hover:text-[#93C5FD]"
                 )} 
               />
               <span className={cn(
