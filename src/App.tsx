@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   MapPin, Calendar, Wallet, Search, Map as MapIcon, 
@@ -23,7 +23,7 @@ import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
-import { generateItinerary, getSuggestions } from './services/geminiService';
+import { generateItinerary, getSuggestions, getTopAttractions, type Attraction } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
 
 const libraries: ("places")[] = ["places"];
@@ -392,7 +392,7 @@ const LocationInput = ({
   );
 };
 
-function AppContent({ isLoaded }: { isLoaded: boolean }) {
+function AppContent({ isLoaded, mapsAuthFailed = false }: { isLoaded: boolean; mapsAuthFailed?: boolean }) {
   const [activeTab, setActiveTab] = useState("explore");
   const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string} | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -420,6 +420,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [travelStyle, setTravelStyle] = useState("standard");
   const [loading, setLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
+  const [attractions, setAttractions] = useState<Attraction[]>([]);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [loadingAttractions, setLoadingAttractions] = useState(false);
   const [routeSummary, setRouteSummary] = useState<{distance: string, time: string, mode: string} | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('travolor_theme');
@@ -932,16 +935,26 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     setLoading(true);
     setItinerary(null);
+    setAttractions([]);
     try {
-      const result = await generateItinerary({
-        location: locationInput,
-        startLocation: startLocation,
-        duration,
-        numPeople,
-        travelStyle: styleToUse,
-        language: language
-      });
-      setItinerary(result);
+      const [itineraryResult, attractionsResult] = await Promise.all([
+        generateItinerary({
+          location: locationInput,
+          startLocation: startLocation,
+          duration,
+          numPeople,
+          travelStyle: styleToUse,
+          language: language
+        }),
+        getTopAttractions(locationInput).catch(err => {
+          console.error("Failed to get attractions:", err);
+          return [];
+        })
+      ]);
+
+      setItinerary(itineraryResult);
+      setAttractions(attractionsResult);
+
       // Simple heuristic to extract some info for the route card if possible
       // Or just set defaults for the visual card
       setRouteSummary({
@@ -1290,9 +1303,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => openInMaps(locationInput)}
-                    className="bg-[#1E90FF] text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-[#1E90FF]/90 transition-all shadow-2xl"
+                    className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-slate-800 transition-all shadow-2xl border border-white/20"
                   >
                     <MapIcon size={20} /> {t.viewMaps}
+                  </motion.button>
+                  <motion.button 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsMapModalOpen(true)}
+                    className="bg-[#1E90FF] text-white px-10 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-[#1E90FF]/90 transition-all shadow-2xl"
+                  >
+                    <Compass size={20} /> Explore Map
                   </motion.button>
                 </div>
               </div>
@@ -1894,6 +1915,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       setDuration(trip.duration);
                       setTravelStyle(trip.style);
                       setItinerary(trip.itinerary);
+                      setAttractions([]);
+                      getTopAttractions(trip.location).then(res => setAttractions(res)).catch(() => {});
                       setActiveTab('explore');
                     }}
                     className="flex-1 bg-[#1E90FF] text-white py-3 rounded-xl font-bold text-sm hover:bg-[#1E90FF]/90 transition-all"
@@ -2527,6 +2550,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           ))}
         </div>
       </nav>
+
+      <AnimatePresence>
+        {isMapModalOpen && (
+          <MapModal 
+            isOpen={isMapModalOpen}
+            onClose={() => setIsMapModalOpen(false)}
+            destination={locationInput}
+            attractions={attractions}
+            isLoaded={isLoaded}
+            mapsAuthFailed={mapsAuthFailed}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -2554,12 +2590,12 @@ export default function App() {
     import.meta.env.VITE_MAPS_API_KEY;
 
   if (mapsKey && !mapsAuthFailed) {
-    return <AppWithMaps mapsKey={mapsKey} setMapsAuthFailed={setMapsAuthFailed} />;
+    return <AppWithMaps mapsKey={mapsKey} setMapsAuthFailed={setMapsAuthFailed} mapsAuthFailed={mapsAuthFailed} />;
   }
-  return <AppContent isLoaded={false} />;
+  return <AppContent isLoaded={false} mapsAuthFailed={true} />;
 }
 
-function AppWithMaps({ mapsKey, setMapsAuthFailed }: { mapsKey: string; setMapsAuthFailed: (failed: boolean) => void }) {
+function AppWithMaps({ mapsKey, setMapsAuthFailed, mapsAuthFailed }: { mapsKey: string; setMapsAuthFailed: (failed: boolean) => void; mapsAuthFailed: boolean }) {
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: mapsKey,
     libraries,
@@ -2572,5 +2608,288 @@ function AppWithMaps({ mapsKey, setMapsAuthFailed }: { mapsKey: string; setMapsA
     }
   }, [loadError, setMapsAuthFailed]);
 
-  return <AppContent isLoaded={isLoaded} />;
+  return <AppContent isLoaded={isLoaded} mapsAuthFailed={mapsAuthFailed} />;
+}
+
+interface MapModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  destination: string;
+  attractions: Attraction[];
+  isLoaded: boolean;
+  mapsAuthFailed: boolean;
+}
+
+function MapModal({ isOpen, onClose, destination, attractions, isLoaded, mapsAuthFailed }: MapModalProps) {
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [markers, setMarkers] = useState<Array<{ name: string; rating: number; description: string; lat: number; lng: number }>>([]);
+  const [loadingMap, setLoadingMap] = useState(false);
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const activeMapRef = useRef<google.maps.Map | null>(null);
+  const currentMarkersRef = useRef<google.maps.Marker[]>([]);
+  const activeInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+
+  // Focus effect to geocode destination and attractions
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const geocodeAll = async () => {
+      setLoadingMap(true);
+      try {
+        if (isLoaded && window.google && !mapsAuthFailed) {
+          const geocoder = new google.maps.Geocoder();
+          
+          // Geocode Destination
+          const destLoc = await new Promise<{ lat: number; lng: number } | null>((resolve) => {
+            geocoder.geocode({ address: destination }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                resolve({
+                  lat: results[0].geometry.location.lat(),
+                  lng: results[0].geometry.location.lng()
+                });
+              } else {
+                resolve(null);
+              }
+            });
+          });
+
+          if (destLoc) {
+            setMapCenter(destLoc);
+
+            // Geocode individual attractions in parallel
+            const markerPromises = attractions.map(attraction => {
+              return new Promise<any>((resolve) => {
+                geocoder.geocode({ address: `${attraction.name}, ${destination}` }, (results, status) => {
+                  if (status === 'OK' && results && results[0]) {
+                    resolve({
+                      ...attraction,
+                      lat: results[0].geometry.location.lat(),
+                      lng: results[0].geometry.location.lng()
+                    });
+                  } else {
+                    // Fallback offset around center
+                    const offsetLat = destLoc.lat + (Math.random() - 0.5) * 0.04;
+                    const offsetLng = destLoc.lng + (Math.random() - 0.5) * 0.04;
+                    resolve({
+                      ...attraction,
+                      lat: offsetLat,
+                      lng: offsetLng
+                    });
+                  }
+                });
+              });
+            });
+
+            const resolved = await Promise.all(markerPromises);
+            setMarkers(resolved);
+          }
+        }
+      } catch (err) {
+        console.error("Geocoding failed", err);
+      } finally {
+        setLoadingMap(false);
+      }
+    };
+
+    geocodeAll();
+  }, [isOpen, destination, attractions, isLoaded, mapsAuthFailed]);
+
+  // Handle actual Google Map instantiation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (isLoaded && window.google && mapCenter && mapElementRef.current && !mapsAuthFailed) {
+      const map = new google.maps.Map(mapElementRef.current, {
+        center: mapCenter,
+        zoom: 13,
+        mapId: "DEMO_MAP_ID",
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true
+      });
+      activeMapRef.current = map;
+
+      // Clear previous markers
+      currentMarkersRef.current.forEach(m => m.setMap(null));
+      currentMarkersRef.current = [];
+
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(mapCenter);
+
+      markers.forEach(m => {
+        const position = { lat: m.lat, lng: m.lng };
+        bounds.extend(position);
+
+        const marker = new google.maps.Marker({
+          position,
+          map,
+          title: m.name,
+          animation: google.maps.Animation.DROP,
+          icon: {
+            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 6,
+            fillColor: "#1E90FF",
+            fillOpacity: 0.9,
+            strokeWeight: 2,
+            strokeColor: "#ffffff",
+          }
+        });
+
+        const infoHtml = `
+          <div style="font-family: 'Inter', sans-serif; padding: 10px; max-width: 240px; color: #1e293b; background: white;">
+            <h4 style="font-size: 14px; font-weight: 700; color: #000080; margin: 0 0 4px 0;">${m.name}</h4>
+            <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+              <span style="color: #fbbf24; font-size: 14px;">★</span>
+              <span style="font-size: 12px; font-weight: 600; color: #475569;">${m.rating}</span>
+            </div>
+            <p style="font-size: 11px; line-height: 1.5; color: #4b5563; margin: 0;">${m.description}</p>
+          </div>
+        `;
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: infoHtml
+        });
+
+        marker.addListener('click', () => {
+          if (activeInfoWindowRef.current) {
+            activeInfoWindowRef.current.close();
+          }
+          infoWindow.open(map, marker);
+          activeInfoWindowRef.current = infoWindow;
+        });
+
+        currentMarkersRef.current.push(marker);
+      });
+
+      if (markers.length > 0) {
+        map.fitBounds(bounds);
+        const listener = google.maps.event.addListener(map, 'idle', () => {
+          if (map.getZoom()! > 16) map.setZoom(14);
+          google.maps.event.removeListener(listener);
+        });
+      }
+    }
+
+    return () => {
+      currentMarkersRef.current.forEach(m => m.setMap(null));
+      currentMarkersRef.current = [];
+    };
+  }, [isOpen, isLoaded, mapCenter, markers, mapsAuthFailed]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-gray-100"
+      >
+        {/* Header */}
+        <div className="p-6 md:p-8 bg-slate-50 border-b border-gray-100 flex justify-between items-center">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-600">Explore Local Wonders</span>
+            <h3 className="text-2xl md:text-3xl font-black text-[#000080] tracking-tight">{destination} Attractions</h3>
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-12 h-12 rounded-full bg-white hover:bg-red-50 hover:text-red-500 text-gray-500 shadow-md border border-gray-100 flex items-center justify-center font-bold transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content Panel */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          {/* Side Attraction List */}
+          <div className="w-full md:w-[350px] bg-slate-50 p-6 overflow-y-auto border-r border-gray-100 flex flex-col gap-4">
+            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-1">Top-Rated (AI Selected)</h4>
+            
+            {loadingMap ? (
+              <div className="flex-1 flex flex-col gap-4">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <div key={n} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-pulse flex flex-col gap-2">
+                    <div className="h-4 bg-gray-200 rounded w-2/3" />
+                    <div className="h-3 bg-gray-100 rounded w-1/3" />
+                    <div className="h-3 bg-gray-100 rounded w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : attractions.length > 0 ? (
+              attractions.map((attr, idx) => (
+                <div 
+                  key={idx}
+                  onClick={() => {
+                    const markerData = markers[idx];
+                    if (markerData && activeMapRef.current) {
+                      activeMapRef.current.panTo({ lat: markerData.lat, lng: markerData.lng });
+                      activeMapRef.current.setZoom(15);
+                      // Trigger marker click to open info window simulation
+                      const gMarker = currentMarkersRef.current[idx];
+                      if (gMarker) {
+                        google.maps.event.trigger(gMarker, 'click');
+                      }
+                    }
+                  }}
+                  className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all group"
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <h5 className="font-bold text-slate-800 text-sm group-hover:text-[#1E90FF] transition-colors">{attr.name}</h5>
+                    <div className="flex items-center gap-1 bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-lg text-xs font-semibold">
+                      <span>★</span>
+                      <span>{attr.rating}</span>
+                    </div>
+                  </div>
+                  <p className="text-gray-500 text-xs line-clamp-2 leading-relaxed">{attr.description}</p>
+                </div>
+              ))
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-8 text-center text-gray-400">
+                <p className="text-sm">No attractions available or loading...</p>
+              </div>
+            )}
+          </div>
+
+          {/* Map display */}
+          <div className="flex-1 relative bg-gray-150 h-full">
+            {loadingMap && (
+              <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-xs flex flex-col items-center justify-center gap-3">
+                <Loader2 className="animate-spin text-[#1E90FF]" size={40} />
+                <span className="text-sm font-semibold text-slate-600">Geocoding & building layout...</span>
+              </div>
+            )}
+
+            {!isLoaded || mapsAuthFailed ? (
+              // Beautiful Non-Map Fallback Interface
+              <div className="absolute inset-0 bg-slate-100 p-8 flex flex-col items-center justify-center text-center">
+                <div className="max-w-md bg-white p-8 rounded-[2rem] shadow-xl border border-gray-100 flex flex-col items-center gap-6">
+                  <div className="w-16 h-16 bg-blue-50 text-[#1E90FF] rounded-full flex items-center justify-center">
+                    <Compass size={32} className="animate-bounce" />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold text-slate-800 mb-2">Beautiful Attraction Guide</h4>
+                    <p className="text-gray-500 text-sm leading-relaxed mb-4">
+                      Direct Map loading is unavailable. Please click below to view these incredible destinations on Google Maps!
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(destination)}+tourist+attractions`, '_blank')}
+                    className="bg-[#1E90FF] text-white px-8 py-3.5 rounded-full font-bold shadow-lg hover:bg-blue-600 transition-all flex items-center gap-2 text-sm"
+                  >
+                    View on Google Maps Website <ExternalLink size={16} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Live Interactive Google Map
+              <div ref={mapElementRef} className="w-full h-full" style={{ minHeight: "350px" }} />
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
 }
