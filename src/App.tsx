@@ -2413,49 +2413,105 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                             </p>
                           </div>
                         ) : (
-                          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 text-emerald-600">
-                            <Check size={20} className="shrink-0" />
-                            <p className="text-xs font-medium leading-relaxed">
-                              You are within your budget. Great job managing expenses!
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 t  const renderAuth = () => {
+    const authLang: Record<string, {
+      emailTab: string;
+      phoneTab: string;
+      otpMode: string;
+      passwordMode: string;
+      sendOtp: string;
+      resendOtp: string;
+      resendNow: string;
+      otpSentToast: string;
+      verifyBtn: string;
+      fullName: string;
+      phoneNumber: string;
+      enterOtp: string;
+    }> = {
+      English: {
+        emailTab: "Email/Username",
+        phoneTab: "Mobile Number",
+        otpMode: "SMS OTP Login",
+        passwordMode: "Password Login",
+        sendOtp: "Send OTP Securely",
+        resendOtp: "Resend Code in",
+        resendNow: "Resend Now",
+        otpSentToast: "Simulated OTP Code sent to",
+        verifyBtn: "Verify OTP & Continue",
+        fullName: "Full Name",
+        phoneNumber: "Phone Number",
+        enterOtp: "Enter 6-Digit OTP",
+      },
+      Marathi: {
+        emailTab: "ईमेल / युझरनेम",
+        phoneTab: "मोबाईल नंबर",
+        otpMode: "SMS OTP लॉगिन",
+        passwordMode: "पासवर्ड लॉगिन",
+        sendOtp: "OTP सुरक्षितपणे पाठवा",
+        resendOtp: "पुन्हा पाठवा",
+        resendNow: "आता पाठवा",
+        otpSentToast: "या मोबाईलवर OTP पाठवला आहे:",
+        verifyBtn: "OTP सत्यापित करा आणि सुरू करा",
+        fullName: "पूर्ण नाव",
+        phoneNumber: "मोबाईल नंबर",
+        enterOtp: "६-अंकी OTP टाका",
+      },
+      Hindi: {
+        emailTab: "ईमेल / यूजरनेम",
+        phoneTab: "मोबाइल नंबर",
+        otpMode: "SMS OTP लॉगिन",
+        passwordMode: "पासवर्ड लॉगिन",
+        sendOtp: "OTP सुरक्षित भेजें",
+        resendOtp: "पुनः भेजें",
+        resendNow: "अभी भेजें",
+        otpSentToast: "इस मोबाइल पर OTP भेजा गया है:",
+        verifyBtn: "OTP सत्यापित करें और शुरू करें",
+        fullName: "पूरा नाम",
+        phoneNumber: "मोबाइल नंबर",
+        enterOtp: "६-अंकीय OTP दर्ज करें",
+      }
+    };
 
-                    <div className="space-y-4">
-                      <div className="flex justify-between text-xs font-bold text-gray-500">
-                        <span>Budget Usage</span>
-                        <span>{percentage.toFixed(0)}% ({formatPrice(totalEstimate)} of {formatPrice(userTotalBudget)})</span>
-                      </div>
-                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={cn(
-                            "h-full transition-all duration-500 rounded-full",
-                            isOverBudget ? "bg-rose-500 animate-pulse" : percentage > 85 ? "bg-amber-500" : "bg-emerald-500"
-                          )}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
+    const curLang = authLang[language] || authLang.English;
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4">
-                      {breakdown.map((item, idx) => (
-                        <div key={idx} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-3 hover:bg-white hover:shadow-md transition-all">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("w-2 h-2 rounded-full", item.color)} />
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.label}</span>
-                          </div>
-                          <p className="text-xl font-bold text-[#000080]">{formatPrice(item.amount)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-white via-sky-50 to-white flex items-center justify-center px-6 py-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md space-y-8"
+        >
+          {/* Top Section: Logo & Tagline */}
+          <div className="text-center space-y-4">
+            <motion.div 
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group overflow-hidden p-4"
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/25 to-transparent opacity-50" />
+              <img 
+                src="/logo.png" 
+                alt="Travolor Logo" 
+                className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
+                referrerPolicy="no-referrer"
+              />
             </motion.div>
-          </motion.div>
-        )}
+            <div className="space-y-1">
+              <h1 className="text-3xl font-display font-black text-[#000080] tracking-tight">Travolor</h1>
+              <p className="text-gray-400 font-semibold text-xs tracking-wider uppercase">Plan Your Perfect Trip</p>
+            </div>
+          </div>
+
+          {authError && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-rose-50 border border-rose-100 text-rose-600 p-4 rounded-2xl text-xs text-center font-bold shadow-sm leading-relaxed"
+            >
+              {authError}
+            </motion.div>
+          )}
 
           {/* Simulated OTP Notification Banner */}
           {otpSent && authMethod === 'phone' && otpSentCode && (
@@ -2473,8 +2529,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           )}
 
           <div className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.055)] space-y-6">
-            {/* Tab Selectors: Email vs Phone */}
-            <div className="grid grid-cols-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+            {/* Toggle tabs for Email / Phone */}
+            <div className="bg-gray-100/80 p-1.5 rounded-2xl grid grid-cols-2 gap-1">
               <button
                 type="button"
                 onClick={() => {
@@ -2485,7 +2541,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   "py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2",
                   authMethod === 'email'
                     ? "bg-white text-[#000080] shadow-sm"
-                    : "text-gray-400 hover:text-gray-650"
+                    : "text-gray-400 hover:text-gray-600"
                 )}
               >
                 <Mail size={14} />
@@ -2501,7 +2557,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   "py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2",
                   authMethod === 'phone'
                     ? "bg-white text-[#000080] shadow-sm"
-                    : "text-gray-400 hover:text-gray-650"
+                    : "text-gray-400 hover:text-gray-600"
                 )}
               >
                 <Phone size={14} />
@@ -2522,7 +2578,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all",
                     phoneMode === 'otp'
                       ? "bg-[#1E90FF]/10 text-[#1E90FF]"
-                      : "text-gray-400 hover:text-gray-655 bg-gray-50"
+                      : "text-gray-400 hover:text-gray-600 bg-gray-50"
                   )}
                 >
                   {curLang.otpMode}
@@ -2537,7 +2593,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all",
                     phoneMode === 'password'
                       ? "bg-[#0e1b69]/10 text-[#000080]"
-                      : "text-gray-400 hover:text-gray-655 bg-gray-50"
+                      : "text-gray-400 hover:text-gray-600 bg-gray-50"
                   )}
                 >
                   {curLang.passwordMode}
@@ -2574,7 +2630,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               {authMethod === 'email' && (
                 <>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3 font-semibold">Email Address</label>
+                    <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3">Email Address</label>
                     <div className="relative group">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={16} />
                       <input 
@@ -2589,7 +2645,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3 font-semibold">Password</label>
+                    <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-3">Password</label>
                     <div className="relative group">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#000080] transition-colors" size={16} />
                       <input 
@@ -2700,17 +2756,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 </>
               )}
 
-              <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500 select-none">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input 
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-gray-200 text-[#000080] focus:ring-[#000080] w-4 h-4"
-                  />
-                  <span>Remember me</span>
+              <div className="flex items-center justify-between px-2 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer group select-none">
+                  <div 
+                    onClick={() => setRememberMe(!rememberMe)}
+                    className={cn(
+                      "w-4 h-4 rounded border transition-all flex items-center justify-center",
+                      rememberMe ? "bg-[#000080] border-[#000080]" : "border-gray-200 group-hover:border-gray-300"
+                    )}
+                  >
+                    {rememberMe && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-gray-500">Remember me</span>
                 </label>
-                <button type="button" className="text-orange-500 hover:underline">Forgot?</button>
+                <button type="button" className="font-bold text-orange-500 hover:underline">Forgot?</button>
               </div>
 
               <motion.button
@@ -2742,7 +2801,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="w-full bg-white border border-gray-100 text-[#000080] py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+                className="w-full bg-white border border-gray-100 text-[#000080] py-3.5 rounded-xl font-bold text-xs flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -2773,9 +2832,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         </motion.div>
       </div>
     );
-  };/div>
-    );
-  };��••"
+  };��••"
                   value={authForm.password}
                   onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
                   className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-14 pr-14 py-4 text-[#000080] font-bold placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-blue-50/50 focus:bg-white transition-all"
