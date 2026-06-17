@@ -105,39 +105,3 @@ Rules:
   }
 }
 
-export interface Attraction {
-  name: string;
-  rating: number;
-  description: string;
-}
-
-export async function getTopAttractions(destination: string): Promise<Attraction[]> {
-  const ai = getGenAI();
-  const prompt = `You are a professional travel assistant for "Travolor".
-  For the destination: "${destination}", identify 5 top-rated attractions/places to visit.
-  Return a valid JSON array of objects conforming to the schema:
-  [
-    {
-      "name": "Attraction Name",
-      "rating": 4.8,
-      "description": "Short description of what makes it special and why it's top-rated."
-    }
-  ]
-  Respond ONLY with the JSON array, no commentary, no markdown formatting blocks, no extra text.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
-    });
-    const text = response.text || "";
-    // Clean potential markdown blocks
-    const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    return JSON.parse(cleanedText) as Attraction[];
-  } catch (error) {
-    console.error("Error getting top attractions:", error);
-    return [];
-  }
-}
-
-

@@ -540,7 +540,7 @@ async function startServer() {
   app.get("/api/search/cabs", async (req, res) => {
     const { from, to, userId } = req.query;
     logSearch(userId ? parseInt(userId as string) : null, 'cabs', { from, to });
-    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_PLATFORM_KEY;
+    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
     try {
       let distance = 0;
@@ -572,7 +572,7 @@ async function startServer() {
 
   app.get("/api/search/autocomplete", async (req, res) => {
     const { input } = req.query;
-    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_PLATFORM_KEY;
+    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY;
     
     if (!input) return res.json([]);
     if (!apiKey) {
@@ -604,7 +604,7 @@ async function startServer() {
 
   app.get("/api/search/attractions", async (req, res) => {
     const { city } = req.query;
-    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_PLATFORM_KEY;
+    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY;
     
     if (!apiKey) return res.json([]);
 
@@ -630,7 +630,7 @@ async function startServer() {
     const { from, to, userId } = req.query;
     logSearch(userId ? parseInt(userId as string) : null, 'trains', { from, to });
     // Mocking realistic train data based on distance
-    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_PLATFORM_KEY;
+    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY;
     let distance = 500;
     try {
       const response = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${from}&destinations=${to}&key=${apiKey}`);
@@ -647,7 +647,7 @@ async function startServer() {
   app.get("/api/search/buses", async (req, res) => {
     const { from, to, userId } = req.query;
     logSearch(userId ? parseInt(userId as string) : null, 'buses', { from, to });
-    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_PLATFORM_KEY;
+    const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY;
     let distance = 500;
     try {
       const response = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${from}&destinations=${to}&key=${apiKey}`);
