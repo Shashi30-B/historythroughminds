@@ -98,7 +98,7 @@ const offlineCities = [
   "Mumbai", "Pune", "Kolhapur", "Mahabaleshwar", "Lonavala", "Nashik", "Alibaug", "Shirdi", "Chhatrapati Sambhajinagar (Aurangabad)", "Nagpur", "Ratnagiri", "Khandala", "Panchgani", "Satara", "Solapur", "Sangli", "Thane", "Navi Mumbai", "Kolkata", "Kochi", "Kedarnath", "Kashmir", "Kanyakumari", "Kerala", "Kodaikanal", "Karwar", "Kanpur", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Goa", "Jaipur", "Udaipur", "Manali", "Shimla", "Dharamshala", "Leh Ladakh", "Agra", "Varanasi", "Amritsar", "Rishikesh"
 ];
 
-function getOfflineItinerary(location: string, startLocation: string, duration: number, travelStyle: string, numPeople: number, language: string = "en") {
+function getOfflineItinerary(location: string, startLocation: string, duration: number, travelStyle: string, numPeople: number, language: string = "en", transportType: string = "self_drive_car") {
   const destName = location || "Uncharted Paradise";
   const numDur = duration && !isNaN(Number(duration)) ? Number(duration) : 3;
   const numP = numPeople && !isNaN(Number(numPeople)) ? Number(numPeople) : 1;
@@ -109,8 +109,39 @@ function getOfflineItinerary(location: string, startLocation: string, duration: 
   const isMarathi = language === "Marathi" || language === "mr" || language === "mr-IN";
   const isHindi = language === "Hindi" || language === "hi" || language === "hi-IN";
 
+  function getCustomTransportTip(tMode: string, isMar: boolean, isHin: boolean) {
+    if (isMar) {
+      switch (tMode) {
+        case "self_drive_car": return "स्वतः कार चालवताना रस्त्यावरचे सुंदर नजारे पाहा. पर्यटन स्थळ परिसरात कार पार्किंगची अधिकृत जागा निवडा.";
+        case "cab": return "तुमच्या प्रायव्हेट टॅक्सी/कॅब ड्रायव्हरला आधीच बोलून ठेवा की मुख्य प्रेक्षणीय जागांवर थांबावे.";
+        case "train": return "रेल्वे सफारीचा आनंद घेऊन जवळच्या मुख्य रेल्वे स्टेशनवरून लोकल रिक्षाने पर्यटन स्थळी जा.";
+        case "bus": return "एसटी/खाजगी बसने स्वस्त आणि मस्त प्रवास करा आणि मध्यवर्ती ठिकाणांवरून पायी प्रवास करा.";
+        case "flight": return "विमानतळावर उतरल्यानंतर थेट प्रीपेड टॅक्सी किंवा मेट्रो सेवा वापरून इच्छित हॉटेल गाठा.";
+        default: return "अधिक चांगल्या अनुभवासाठी आणि पैशांच्या बचतीसाठी लोकल ऑटो-रिक्षा किंवा मेट्रो वापरा.";
+      }
+    } else if (isHin) {
+      switch (tMode) {
+        case "self_drive_car": return "खुद गाड़ी चलाकर आरामदायक सफर का मज़ा लें। पर्यटन क्षेत्रों में अधिकृत पार्किंग का उपयोग करें।";
+        case "cab": return "अपनी प्राइवेट टूरिस्ट कैबिनेट में बैठकर आराम से सफर करें और मनचाही जगह रोक कर तस्वीरें लें।";
+        case "train": return "मनोरम रेलवे ट्रैक का आनंद लेते हुए स्टेशन पर उतरें और वहां से स्थानीय सवारी बुक करें।";
+        case "bus": return "क्षेत्रीय बस सेवा का उपयोग कर सफर को बजट अनुकूल बनाएं, और लोकल बाजारों में पैदल घूमें।";
+        case "flight": return "हवाई अड्डे से प्रीपेड टैक्सी या मेट्रो रेल के ज़रिए बिना झंझट होटल तक पहुँचें।";
+        default: return "सस्ते और प्रामाणिक अनुभव के लिए स्थानीय ऑटो-रिक्षा या मेट्रो का उपयोग करें।";
+      }
+    } else {
+      switch (tMode) {
+        case "self_drive_car": return "Enjoy the flexibility of driving your own car. Take scenic roadside stops and use official parking grounds.";
+        case "cab": return "Relax in your personal chauffeur-driven cab. Feel free to request pit stops for snacks and photo moments.";
+        case "train": return "Experience the traditional beauty of Indian Railways. Alight at the station and catch a prepaid station taxi.";
+        case "bus": return "Save heavily with eco-friendly regional bus connections. Core spots are walkable from the main bus stand.";
+        case "flight": return "Skip the fatigue with a fast flight, then hop on an airport shuttle or metro to arrive smoothly at your resort.";
+        default: return "Use local auto-rickshaws, shared cabs or local metro for a cost-effective and authentic experience.";
+      }
+    }
+  }
+
   // Custom headers in local languages
-  let title = `🌍 ${destName} Travel Itinerary`;
+  let title = `🌍 ${destName} Travel Itinerary (via ${transportType.replace(/_/g, ' ').toUpperCase()})`;
   let durationText = `⏱️ Duration: ${numDur} Days`;
   let budgetText = `💰 Budget Category: ${style.toUpperCase()} | Approx Cost: ₹${approxCost.toLocaleString("en-IN")} INR`;
   let dayPlanText = `🗓️ Day-by-Day Plan:`;
@@ -119,7 +150,8 @@ function getOfflineItinerary(location: string, startLocation: string, duration: 
   let localFoodTitle = `🍽️ Local food recommendation:`;
   
   if (isMarathi) {
-    title = `🌍 ${destName} प्रवासाची रूपरेषा (Travel Itinerary)`;
+    const showMode = transportType === "self_drive_car" ? "स्वतः कार चालवून" : (transportType === "cab" ? "कॅबने" : (transportType === "train" ? "रेल्वेने" : (transportType === "bus" ? "बसने" : "विमानाने")));
+    title = `🌍 ${destName} प्रवासाची रूपरेषा (${showMode} प्रवास)`;
     durationText = `⏱️ कालावधी: ${numDur} दिवस`;
     budgetText = `💰 बजेट श्रेणी: ${style.toLowerCase() === "budget" ? "बजेट (स्वस्त)" : (style.toLowerCase() === "luxury" ? "लक्झरी (आलिशान)" : "मध्यम (Moderate)")} | अंदाजे खर्च: ₹${approxCost.toLocaleString("en-IN")} INR`;
     dayPlanText = `🗓️ दिवसनिहाय प्रवास योजना (Day-by-Day Plan):`;
@@ -127,7 +159,8 @@ function getOfflineItinerary(location: string, startLocation: string, duration: 
     proTipsTitle = `💡 ${destName} साठी ट्रॅव्होलर प्रो-टिप्स (Pro-Tips):`;
     localFoodTitle = `🍽️ स्थानिक खाद्यपदार्थ शिफारसी (Local Food):`;
   } else if (isHindi) {
-    title = `🌍 ${destName} यात्रा कार्यक्रम (Travel Itinerary)`;
+    const showMode = transportType === "self_drive_car" ? "सेल्फ-ड्राइव कार" : (transportType === "cab" ? "कैब" : (transportType === "train" ? "ट्रेन" : (transportType === "bus" ? "बस" : "फ्लाइट")));
+    title = `🌍 ${destName} यात्रा कार्यक्रम (${showMode} द्वारा)`;
     durationText = `⏱️ अवधि: ${numDur} दिन`;
     budgetText = `💰 बजट श्रेणी: ${style.toLowerCase() === "budget" ? "बजट" : (style.toLowerCase() === "luxury" ? "लक्जरी" : "मध्यम")} | अनुमानित लागत: ₹${approxCost.toLocaleString("en-IN")} INR`;
     dayPlanText = `🗓️ दिन-प्रतिदिन की योजना (Day-by-Day Plan):`;
@@ -190,20 +223,18 @@ function getOfflineItinerary(location: string, startLocation: string, duration: 
     let mAct = act.m;
     let aAct = act.a;
     let eAct = act.e;
-    let tTip = act.t;
+    let tTip = getCustomTransportTip(transportType, isMarathi, isHindi);
     let dayLabel = `Day ${i}: Exploring ${destName}`;
 
     if (isMarathi) {
       mAct = act.m_mr;
       aAct = act.a_mr;
       eAct = act.e_mr;
-      tTip = act.t_mr;
       dayLabel = `दिवस ${i}: ${destName} ची सफर आणि रहस्ये`;
     } else if (isHindi) {
       mAct = act.m_hi;
       aAct = act.a_hi;
       eAct = act.e_hi;
-      tTip = act.t_hi;
       dayLabel = `दिन ${i}: ${destName} की यात्रा और आनंद`;
     }
 
@@ -867,13 +898,13 @@ async function startServer() {
 
   // Gemini API Routes
   app.post("/api/gemini/generate-itinerary", async (req, res) => {
-    const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch } = req.body;
+    const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch, transportType = "self_drive_car" } = req.body;
     
     // Proactive check to fall back cleanly if API key is not yet set
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
       console.warn("GEMINI_API_KEY missing or empty. Activating offline itinerary engine.");
-      const text = getOfflineItinerary(location, startLocation, duration, travelStyle, numPeople, language);
+      const text = getOfflineItinerary(location, startLocation, duration, travelStyle, numPeople, language, transportType);
       return res.json({
         text,
         sources: [],
@@ -892,7 +923,12 @@ User Request Details:
 - Duration: ${duration} Days
 - Travel Style / Budget Category: ${travelStyle} (e.g. Budget, Moderate, Luxury)
 - Number of Travelers: ${numPeople}
+- Mode of Transportation: ${transportType.replace(/_/g, ' ').toUpperCase()} (options: Self Drive Car, Cab, Train, Bus, Flight)
 - Language Preference: Please write the entire response and itinerary ONLY in the ${language} language. Write all headings, descriptions, tip titles, and day names in ${language}.
+
+IMPORTANT transport rules:
+1. Since the user is travelling via ${transportType.replace(/_/g, ' ').toUpperCase()}, tailor all activities, daily schedules, commutes, and routes to align perfectly with this exact transport mode.
+2. In the "Transport Tip" section for each day, write a custom paragraph tailored/specific to using ${transportType.replace(/_/g, ' ').toUpperCase()} (e.g. road-trip parking, driving scenery, train boarding at stations, taxi booking tips, flight arrivals, or regional bus dropoffs). Tell the user how to navigate using this chosen transport mode.
 
 Follow this exact structure for every response:
 
@@ -910,7 +946,7 @@ Afternoon: [Activity name and short description] - [Approx Cost]
 
 Evening: [Activity name and short description] - [Approx Cost]
 
-🚕 Transport Tip: [How to get around for the day]
+🚕 Transport Tip: [How to get around for the day using ${transportType.replace(/_/g, ' ').toUpperCase()}]
 
 (Repeat the above structure for all ${duration} days. Do not skip any day.)
 
@@ -970,7 +1006,7 @@ Rules:
       });
     } catch (error: any) {
       console.warn("Server error generating itinerary, falling back to local engine:", error.message || error);
-      const text = getOfflineItinerary(location, startLocation, duration, travelStyle, numPeople, language);
+      const text = getOfflineItinerary(location, startLocation, duration, travelStyle, numPeople, language, transportType);
       res.json({ 
         text,
         sources: [],

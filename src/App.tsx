@@ -781,11 +781,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [startCoords, setStartCoords] = useState<{lat: number, lng: number} | null>(null);
   const [endCoords, setEndCoords] = useState<{lat: number, lng: number} | null>(null);
   const [userTotalBudget, setUserTotalBudget] = useState<number>(50000);
-  const [transportType, setTransportType] = useState("public"); // public, private, flight
+  const [transportType, setTransportType] = useState("self_drive_car"); // self_drive_car, cab, train, bus, flight
   const [accommodationType, setAccommodationType] = useState("standard"); // hostel, standard, luxury
 
   const liveBudget = useMemo(() => {
-    const transportRates: Record<string, number> = { public: 500, private: 2000, flight: 5000 };
+    const transportRates: Record<string, number> = {
+      self_drive_car: 1800,
+      cab: 3000,
+      train: 600,
+      bus: 400,
+      flight: 6000
+    };
     const hotelRates: Record<string, number> = { hostel: 800, standard: 2500, luxury: 8000 };
     const foodRates: Record<string, number> = { budget: 500, standard: 1200, luxury: 3000 };
     const activityRates: Record<string, number> = { low: 300, medium: 1000, high: 2500 };
@@ -1587,6 +1593,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         duration,
         numPeople,
         travelStyle: styleToUse,
+        transportType: transportType,
         language: language,
         enableThinking: enableThinking,
         useSearch: useSearch
@@ -1914,6 +1921,58 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       />
                       <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                     </label>
+                  </div>
+                </div>
+
+                {/* Mode of Transportation Selector */}
+                <div className="col-span-1 md:col-span-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col text-left">
+                      <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">
+                        {language === "Marathi" ? "सहलीचा प्रवास कसा करणार? / TRIP MODE" : (language === "Hindi" ? "यात्रा कैसे करेंगे? / TRIP MODE" : "How will you travel? / Trip Mode")}
+                      </span>
+                      <span className="text-sm font-bold text-[#000080]" id="transport-selection-title">
+                        {language === "Marathi" ? "प्रवास माध्यम निवडा (यानुसार प्रवासाचे नियोजन बदलेल)" : (language === "Hindi" ? "परिवहन का चयन करें (इसके अनुसार यात्रा का नियोजन बदलेगा)" : "Select Transportation Mode (itinerary changes accordingly)")}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 mt-1">
+                      {[
+                        { id: "self_drive_car", icon: Car, color: "text-amber-500 bg-amber-50 dark:bg-amber-950/20" },
+                        { id: "cab", icon: Car, color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20" },
+                        { id: "train", icon: TrainFront, color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20" },
+                        { id: "bus", icon: Bus, color: "text-purple-500 bg-purple-50 dark:bg-purple-950/20" },
+                        { id: "flight", icon: Plane, color: "text-sky-500 bg-sky-50 dark:bg-sky-950/20" }
+                      ].map((opt) => {
+                        const Icon = opt.icon;
+                        const isSelected = transportType === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            id={`btn-transport-${opt.id}`}
+                            onClick={() => setTransportType(opt.id || "self_drive_car")}
+                            className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-center transition-all cursor-pointer group ${
+                              isSelected 
+                                ? "bg-[#000080] border-[#000080] text-white shadow-md transform scale-[1.03]" 
+                                : "bg-gray-50 border-gray-100 hover:bg-white hover:border-[#1E90FF] text-gray-600 dark:text-slate-300 dark:bg-slate-800 dark:border-slate-700"
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-1.5 transition-all group-hover:scale-110 ${
+                              isSelected ? "bg-white/20 text-white" : opt.color
+                            }`}>
+                              <Icon size={20} />
+                            </div>
+                            <span className="text-xs font-black tracking-tight block">
+                              {language === "Marathi" 
+                                ? (opt.id === "self_drive_car" ? "स्वतःची कार" : opt.id === "cab" ? "कॅब / टॅक्सी" : opt.id === "train" ? "रेल्वे / ट्रेन" : opt.id === "bus" ? "एसटी/बस" : "विमान प्रवास") 
+                                : (language === "Hindi" 
+                                  ? (opt.id === "self_drive_car" ? "स्वयं ड्राइव कार" : opt.id === "cab" ? "कैब / टैक्सी" : opt.id === "train" ? "ट्रेन सफर" : opt.id === "bus" ? "बस द्वारा" : "फ़्लाइट")
+                                  : (opt.id === "self_drive_car" ? "Self-Drive" : opt.id === "cab" ? "Cab / Taxi" : opt.id === "train" ? "Train" : opt.id === "bus" ? "Bus" : "Flight"))}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -2555,14 +2614,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <motion.div 
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
-              className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group overflow-hidden p-4"
+              className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-[0_12px_45px_rgba(10,31,68,0.15)] mx-auto relative group overflow-hidden p-0.5 border-2 border-[#000080]/10"
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
-              <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/25 to-transparent opacity-50" />
               <img 
-                src="/logo.png" 
+                src="/src/assets/images/travolor_logo_1781795996789.jpg" 
                 alt="Travolor Logo" 
-                className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
+                className="w-full h-full object-cover rounded-full relative z-10 group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
               />
             </motion.div>
@@ -3598,9 +3656,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             onClick={() => setActiveTab('explore')}
           >
             <img 
-              src="/logo.png" 
+              src="/src/assets/images/travolor_logo_1781795996789.jpg" 
               alt="Travolor Logo" 
-              className="h-10 w-auto object-contain"
+              className="h-11 w-11 rounded-full object-cover border border-white/20 shadow-sm"
               referrerPolicy="no-referrer"
             />
             <span className={cn(

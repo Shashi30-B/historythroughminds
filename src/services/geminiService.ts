@@ -15,6 +15,7 @@ export interface ItineraryRequest {
   duration: number;
   numPeople: number;
   travelStyle: string;
+  transportType?: string;
   language?: string;
   enableThinking?: boolean;
   useSearch?: boolean;
@@ -112,7 +113,7 @@ export async function generateItinerary(request: ItineraryRequest): Promise<Itin
   }
 
   // Fallback to client-side API
-  const { location, startLocation, duration, numPeople, travelStyle, language = "en" } = request;
+  const { location, startLocation, duration, numPeople, travelStyle, language = "en", transportType = "self_drive_car" } = request;
   
   try {
     const ai = getGenAI();
@@ -126,7 +127,12 @@ User Request Details:
 - Duration: ${duration} Days
 - Travel Style / Budget Category: ${travelStyle} (e.g. Budget, Moderate, Luxury)
 - Number of Travelers: ${numPeople}
+- Mode of Transportation: ${transportType.replace(/_/g, ' ').toUpperCase()} (options: Self Drive Car, Cab, Train, Bus, Flight)
 - Language Preference: Please write the entire response and itinerary ONLY in the ${language} language. Write all headings, descriptions, tip titles, and day names in ${language}.
+
+IMPORTANT transport rules:
+1. Since the user is travelling via ${transportType.replace(/_/g, ' ').toUpperCase()}, tailor all activities, daily schedules, commutes, and routes to align perfectly with this exact transport mode.
+2. In the "Transport Tip" section for each day, write a custom paragraph tailored/specific to using ${transportType.replace(/_/g, ' ').toUpperCase()} (e.g. road-trip parking, driving scenery, train boarding at stations, taxi booking tips, flight arrivals, or regional bus dropoffs). Tell the user how to navigate using this chosen transport mode.
 
 Follow this exact structure for every response:
 
@@ -144,7 +150,7 @@ Afternoon: [Activity name and short description] - [Approx Cost]
 
 Evening: [Activity name and short description] - [Approx Cost]
 
-🚕 Transport Tip: [How to get around for the day]
+🚕 Transport Tip: [How to get around for the day using ${transportType.replace(/_/g, ' ').toUpperCase()}]
 
 (Repeat the above structure for all ${duration} days. Do not skip any day.)
 
