@@ -898,7 +898,7 @@ async function startServer() {
 
   // Gemini API Routes
   app.post("/api/gemini/generate-itinerary", async (req, res) => {
-    const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch, transportType = "self_drive_car" } = req.body;
+    const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch, transportType = "self_drive_car", customInstructions } = req.body;
     
     // Proactive check to fall back cleanly if API key is not yet set
     const apiKey = process.env.GEMINI_API_KEY;
@@ -913,7 +913,7 @@ async function startServer() {
       });
     }
 
-    const prompt = `You are an expert AI Travel Planner for "Travolor". Your goal is to generate highly practical, exciting, and easy-to-read travel itineraries based on the user's input.
+    let prompt = `You are an expert AI Travel Planner for "Travolor". Your goal is to generate highly practical, exciting, and easy-to-read travel itineraries based on the user's input.
 
 Do not use JSON. Output the response in beautifully formatted Markdown (plain text) using headings, bullet points, and bold text.
 
@@ -964,6 +964,10 @@ Rules:
 3. Do NOT add ANY conversational filler or introduction/conclusion commentary before or after the itinerary. Start immediately with "🌍 [Destination Name] Travel Itinerary" and end exactly after the local food recommendation.
 4. Calculate approx costs in Indian Rupees (INR).`;
 
+    if (customInstructions && customInstructions.trim()) {
+      prompt += `\n\n- ADDITIONAL CUSTOM PREFERENCES / INSTRUCTIONS: ${customInstructions}\nIMPORTANT: Please customize and adapt the activities, locations, and timings in the generated plan to fulfill these user instructions perfectly!`;
+    }
+
     // Configure model selection based on thinking/grounding requested
     const useHighThinking = enableThinking === true || travelStyle === "luxury";
     const model = useHighThinking ? "gemini-3.1-pro-preview" : "gemini-3.5-flash";
@@ -1013,6 +1017,47 @@ Rules:
         modelUsed: "Travolor Local Engine (Offline Fallback - API Error)",
         grounded: false
       });
+    }
+  });
+
+  // AI-Powered Itinerary Refinement & Customization
+  app.post("/api/gemini/refine-itinerary", async (req, res) => {
+    const { originalItinerary, refinementPrompt, language = "English" } = req.body;
+    
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
+      console.warn("GEMINI_API_KEY missing. Performing local simulation of refinement.");
+      return res.json({
+        text: originalItinerary + `\n\n*(Swayam-Siddha Marathi edit simulation: "${refinementPrompt}")*`
+      });
+    }
+
+    try {
+      const prompt = `You are an expert itinerary editor. Your task is to update or customize an existing travel itinerary based on the user's refinement instructions.
+
+ORIGINAL ITINERARY:
+${originalItinerary}
+
+REFINEMENT INSTRUCTIONS:
+"${refinementPrompt}"
+
+LANGUAGE CONFIGURATION:
+- Return the ENTIRE updated itinerary in ${language} language.
+
+INSTRUCTIONS:
+1. Revise the itinerary carefully to incorporate the user's requested changes. Keep the core travel structure (Days, Morning, Afternoon, Evening, transport tips, etc.) but update the activities, budgets, or destinations as requested.
+2. Maintain the beautiful Markdown formatting.
+3. Return only the revised markdown itinerary without any introductory or concluding sentences. Start directly with the itinerary heading.`;
+
+      const response = await getGeminiClient().models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt
+      });
+
+      res.json({ text: response.text || originalItinerary });
+    } catch (error: any) {
+      console.error("Error in server-side refine-itinerary:", error);
+      res.json({ text: originalItinerary + `\n\n*(Error refining AI itinerary: ${error.message || error})*` });
     }
   });
 
