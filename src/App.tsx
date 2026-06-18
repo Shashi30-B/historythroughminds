@@ -2618,8 +2618,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
               <img 
-                src="/src/assets/images/travolor_logo_1781795996789.jpg" 
-                alt="Travolor Logo" 
+                src="/logo.png" 
+                alt="Travolor Logo"  
                 className="w-full h-full object-cover rounded-full relative z-10 group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
               />
@@ -3656,7 +3656,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             onClick={() => setActiveTab('explore')}
           >
             <img 
-              src="/src/assets/images/travolor_logo_1781795996789.jpg" 
+              src="/logo.png" 
               alt="Travolor Logo" 
               className="h-11 w-11 rounded-full object-cover border border-white/20 shadow-sm"
               referrerPolicy="no-referrer"
