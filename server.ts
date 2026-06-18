@@ -8,17 +8,27 @@ import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 dotenv.config();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = process.cwd();
 const db = new Database("travel_app.db");
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+let aiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
+    throw new Error("GEMINI_API_KEY is not defined. Please add Gemini API key in Settings > Secrets to enable this feature.");
   }
-});
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({
+      apiKey: apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+  }
+  return aiClient;
+}
 
 // Initialize DB
 db.exec(`
@@ -83,6 +93,190 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
+
+const offlineCities = [
+  "Mumbai", "Pune", "Kolhapur", "Mahabaleshwar", "Lonavala", "Nashik", "Alibaug", "Shirdi", "Chhatrapati Sambhajinagar (Aurangabad)", "Nagpur", "Ratnagiri", "Khandala", "Panchgani", "Satara", "Solapur", "Sangli", "Thane", "Navi Mumbai", "Kolkata", "Kochi", "Kedarnath", "Kashmir", "Kanyakumari", "Kerala", "Kodaikanal", "Karwar", "Kanpur", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Goa", "Jaipur", "Udaipur", "Manali", "Shimla", "Dharamshala", "Leh Ladakh", "Agra", "Varanasi", "Amritsar", "Rishikesh"
+];
+
+function getOfflineItinerary(location: string, startLocation: string, duration: number, travelStyle: string, numPeople: number, language: string = "en") {
+  const destName = location || "Uncharted Paradise";
+  const numDur = duration && !isNaN(Number(duration)) ? Number(duration) : 3;
+  const numP = numPeople && !isNaN(Number(numPeople)) ? Number(numPeople) : 1;
+  const style = travelStyle || "Moderate";
+  const approxCost = style.toLowerCase() === "luxury" ? (numDur * 8000 * numP) : (style.toLowerCase() === "budget" ? (numDur * 2000 * numP) : (numDur * 4000 * numP));
+  
+  // Choose language
+  const isMarathi = language === "Marathi" || language === "mr" || language === "mr-IN";
+  const isHindi = language === "Hindi" || language === "hi" || language === "hi-IN";
+
+  // Custom headers in local languages
+  let title = `🌍 ${destName} Travel Itinerary`;
+  let durationText = `⏱️ Duration: ${numDur} Days`;
+  let budgetText = `💰 Budget Category: ${style.toUpperCase()} | Approx Cost: ₹${approxCost.toLocaleString("en-IN")} INR`;
+  let dayPlanText = `🗓️ Day-by-Day Plan:`;
+  let transportTipTitle = `🚕 Transport Tip:`;
+  let proTipsTitle = `💡 Travolor Pro-Tips for ${destName}:`;
+  let localFoodTitle = `🍽️ Local food recommendation:`;
+  
+  if (isMarathi) {
+    title = `🌍 ${destName} प्रवासाची रूपरेषा (Travel Itinerary)`;
+    durationText = `⏱️ कालावधी: ${numDur} दिवस`;
+    budgetText = `💰 बजेट श्रेणी: ${style.toLowerCase() === "budget" ? "बजेट (स्वस्त)" : (style.toLowerCase() === "luxury" ? "लक्झरी (आलिशान)" : "मध्यम (Moderate)")} | अंदाजे खर्च: ₹${approxCost.toLocaleString("en-IN")} INR`;
+    dayPlanText = `🗓️ दिवसनिहाय प्रवास योजना (Day-by-Day Plan):`;
+    transportTipTitle = `🚕 वाहतूक सल्ला (Transport Tip):`;
+    proTipsTitle = `💡 ${destName} साठी ट्रॅव्होलर प्रो-टिप्स (Pro-Tips):`;
+    localFoodTitle = `🍽️ स्थानिक खाद्यपदार्थ शिफारसी (Local Food):`;
+  } else if (isHindi) {
+    title = `🌍 ${destName} यात्रा कार्यक्रम (Travel Itinerary)`;
+    durationText = `⏱️ अवधि: ${numDur} दिन`;
+    budgetText = `💰 बजट श्रेणी: ${style.toLowerCase() === "budget" ? "बजट" : (style.toLowerCase() === "luxury" ? "लक्जरी" : "मध्यम")} | अनुमानित लागत: ₹${approxCost.toLocaleString("en-IN")} INR`;
+    dayPlanText = `🗓️ दिन-प्रतिदिन की योजना (Day-by-Day Plan):`;
+    transportTipTitle = `🚕 परिवहन टिप (Transport Tip):`;
+    proTipsTitle = `💡 ${destName} के लिए ट्रैवलर प्रो-टिप्स (Pro-Tips):`;
+    localFoodTitle = `🍽️ स्थानीय भोजन सिफारिशें (Local Food):`;
+  }
+
+  let markdown = `${title}\n${durationText}\n${budgetText}\n\n${dayPlanText}\n\n`;
+
+  const genericActivities = [
+    {
+      m: "Morning visit to the iconic main square, local landmark exploration, and fresh local breakfast.",
+      a: "Afternoon museum tour, heritage cultural center, and trying out famous local tea or snacks.",
+      e: "Evening sunset view at a scenic point, lake ride or walking street tour, followed by a fine dinner.",
+      t: "Use local auto-rickshaws, shared cabs or local metro for a cost-effective and authentic experience.",
+      m_mr: "घोटाळा किंवा स्थानिक नाश्त्यासह मुख्य चौक आणि ऐतिहासिक वास्तूंची सफर.",
+      a_mr: "दुपारी प्रसिद्ध म्युझियम, सांस्कृतिक केंद्र भेट आणि तिथला चहा व स्थानिक अल्पोपहार.",
+      e_mr: "संध्याकाळी सूर्यास्त पॉईंट, तलाव सफर आणि चवदार रात्रीचे जेवण.",
+      t_mr: "अधिक चांगल्या अनुभवासाठी आणि पैशांच्या बचतीसाठी लोकल ऑटो-रिक्षा किंवा मेट्रो वापरा.",
+      m_hi: "स्थानिक नाश्ते के साथ मुख्य चौक और ऐतिहासिक पर्यटन स्थलों का दौरा।",
+      a_hi: "दोपहर में प्रसिद्ध संग्रहालय, सांस्कृतिक केंद्र और वहाँ की प्रसिद्ध चाय व स्नैक्स।",
+      e_hi: "शाम को सूर्यास्त बिंदु, झील की सवारी और स्वादिष्ट रात्रिभोज।",
+      t_hi: "सस्ते और प्रामाणिक अनुभव के लिए स्थानीय ऑटो-रिक्षा या मेट्रो का उपयोग करें।"
+    },
+    {
+      m: "Morning hike, nature trail walk, or visiting a pristine garden/national park with beautiful viewpoints.",
+      a: "Afternoon shopping spree at the cultural handicraft market and a traditional thali lunch.",
+      e: "Relaxing spa session or leisure walk by the promenade/riverfront, enjoying local live music.",
+      t: "Renting a scooter or booking a reliable local cab for the day makes commuting extremely flexible.",
+      m_mr: "सकाळी निसर्गरम्य ट्रेक, जंगलातील पायवाट किंवा सुबक पायऱ्यांच्या बागेला भेट.",
+      a_mr: "दुपारी हस्तकला बाजारात खरेदी आणि पारंपारिक थाळी जेवणाचा आस्वाद.",
+      e_mr: "संध्याकाळी नदीकाठचा रस्ता किंवा समुद्रकिनाऱ्यावर फेरफटका आणि फिरती गाणी.",
+      t_mr: "स्कूटर भाड्याने घेणे किंवा खाजगी टॅक्सी करणे प्रवासासाठी सोयीस्कर ठरेल.",
+      m_hi: "सुबह की चढ़ाई, प्रकृति की पगडंडी, या सुंदर उद्यानों/राष्ट्रीय उद्यानों का दौरा।",
+      a_hi: "दोपहर में सांस्कृतिक हस्तशिल्प बाजार में खरीदारी और पारंपरिक थाली का भोजन।",
+      e_hi: "नदी के किनारे या समुद्र तट पर शाम की सैर और स्थानीय संगीत का आनंद।",
+      t_hi: "दिन के लिए स्कूटर किराए पर लेना या स्थानीय टैक्सी बुक करना अत्यधिक लचीला होगा।"
+    },
+    {
+      m: "Early morning spiritual temple, church, or monastery visit for peaceful meditation and scenic views.",
+      a: "Visiting adventure theme park, recreational lake sports, or local art gallery exhibitions.",
+      e: "Niche street food crawling, visiting rooftop cafes with a panoramic skyline and souvenirs shopping.",
+      t: "Walking around the central market is best; use local cycle rickshaws for short distances.",
+      m_mr: "सकाळी ध्यानधारणा आणि शांततेसाठी धार्मिक स्थळ, मंदिर, चर्च किंवा मठाला भेट.",
+      a_mr: "दुपारी स्थानिक मनोरंजन पार्क, साहसी खेळ किंवा कलादालनाचे प्रदर्शन.",
+      e_mr: "संध्याकाळी प्रसिद्ध स्ट्रीट फूड खाणे, रुफटॉप कॅफे मधून शहराचे विहंगम दृश्य पाहणे आणि खरेदी.",
+      t_mr: "मध्यवर्ती बाजारात पायी फिरणे उत्तम; कमी अंतरासाठी सायकल रिक्षा वापरा.",
+      m_hi: "ध्यान और शांति के लिए सुबह-सुबह किसी मंदिर, चर्च या मठ का दौरा।",
+      a_hi: "दोपहर में स्थानीय मनोरंजन पार्क, साहसिक खेल या कला दीर्घा की प्रदर्शनी।",
+      e_hi: "शाम को प्रसिद्ध स्ट्रीट फूड का आनंद लेना, शानदार रूफटॉप कैफे जाना और खरीदारी।",
+      t_hi: "केंद्रीय बाजार के चारों ओर पैदल घूमना सबसे अच्छा है; छोटी दूरी के लिए साइकिल रिक्षा का उपयोग करें।"
+    }
+  ];
+
+  for (let i = 1; i <= numDur; i++) {
+    const actIdx = (i - 1) % genericActivities.length;
+    const act = genericActivities[actIdx];
+    
+    let mAct = act.m;
+    let aAct = act.a;
+    let eAct = act.e;
+    let tTip = act.t;
+    let dayLabel = `Day ${i}: Exploring ${destName}`;
+
+    if (isMarathi) {
+      mAct = act.m_mr;
+      aAct = act.a_mr;
+      eAct = act.e_mr;
+      tTip = act.t_mr;
+      dayLabel = `दिवस ${i}: ${destName} ची सफर आणि रहस्ये`;
+    } else if (isHindi) {
+      mAct = act.m_hi;
+      aAct = act.a_hi;
+      eAct = act.e_hi;
+      tTip = act.t_hi;
+      dayLabel = `दिन ${i}: ${destName} की यात्रा और आनंद`;
+    }
+
+    markdown += `### ${dayLabel}\n\n`;
+    markdown += `🌅 **Morning:** ${mAct} - Approx ₹${style.toLowerCase() === "budget" ? 150 : (style.toLowerCase() === "luxury" ? 800 : 400)}\n\n`;
+    markdown += `☀️ **Afternoon:** ${aAct} - Approx ₹${style.toLowerCase() === "budget" ? 250 : (style.toLowerCase() === "luxury" ? 1500 : 700)}\n\n`;
+    markdown += `🌆 **Evening:** ${eAct} - Approx ₹${style.toLowerCase() === "budget" ? 200 : (style.toLowerCase() === "luxury" ? 2000 : 800)}\n\n`;
+    markdown += `🚕 **${transportTipTitle}** ${tTip}\n\n---\n\n`;
+  }
+
+  let tip1 = "Book attractions in advance online to secure your preferred slots and avoid long waiting lines.";
+  let tip2 = "Keep sufficient local currency cash in hand, as small local vendors, auto drivers, and street markets might not accept digital UPI payment.";
+  let foodRec = "Don't miss the local specialities, delicious street savory chats, artisanal sweets, and refreshing regional beverages.";
+
+  if (isMarathi) {
+    tip1 = "प्रवेश तिकिटे ऑनलाईन आधीच बुक करा, जेणेकरून वेळ वाचेल आणि गर्दीपासून सुटका होईल.";
+    tip2 = "तुमच्यासोबत पुरेशी रोकड पैसे बाळगा, कारण लहान स्ट्रीट वेंडर किंवा रिक्षाचालक डिजिटल पेमेंट स्वीकारत नाहीत.";
+    foodRec = "इथल्या प्रसिद्ध ताजेतवाने पेय, गरमागरम स्ट्रीट फूड आणि पारंपारिक गोड पदार्थांची चव घ्यायला विसरू नका.";
+  } else if (isHindi) {
+    tip1 = "प्रवेश टिकट ऑनलाइन पहले से बुक करें ताकि समय बचे और लंबी कतारों से बचा जा सके।";
+    tip2 = "अपने पास पर्याप्त नकद रखें क्योंकि छोटे स्थानीय वेंडर या रिक्षा चालक डिजिटल यूपीआई भुगतान स्वीकार नहीं कर सकते।";
+    foodRec = "यहाँ के स्थानीय प्रसिद्ध व्यंजनों, स्वादिष्ट चाट और मीठे पकवानों का स्वाद लेना न भूलें।";
+  }
+
+  markdown += `${proTipsTitle}\n\n`;
+  markdown += `📌 **Tip 1:** ${tip1}\n\n`;
+  markdown += `📌 **Tip 2:** ${tip2}\n\n`;
+  markdown += `${localFoodTitle} ${foodRec}\n`;
+
+  return markdown;
+}
+
+function getOfflineChatResponse(query: string, language: string = "English", botRole: string = "copilot"): string {
+  const q = query.toLowerCase();
+  const isMarathi = language === "Marathi" || language === "mr" || language === "mr-IN";
+  const isHindi = language === "Hindi" || language === "hi" || language === "hi-IN";
+  
+  if (isMarathi) {
+    if (q.includes("जेवण") || q.includes("हॉटेल") || q.includes("खाद्य") || q.includes("खा") || q.includes("food") || q.includes("eat") || q.includes("restaurant")) {
+      return "मला खाद्यपदार्थांबद्दल सांगायला नक्कीच आवडेल! तुम्ही जर महाराष्ट्रात असाल, तर तिथली गरमागरम झणझणीत मिसळ पाव, साबुदाणा वडा आणि कोल्हापुरी तांबडा-पांढरा रस्सा चुकवू नका. गोड खाण्यासाठी पुरणपोळी उत्कृष्ट पर्याय आहे. तुम्हाला कोणत्या विशिष्ट ठिकाणाचे खाद्यपदार्थ शोधायचे आहेत का?";
+    }
+    if (q.includes("बजेट") || q.includes("पैसे") || q.includes("स्वस्त") || q.includes("budget") || q.includes("cheap") || q.includes("save")) {
+      return "सर्वोत्तम बजेट प्रवासी सल्ला:\n1. स्थानिक सार्वजनिक बस किंवा मेट्रोचा वापर करा.\n2. महागड्या हॉटेल ऐवजी होमस्टे किंवा हॉस्टेलमध्ये राहा.\n3. स्थानिक लोकांकडून गल्लीबोळातील स्वस्त पण अतिशय चवदार भोजनालयांची माहिती घ्या.";
+    }
+    if (q.includes("इतिहास") || q.includes("किल्ला") || q.includes("fort") || q.includes("history") || q.includes("old") || q.includes("ancient")) {
+      return "इतिहास आणि वारसा हा आपल्या प्रवासाचा गाभा आहे! जर तुम्ही महाराष्ट्रात असाल, तर छत्रपती शिवाजी महाराजांचे शौर्य दाखवणारे गड-किल्ले जसे की रायगड, प्रतापगड, सिंधुदुर्ग नक्की पहा. या किल्ल्यांभोवतीचा इतिहास थरारक आहे.";
+    }
+    return "नमस्कार! ट्रॅव्होलर प्रवासाचे तुमचे सह-प्रवासी सहचर (Co-pilot) म्हणून मी हजर आहे. मला सांगा, तुम्हाला प्रवासाचे नियोजन, बजेट हॉटेल्स, स्थानिक प्रेक्षणीय ठिकाणे किंवा स्वादिष्ट भोजनाची शिफारस हवी आहे का?";
+  } else if (isHindi) {
+    if (q.includes("भोजन") || q.includes("खाना") || q.includes("होटल") || q.includes("food") || q.includes("eat") || q.includes("restaurant")) {
+      return "मुझे भोजन की सलाह देना बहुत पसंद है! आप जहाँ भी जा रहे हैं, वहाँ का प्रसिद्ध स्थानीय स्ट्रीट फूड, चाट और पारंपरिक प्रादेशिक थाली ज़रूर चखें। क्या आप किसी विशिष्ट व्यंजन या शहर के बारे में जानना चाहते हैं?";
+    }
+    if (q.includes("बजट") || q.includes("पैसे") || q.includes("सस्ता") || q.includes("budget") || q.includes("cheap") || q.includes("save")) {
+      return "बजट यात्रा के मूल मंत्र:\n1. ऑटो या प्राइवेट टैक्सी के बजाय स्थानीय बसों और मेट्रो का उपयोग करें।\n2. स्थानीय स्ट्रीट फूड चौपाटी और ढाबों पर भोजन करें जो स्वादिष्ट और किफायती होते हैं।\n3. पहले से बुकिंग करके विशेष छूट प्राप्त करें।";
+    }
+    if (q.includes("इतिहास") || q.includes("किला") || q.includes("history") || q.includes("fort") || q.includes("ancient")) {
+      return "ऐतिहासिक स्थलों की यात्रा का अपना ही मज़ा है! भारत में लाल किला, जयपुर के हवेलियां, और अजंता-एलोरा की गुफाएं अद्भुत सांस्कृतिक विरासत पेश करती हैं। क्या आप किसी महल या किले के इतिहास के बारे में जानना चाहते हैं?";
+    }
+    return "नमस्कार! ट्रैवलर को-पायलट में आपका स्वागत है। मैं आपकी यात्रा को आसान, किफायती और यादगार बनाने में मदद करूँगा। आप कहाँ की यात्रा की योजना बना रहे हैं?";
+  } else {
+    // English
+    if (q.includes("food") || q.includes("eat") || q.includes("restaurant") || q.includes("culinary") || q.includes("dish")) {
+      return "Culinary exploration is one of the best parts of travel! I highly recommend trying out local street food stalls, old heritage restaurants, and seasonal regional specialities. Let me know which city you're querying, and I'll find the absolute best options for you!";
+    }
+    if (q.includes("budget") || q.includes("cheap") || q.includes("cost") || q.includes("money") || q.includes("save")) {
+      return "Traveling on a budget is extremely rewarding! Here are three golden rules:\n1. Prefer public transit (rail/buses) or renting shared scooters rather than private luxury cabs.\n2. Opt for well-reviewed homestays or boutique hostels instead of major chain hotels.\n3. Eat where the locals eat! Neighborhood street food complexes are clean, cheap, and unmatched in flavor.";
+    }
+    if (q.includes("history") || q.includes("fort") || q.includes("ancient") || q.includes("monument") || q.includes("museum")) {
+      return "Every destination has a voice from the past! Exploring rich historical forts, ancient temples, or centuries-old monuments provides deep context. Let me know if you are planning to visit historic hubs like Jaipur, Rome, or Agra, and I can reveal their legendary tales!";
+    }
+    return "Hello! I'm Travolor Co-pilot, your personal AI travel assistant. Ask me anything about planning itineraries, local restaurant guides, budgeting hacks, or must-visit historical monuments!";
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -675,9 +869,17 @@ async function startServer() {
   app.post("/api/gemini/generate-itinerary", async (req, res) => {
     const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch } = req.body;
     
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY missing on server");
-      return res.status(500).json({ error: "GEMINI_API_KEY is not defined on the server." });
+    // Proactive check to fall back cleanly if API key is not yet set
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
+      console.warn("GEMINI_API_KEY missing or empty. Activating offline itinerary engine.");
+      const text = getOfflineItinerary(location, startLocation, duration, travelStyle, numPeople, language);
+      return res.json({
+        text,
+        sources: [],
+        modelUsed: "Travolor Local Engine (Offline Fallback - Key Unset)",
+        grounded: false
+      });
     }
 
     const prompt = `You are an expert AI Travel Planner for "Travolor". Your goal is to generate highly practical, exciting, and easy-to-read travel itineraries based on the user's input.
@@ -745,7 +947,7 @@ Rules:
     }
 
     try {
-      const response = await ai.models.generateContent({
+      const response = await getGeminiClient().models.generateContent({
         model: model,
         contents: prompt,
         config: config
@@ -767,8 +969,14 @@ Rules:
         grounded: sources.length > 0
       });
     } catch (error: any) {
-      console.error("Server error generating itinerary:", error);
-      res.status(500).json({ error: error.message || "Failed to generate itinerary" });
+      console.warn("Server error generating itinerary, falling back to local engine:", error.message || error);
+      const text = getOfflineItinerary(location, startLocation, duration, travelStyle, numPeople, language);
+      res.json({ 
+        text,
+        sources: [],
+        modelUsed: "Travolor Local Engine (Offline Fallback - API Error)",
+        grounded: false
+      });
     }
   });
 
@@ -776,13 +984,24 @@ Rules:
   app.post("/api/gemini/chat", async (req, res) => {
     const { messages, userLocation, mode = "general", botRole = "copilot", language = "English" } = req.body;
 
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY missing on server");
-      return res.status(500).json({ error: "GEMINI_API_KEY is not defined on the server." });
-    }
-
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "messages array is required." });
+    }
+
+    const lastUserMessage = messages[messages.length - 1]?.text || "";
+    const lowerMessage = lastUserMessage.toLowerCase();
+
+    // Check if key is available, if not, jump to offline fallback immediately
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
+      console.warn("GEMINI_API_KEY missing or empty. Activating offline chatbot response engine.");
+      const text = getOfflineChatResponse(lastUserMessage, language, botRole);
+      return res.json({
+        text,
+        sources: [],
+        modelUsed: "Travolor Chat Engine (Offline Fallback - Key Unset)",
+        grounded: false
+      });
     }
 
     // Determine model based on complexity mode requested
@@ -809,9 +1028,6 @@ Rules:
     systemInstruction += ` CRITICAL: You must answer and write your responses ONLY in the ${language} language. Write all suggestions, travel advice, headings, and friendly comments in ${language}.`;
 
     // Configure tools: dynamic detection or explicit request
-    const lastUserMessage = messages[messages.length - 1]?.text || "";
-    const lowerMessage = lastUserMessage.toLowerCase();
-    
     const tools: any[] = [];
     const config: any = {
       systemInstruction
@@ -861,7 +1077,7 @@ Rules:
       }));
 
       // Initialize stateless multi-turn chat using config
-      const chat = ai.chats.create({
+      const chat = getGeminiClient().chats.create({
         model: selectedModel,
         history: history,
         config: config
@@ -898,17 +1114,30 @@ Rules:
         grounded: sources.length > 0
       });
     } catch (error: any) {
-      console.error("Chatbot generation error:", error);
-      res.status(500).json({ error: error.message || "Failed to communicate with Travolor Assistant" });
+      console.warn("Chatbot generation error, falling back to local chat engine:", error.message || error);
+      const text = getOfflineChatResponse(lastUserMessage, language, botRole);
+      res.json({
+        text,
+        sources: [],
+        modelUsed: "Travolor Chat Engine (Offline Fallback - API Error)",
+        grounded: false
+      });
     }
   });
 
   app.post("/api/gemini/get-suggestions", async (req, res) => {
     const { letter } = req.body;
+    const cleanLetter = (letter || "").trim().toLowerCase();
     
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY missing on server");
-      return res.status(500).json({ error: "GEMINI_API_KEY is not defined on the server." });
+    // Proactive check to fall back clean if API key is not set
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
+      console.warn("GEMINI_API_KEY missing or empty. Activating offline suggestions engine.");
+      const matches = offlineCities.filter(c => c.toLowerCase().startsWith(cleanLetter));
+      const backupList = matches.length > 0 ? matches : offlineCities.slice(0, 8);
+      return res.json({ 
+        text: `Suggested Destinations starting with ${letter || 'A'}: ` + backupList.slice(0, 8).join(', ') 
+      });
     }
 
     const prompt = `You are a premium Travel Planner AI autocomplete engine.
@@ -918,14 +1147,18 @@ Format: "Suggested Destinations starting with ${letter}: City1, City2, City3, ..
 Keep it professional and high-end.`;
 
     try {
-      const response = await ai.models.generateContent({
+      const response = await getGeminiClient().models.generateContent({
         model: "gemini-3.5-flash",
         contents: prompt,
       });
       res.json({ text: response.text || "" });
     } catch (error: any) {
-      console.error("Server error getting suggestions:", error);
-      res.status(500).json({ error: error.message || "Failed to get suggestions" });
+      console.warn("Server error getting suggestions, falling back to offline suggestions list:", error.message || error);
+      const matches = offlineCities.filter(c => c.toLowerCase().startsWith(cleanLetter));
+      const backupList = matches.length > 0 ? matches : offlineCities.slice(0, 8);
+      res.json({ 
+        text: `Suggested Destinations starting with ${letter || 'A'}: ` + backupList.slice(0, 8).join(', ') 
+      });
     }
   });
 
