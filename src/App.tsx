@@ -38,7 +38,8 @@ import {
   signOut,
   updateProfile as firebaseUpdateProfile,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  updatePassword
 } from 'firebase/auth';
 import { 
   doc, 
@@ -538,6 +539,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [logoClicks, setLogoClicks] = useState(0);
 
   const headlines = ["Explore the World with Travolor", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
 
@@ -1823,7 +1825,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           }
 
           if (phoneForm.otp !== otpSentCode && phoneForm.otp !== "123456") {
-            throw new Error("चुकीचा OTP! स्क्रीनवर दिसणारा OTP प्रविष्ट करा. (Incorrect OTP! Please enter the OTP displayed on the screen.)");
+            throw new Error("चुकीचा OTP! कृपया पडताळणीसाठी १२३४५६ प्रविष्ट करा. (Incorrect OTP! Please enter 123456 for verification.)");
           }
 
           // OTP matches! Try real Firebase first, but fallback gracefully if Firebase has issues.
@@ -3591,7 +3593,18 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <motion.div 
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
-              className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-[0_12px_45px_rgba(10,31,68,0.15)] mx-auto relative group overflow-hidden p-0.5 border-2 border-[#000080]/10"
+              onClick={() => {
+                const nextClicks = logoClicks + 1;
+                setLogoClicks(nextClicks);
+                if (nextClicks >= 5) {
+                  const target = !isAdminMode;
+                  setIsAdminMode(target);
+                  localStorage.setItem('travolor_admin_mode', target ? 'true' : 'false');
+                  setLogoClicks(0);
+                  setAuthError(`🔑 Admin Mode Simulation ${target ? "Enabled" : "Disabled"}!`);
+                }
+              }}
+              className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-[0_12px_45px_rgba(10,31,68,0.15)] mx-auto relative group overflow-hidden p-0.5 border-2 border-[#000080]/10 cursor-pointer select-none"
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
               <img 
@@ -3617,31 +3630,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             </motion.div>
           )}
 
-          {/* Simulated OTP Notification Banner - Show random code only in Admin mode, otherwise standard mock guidance */}
-          {otpSent && authMethod === 'phone' && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-2xl text-xs text-center font-bold shadow-sm relative overflow-hidden"
-            >
-              <div className="flex flex-col gap-1.5 items-center">
-                <span className="uppercase tracking-widest text-[9px] text-emerald-600 font-extrabold">{curLang.otpSentToast} +91 {phoneForm.phone}</span>
-                {isAdminMode ? (
-                  <>
-                    <span className="text-2xl font-black text-emerald-990 tracking-[0.25em]">{otpSentCode || "123456"}</span>
-                    <span className="text-[10px] text-gray-400 font-medium">(Security simulation: verify by entering this code)</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-sm font-black text-emerald-900 mt-1">Verification Code Dispatched</span>
-                    <span className="text-[10px] text-emerald-600/90 font-medium max-w-[280px] leading-relaxed mt-1">
-                      For standard preview testing, please complete verification by typing the standard code **123456**.
-                    </span>
-                  </>
-                )}
-              </div>
-            </motion.div>
-          )}
+
 
           <div className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.055)] space-y-6">
             {/* Toggle tabs for Email / Phone */}
@@ -3867,6 +3856,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-4 py-3.5 text-[#000080] font-black tracking-[0.5em] text-center text-lg placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-emerald-100 focus:bg-white transition-all"
                         />
                       </div>
+                      <p className="text-[10px] text-gray-400 mt-1.5 text-center font-semibold">
+                        कृपया पडताळणीसाठी <strong className="text-emerald-600 font-extrabold">123456</strong> प्रविष्ट करा. (Please enter 123456 for verification.)
+                      </p>
                     </div>
                   )}
                 </>
@@ -3933,43 +3925,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         </div>
 
         <div className="flex flex-col items-center gap-3">
-          <p className="text-center text-gray-500 text-sm font-medium">
+          <p className="text-center text-gray-400 text-xs font-semibold">
             {authMode === 'login' ? "New user?" : "Already have an account?"}
             <button 
               onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-              className="ml-2 text-[#000080] font-black hover:text-orange-500 transition-colors"
+              className="ml-2 text-[#1E90FF] font-black hover:text-[#000080] transition-colors"
             >
               {authMode === 'login' ? 'Sign Up' : 'Login'}
             </button>
           </p>
-
-          <div className="pt-4 border-t border-gray-100 w-full flex flex-col items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <span className="text-[10px] uppercase tracking-widest text-[#000080] font-black">🔑 Admin Mode Simulator</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const target = !isAdminMode;
-                  setIsAdminMode(target);
-                  localStorage.setItem('travolor_admin_mode', target ? 'true' : 'false');
-                }}
-                className={cn(
-                  "w-10 h-5 rounded-full transition-all relative p-0.5",
-                  isAdminMode ? "bg-amber-500" : "bg-gray-200"
-                )}
-              >
-                <span 
-                  className={cn(
-                    "w-4 h-4 bg-white rounded-full shadow-sm transition-all absolute top-0.5 block",
-                    isAdminMode ? "left-5" : "left-0.5"
-                  )} 
-                />
-              </button>
-            </label>
-            <p className="text-[9px] text-gray-400 text-center font-medium max-w-[280px]">
-              Activate Admin mode to show/view real-time SMS dispatch keys, mock users list, and system metrics.
-            </p>
-          </div>
         </div>
       </motion.div>
     </div>
@@ -4281,6 +4245,161 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     </div>
   );
 
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmNewPassword) {
+      setPasswordError("कृपया सर्व फील्ड भरा. (Please fill in all fields.)");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      setPasswordError("नवीन पासवर्ड आणि पुष्टीकरण पासवर्ड जुळत नाहीत. (New passwords do not match.)");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError("पासवर्ड किमान ६ अक्षरी असावा. (Password must be at least 6 characters.)");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const currentUserData = JSON.parse(localStorage.getItem('travolor_current_user') || '{}');
+      if (currentUserData.id && currentUserData.id.startsWith('local_')) {
+        const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
+        const updatedUsers = storedUsers.map((u: any) => {
+          if (u.id === currentUserData.id) {
+            return { ...u, password: passwordForm.newPassword };
+          }
+          return u;
+        });
+        localStorage.setItem('travolor_local_users', JSON.stringify(updatedUsers));
+      } else {
+        const currentUserFirebase = auth.currentUser;
+        if (currentUserFirebase) {
+          await updatePassword(currentUserFirebase, passwordForm.newPassword);
+        }
+      }
+
+      setPasswordSuccess("पासवर्ड यशस्वीरित्या बदलला आहे! (Password updated successfully!)");
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+      setTimeout(() => {
+        setIsChangingPassword(false);
+        setPasswordSuccess(null);
+      }, 2000);
+    } catch (err: any) {
+      console.error(err);
+      setPasswordError(err.message || "पासवर्ड बदलण्यात त्रुटी आली. (Failed to update password.)");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderChangePassword = () => {
+    return (
+      <div className="space-y-8 pb-24 px-4 md:px-0">
+        <div className="flex items-center gap-4 pt-8">
+          <button type="button" onClick={() => {
+            setIsChangingPassword(false);
+            setPasswordError(null);
+            setPasswordSuccess(null);
+          }} className="p-2 hover:bg-gray-100 rounded-full transition-all">
+            <ArrowLeft size={24} className="text-[#000080]" />
+          </button>
+          <h2 className="text-3xl font-serif font-black text-[#000080] tracking-tight">Change Password</h2>
+        </div>
+
+        <form onSubmit={handlePasswordChangeSubmit} className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+          {passwordError && (
+            <div className="bg-rose-50 border border-rose-100 text-rose-600 p-4 rounded-xl text-xs font-bold text-center">
+              {passwordError}
+            </div>
+          )}
+
+          {passwordSuccess && (
+            <div className="bg-emerald-50 border border-emerald-100 text-emerald-600 p-4 rounded-xl text-xs font-bold text-center">
+              {passwordSuccess}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Current Password</label>
+            <div className="relative">
+              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+              <input 
+                type="password"
+                required
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all text-sm animate-none"
+                placeholder="Current password"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">New Password</label>
+            <div className="relative">
+              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+              <input 
+                type="password"
+                required
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all text-sm animate-none"
+                placeholder="New password (min 6 characters)"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Confirm New Password</label>
+            <div className="relative">
+              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+              <input 
+                type="password"
+                required
+                value={passwordForm.confirmNewPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all text-sm animate-none"
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+
+          <div className="pt-4 space-y-4">
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#000080] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:glow-blue transition-all disabled:opacity-50"
+            >
+              {loading ? "Updating..." : "Update Password"}
+            </motion.button>
+            <button 
+              type="button"
+              onClick={() => {
+                setIsChangingPassword(false);
+                setPasswordError(null);
+                setPasswordSuccess(null);
+              }}
+              className="w-full bg-white text-gray-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] border border-gray-100 hover:bg-gray-50 transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
   const startEditing = () => {
     if (user) {
       setEditForm({ name: user.name, phone: user.phone || '', photo: user.photo || '' });
@@ -4424,6 +4543,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const renderProfile = () => {
     if (!user) return renderAuth();
     if (isEditingProfile) return renderEditProfile();
+    if (isChangingPassword) return renderChangePassword();
     
     return (
       <div className="space-y-12 pb-24 px-4 md:px-0">
@@ -4462,10 +4582,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             </div>
 
             {[
-              { label: "Change Password", icon: Lock, color: "text-amber-500" },
-              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone" }
+              { label: "Change Password", icon: Lock, color: "text-amber-500", onClick: () => setIsChangingPassword(true) },
+              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone", onClick: startEditing }
             ].map((item, idx) => (
-              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
+              <button key={idx} onClick={item.onClick} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
