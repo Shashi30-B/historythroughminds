@@ -19,7 +19,7 @@ import {
   Plane, TrainFront, Bus, Car, Package,
   GripVertical, MapPin as MapPinIcon, Navigation2, Zap,
   MessageSquare, Send, Bot, Cpu, X,
-  Mic, MicOff, Volume2, VolumeX
+  Mic, MicOff, Volume2, VolumeX, CloudRain
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
@@ -549,6 +549,74 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [numPeople, setNumPeople] = useState(2);
   const [travelStyle, setTravelStyle] = useState("standard");
   const [customInstructions, setCustomInstructions] = useState("");
+  const [cravingFilter, setCravingFilter] = useState("");
+  const [travelMood, setTravelMood] = useState("standard");
+  const [unlockHiddenGems, setUnlockHiddenGems] = useState(false);
+  const [actualExpenses, setActualExpenses] = useState<Array<{ id: string; desc: string; amount: number; day: number }>>(() => {
+    try {
+      const stored = localStorage.getItem('travolor_actual_expenses');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [weatherPackingChecklist, setWeatherPackingChecklist] = useState<Array<{ item: string; checked: boolean }>>([
+    { item: "Power Bank & Charging Cables", checked: false },
+    { item: "Water Bottle (Stay Hydrated)", checked: false },
+    { item: "Comfortable Walking Shoes", checked: false },
+    { item: "Aadhaar Card / Driving ID Card", checked: false },
+    { item: "First Aid Kit & Aspirins", checked: false }
+  ]);
+  const [weatherForecast, setWeatherForecast] = useState<string>("Pleasant & Sunny, 22°C - 28°C");
+
+  const generateWeatherAndPacking = (dest: string) => {
+    const cleanDest = dest.trim().toLowerCase();
+    let forecast = "Pleasant & Sunny, 22°C - 28°C";
+    let list = [
+      { item: "Power Bank & Charging Cables", checked: false },
+      { item: "Water Bottle (Stay Hydrated)", checked: false },
+      { item: "Comfortable Walking Shoes", checked: false },
+      { item: "ID Cards (Aadhaar / Driving License)", checked: false },
+      { item: "First Aid Kit & Personal Medicines", checked: false }
+    ];
+
+    if (cleanDest.includes("goa") || cleanDest.includes("kerala") || cleanDest.includes("pondicherry") || cleanDest.includes("mumbai") || cleanDest.includes("kochi") || cleanDest.includes("alibaug")) {
+      forecast = "Coastal Humid Vibe, 26°C - 32°C";
+      list = [
+        { item: "Sunscreen & Sunglasses", checked: false },
+        { item: "Quick-Dry Beach Clothing", checked: false },
+        { item: "Sandals / Flip-flops", checked: false },
+        { item: "Waterproof Phone Pouch", checked: false },
+        ...list
+      ];
+    } else if (cleanDest.includes("manali") || cleanDest.includes("shimla") || cleanDest.includes("leh") || cleanDest.includes("srinagar") || cleanDest.includes("darjeeling") || cleanDest.includes("kashmir") || cleanDest.includes("ooty") || cleanDest.includes("mumbai")) {
+      forecast = "Crisp Mountain Breeze, 8°C - 16°C";
+      list = [
+        { item: "Thick Warm Jacket / Fleece Sweater", checked: false },
+        { item: "Thermals & Woolen Socks", checked: false },
+        { item: "Lip Balm & Cold Cream", checked: false },
+        { item: "Gloves & Woolen Cap / Beanie", checked: false },
+        ...list
+      ];
+    } else if (cleanDest.includes("lonavala") || cleanDest.includes("matheran") || cleanDest.includes("mahabaleshwar") || cleanDest.includes("cherrapunji")) {
+      forecast = "Misty Monsoon Showers expected, 20°C - 24°C";
+      list = [
+        { item: "Umbrella & Lightweight Raincoat", checked: false },
+        { item: "Waterproof Shoes or Sandals", checked: false },
+        { item: "Dry Bags for Electronics", checked: false },
+        { item: "Mosquito Repellent Gel", checked: false },
+        ...list
+      ];
+    }
+
+    setWeatherForecast(forecast);
+    setWeatherPackingChecklist(list);
+  };
+
+  useEffect(() => {
+    localStorage.setItem('travolor_actual_expenses', JSON.stringify(actualExpenses));
+  }, [actualExpenses]);
+
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
   const [refinementPrompt, setRefinementPrompt] = useState("");
   const [refiningItinerary, setRefiningItinerary] = useState(false);
@@ -1621,7 +1689,50 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       }
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || "Authentication failed.");
+      let friendlyMessage = err.message || "Authentication failed.";
+      
+      const isMarathi = language === "Marathi";
+      const isHindi = language === "Hindi";
+
+      if (err.code === 'auth/invalid-credential') {
+        friendlyMessage = isMarathi
+          ? "चुकीचा ईमेल किंवा पासवर्ड. कृपया पुन्हा तपासा आणि प्रयत्न करा."
+          : (isHindi
+            ? "अमान्य ईमेल या पासवर्ड। कृपया जाँचें और पुनः प्रयास करें।"
+            : "Invalid email or password. Please verify your credentials and try again.");
+      } else if (err.code === 'auth/email-already-in-use') {
+        friendlyMessage = isMarathi
+          ? "हा ईमेल पत्ता आधीपासूनच नोंदणीकृत आहे. कृपया लॉगिन करा."
+          : (isHindi
+            ? "यह ईमेल पता पहले से ही पंजीकृत है। कृपया लॉगिन करें।"
+            : "This email address is already registered. Please login instead.");
+      } else if (err.code === 'auth/user-not-found') {
+        friendlyMessage = isMarathi
+          ? "या ईमेलचा कोणताही युझर सापडला नाही. कृपया प्रथम नोंदणी (Sign Up) करा."
+          : (isHindi
+            ? "इस ईमेल के साथ कोई उपयोगकर्ता नहीं मिला। कृपया पहले पंजीकरण (Sign Up) करें।"
+            : "No user found with this email. Please sign up first.");
+      } else if (err.message && (err.message.includes("invalid-credential") || err.message.includes("INVALID_LOGIN_CREDENTIALS"))) {
+        friendlyMessage = isMarathi
+          ? "चुकीचा ईमेल किंवा पासवर्ड. कृपया पुन्हा तपासा आणि प्रयत्न करा."
+          : (isHindi
+            ? "अमान्य ईमेल या पासवर्ड। कृपया जाँचें और पुनः प्रयास करें।"
+            : "Invalid email or password. Please verify your credentials and try again.");
+      } else if (err.message && err.message.includes("email-already-in-use")) {
+        friendlyMessage = isMarathi
+          ? "हा ईमेल पत्ता आधीपासूनच नोंदणीकृत आहे. कृपया लॉगिन करा."
+          : (isHindi
+            ? "यह ईमेल पता पहले से ही पंजीकृत है। कृपया लॉगिन करें।"
+            : "This email address is already registered. Please login instead.");
+      } else if (err.message && err.message.includes("user-not-found")) {
+        friendlyMessage = isMarathi
+          ? "या ईमेलचा कोणताही युझर सापडला नाही. कृपया प्रथम नोंदणी (Sign Up) करा."
+          : (isHindi
+            ? "इस ईमेल के साथ कोई उपयोगकर्ता नहीं मिला। कृपया पहले पंजीकरण (Sign Up) करें।"
+            : "No user found with this email. Please sign up first.");
+      }
+
+      setAuthError(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -1703,9 +1814,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         language: language,
         enableThinking: enableThinking,
         useSearch: useSearch,
-        customInstructions: customInstructions
+        customInstructions: customInstructions,
+        cravingFilter: cravingFilter,
+        travelMood: travelMood,
+        unlockHiddenGems: unlockHiddenGems
       });
       setItinerary(result.text);
+      generateWeatherAndPacking(locationInput);
       if (result.sources) {
         setItinerarySources(result.sources);
       }
@@ -2062,6 +2177,34 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                     </label>
                   </div>
+
+                  {/* Hidden Gems Unlocker */}
+                  <div className="flex items-center justify-between border-t border-dashed border-gray-100 dark:border-slate-800 pt-3">
+                    <div className="flex items-center gap-3 text-left">
+                      <div className="w-9 h-9 rounded-xl bg-yellow-100/70 dark:bg-yellow-950/20 text-amber-500 flex items-center justify-center">
+                        <Compass size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-[#000080] dark:text-indigo-400">
+                            {language === "Marathi" ? "🔑 ऑफ-बीट 'हिडन जेम्स'" : "🔑 Unlock Hidden Gems"}
+                          </span>
+                        </div>
+                        <span className="text-gray-400 text-[11px]">
+                          {language === "Marathi" ? "गर्दी नसलेली छुप्या स्थानिक जागांचा शोध" : "Avoid tourist trap spots for unique secrets"}
+                        </span>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={unlockHiddenGems} 
+                        onChange={(e) => setUnlockHiddenGems(e.target.checked)} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-yellow-300 dark:peer-focus:ring-yellow-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Mode of Transportation Selector */}
@@ -2112,6 +2255,97 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           </button>
                         );
                       })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Mood-Based Itinerary & 1. Hyper-Local Food Trails */}
+                <div className="col-span-1 md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Mood Selector card */}
+                  <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left flex flex-col justify-between">
+                    <div>
+                      <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">
+                        {language === "Marathi" ? "३. मूळ-बेस्ड ट्रिप नियोजन / SELECT YOUR MOOD" : "3. Mood-Based Itinerary Vibe"}
+                      </span>
+                      <span className="text-sm font-bold text-[#000080] dark:text-indigo-400 block mb-3">
+                        {language === "Marathi" ? "तुमचा आजचा मूड कसा आहे? (यानुसार पर्यटन स्थळांचे पर्याय बदलतील)" : "Choose trip flavor according to your active state of mind"}
+                      </span>
+
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: "standard", label: language === "Marathi" ? "सामान्य (Standard)" : "Standard", icon: Sparkles, color: "text-blue-500 bg-blue-50/75 dark:bg-blue-950/20" },
+                          { id: "peaceful_relaxed", label: language === "Marathi" ? "शांतता (Peaceful/Quiet)" : "Peaceful & Semi-Chill", icon: Heart, color: "text-rose-500 bg-rose-50/75 dark:bg-rose-950/20" },
+                          { id: "adventure_thrills", label: language === "Marathi" ? "ॲडव्हेंचर (Adventure/Thrills)" : "Adventure & Action", icon: Zap, color: "text-amber-500 bg-amber-50/75 dark:bg-amber-950/20" },
+                          { id: "nature_scenic", label: language === "Marathi" ? "निसर्ग (Scenic/Nature)" : "Nature Escape", icon: Globe, color: "text-emerald-500 bg-emerald-50/75 dark:bg-emerald-950/20" },
+                          { id: "heritage_history", label: language === "Marathi" ? "इतिहास (Heritage/History)" : "Heritage Walk", icon: ShieldCheck, color: "text-indigo-500 bg-indigo-50/75 dark:bg-indigo-950/20" },
+                          { id: "foodie_culinary", label: language === "Marathi" ? "खादाडी (Foodie)" : "Culinary Vibe", icon: ShoppingBag, color: "text-purple-500 bg-purple-50/75 dark:bg-purple-950/20" }
+                        ].map((m) => {
+                          const MoodIcon = m.icon;
+                          const active = travelMood === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              onClick={() => setTravelMood(m.id)}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                active 
+                                  ? "bg-[#000080] border-[#000080] text-white shadow-sm" 
+                                  : "bg-gray-50 border-gray-100 hover:bg-white text-gray-600 dark:bg-slate-800 dark:border-slate-750 dark:text-slate-200"
+                              }`}
+                            >
+                              <MoodIcon size={14} className={active ? "text-white" : m.color} />
+                              {m.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hyperlocal Craving filter card */}
+                  <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left flex flex-col justify-between space-y-3">
+                    <div>
+                      <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">
+                        {language === "Marathi" ? "१. स्ट्रीट फूड आणि स्नॅक ट्रेल्स / STREET FOOD FOODIE COIL" : "1. Hyper-Local Food Craving Trail"}
+                      </span>
+                      <span className="text-sm font-bold text-[#000080] dark:text-indigo-400 block mb-3">
+                        {language === "Marathi" ? "तुम्हाला तिथले कोणते प्रसिद्ध पदार्थ शोधायचे आहेत?" : "AI will search famous small food stands and hidden food lanes"}
+                      </span>
+
+                      <input 
+                        type="text"
+                        value={cravingFilter}
+                        onChange={(e) => setCravingFilter(e.target.value)}
+                        placeholder={
+                          language === "Marathi" 
+                            ? "उदा. कोल्हापुरी मिसळ, तुपातील मऊ शेव टोस्ट, क्रिस्पी बटाटा वडा..." 
+                            : "e.g. Crispy Vadapav, Ghee-based toast, scattered savory farsan..."
+                        }
+                        className="w-full px-4 py-2.5 border border-gray-150 dark:border-slate-750 bg-gray-50 dark:bg-slate-850 text-gray-800 dark:text-white rounded-xl focus:ring-1 focus:ring-blue-500 outline-none text-xs transition-all mb-2"
+                      />
+
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {[
+                          { text: "क्रिस्पी वडापाव / क्रिस्पी समोसा", english: "Crispy Vadapav & Samosa" },
+                          { text: "तूप टोस्ट / ग्रील्ड ब्रेड", english: "Ghee Toast & Grilled Bread" },
+                          { text: "वरून क्रश शेव / चविष्ट फरसाण", english: "Savory Farsan & Crushed Sev" },
+                          { text: "चटपटीत पाणीपुरी / चाट", english: "Tangy Chaat & Street Eats" }
+                        ].map((chip) => {
+                          const active = cravingFilter === chip.text || cravingFilter === chip.english;
+                          return (
+                            <button
+                              key={chip.text}
+                              onClick={() => setCravingFilter(language === "Marathi" ? chip.text : chip.english)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                active 
+                                  ? "bg-[#1E90FF] border-[#1E90FF] text-white shadow-xs" 
+                                  : "bg-gray-50 border-gray-100 hover:bg-white text-gray-500 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                              }`}
+                            >
+                              {language === "Marathi" ? chip.text.split(" / ")[0] : chip.english.split(" & ")[0]}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2546,6 +2780,107 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     ))}
                   </div>
                 </div>
+
+                {/* 4. Smart Weather-Synced Packing Checklist */}
+                <div className="bg-white rounded-[3rem] p-8 md:p-10 shadow-xl border border-gray-100/70 space-y-6 text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/20 text-sky-500 flex items-center justify-center">
+                      <Thermometer size={22} />
+                    </div>
+                    <div>
+                      <h4 className="text-[#000080] font-bold text-lg tracking-tight">
+                        {language === "Marathi" ? "४. स्मार्ट पॅकिंग आणि हवामान" : "4. Weather & Packing"}
+                      </h4>
+                      <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">
+                        {language === "Marathi" ? "हवामानानुसार चेकलिस्ट" : "Weather-Synced Checklists"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Forecast alert banner */}
+                  <div className="bg-sky-50/70 dark:bg-sky-950/10 border border-sky-150 rounded-2xl p-4 flex gap-3 text-sky-800 dark:text-sky-300">
+                    <CloudRain size={20} className="shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="text-[10px] uppercase font-bold tracking-widest opacity-60">
+                        {language === "Marathi" ? "अपेक्षित हवामान" : "Expected Weather"}
+                      </p>
+                      <p className="text-sm font-bold">{weatherForecast}</p>
+                    </div>
+                  </div>
+
+                  {/* Packing items checklist */}
+                  <div className="space-y-3.5">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+                      {language === "Marathi" ? "तुमची बॅग बॅक करा (चेकलिस्ट)" : "YOUR SMART PACKING LIST"}
+                    </p>
+
+                    <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                      {weatherPackingChecklist.map((itemObj, idx) => (
+                        <div 
+                          key={idx}
+                          onClick={() => {
+                            const updated = [...weatherPackingChecklist];
+                            updated[idx].checked = !updated[idx].checked;
+                            setWeatherPackingChecklist(updated);
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all",
+                            itemObj.checked 
+                              ? "bg-slate-50/50 border-emerald-200 text-gray-400Line line-through" 
+                              : "bg-gray-50/50 border-gray-100 hover:bg-white text-gray-700 hover:shadow-sm"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all",
+                            itemObj.checked 
+                              ? "border-emerald-500 bg-emerald-500 text-white" 
+                              : "border-gray-300 bg-white"
+                          )}>
+                            {itemObj.checked && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <span className={cn("text-xs font-semibold select-none", itemObj.checked ? "line-through text-gray-400" : "text-gray-75 *")}>{itemObj.item}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add Packing Item Bar */}
+                    <div className="flex gap-2 pt-2 border-t border-gray-50">
+                      <input 
+                        type="text"
+                        id="new-packing-item-input"
+                        placeholder={language === "Marathi" ? "नवीन वस्तू जोडा..." : "Add to pack list..."}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const input = e.currentTarget;
+                            if (input.value.trim()) {
+                              setWeatherPackingChecklist([
+                                ...weatherPackingChecklist,
+                                { item: input.value.trim(), checked: false }
+                              ]);
+                              input.value = "";
+                            }
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50/50 rounded-xl outline-none focus:ring-1 focus:ring-sky-500 text-xs text-gray-700"
+                      />
+                      <button 
+                        onClick={() => {
+                          const input = document.getElementById('new-packing-item-input') as HTMLInputElement;
+                          if (input && input.value.trim()) {
+                            setWeatherPackingChecklist([
+                              ...weatherPackingChecklist,
+                              { item: input.value.trim(), checked: false }
+                            ]);
+                            input.value = "";
+                          }
+                        }}
+                        className="bg-sky-500 hover:bg-sky-600 text-white px-3 py-2 rounded-xl text-xs font-black"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </aside>
             </div>
 
@@ -2681,6 +3016,162 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           </div>
                         );
                       })}
+                    </div>
+
+                    {/* 2. Interactive Expense Logger Panel */}
+                    <div className="border-t border-dashed border-gray-150 dark:border-slate-800 pt-8 mt-5 space-y-6 text-left">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                          <h4 className="text-xl font-bold text-[#000080] dark:text-[#1E90FF] flex items-center gap-2">
+                            <span>₹ {language === "Marathi" ? "प्रत्यक्ष रोजचा खर्च ट्रॅकर" : "2. Actual Day-by-Day Expenses"}</span>
+                          </h4>
+                          <p className="text-gray-400 text-xs mt-1">
+                            {language === "Marathi" ? "तुमचे प्रत्यक्षातील खर्च नोंदवा. बजेट अधिक झाल्यास AI तुमच्या सहलीचे आयोजन बदलून देईल!" : "Log what you actually spend on the go. Over-budget? Let AI optimize your activities!"}
+                          </p>
+                        </div>
+
+                        {actualExpenses.length > 0 && (
+                          <button 
+                            onClick={async () => {
+                              const expenseSum = actualExpenses.reduce((s, e) => s + e.amount, 0);
+                              const dynamicPrompt = `\n\n- REAL-TIME RE-BUDGET ADJUSTMENT FORCE: The traveler has already spent ${expenseSum} INR out of their total original budget of ${userTotalBudget} INR. Re-optimize the remaining schedule days of the trip to prioritize free attractions, inexpensive street food joints, and much cheaper local travel options to prevent going over budget!`;
+                              setLoading(true);
+                              try {
+                                const result = await generateItinerary({
+                                  location: locationInput,
+                                  startLocation: startLocation,
+                                  duration,
+                                  numPeople,
+                                  travelStyle: "budget", // Auto-downgrade style to keep them safe
+                                  transportType: transportType,
+                                  language: language,
+                                  enableThinking: enableThinking,
+                                  useSearch: true,
+                                  customInstructions: (customInstructions ? customInstructions + dynamicPrompt : dynamicPrompt)
+                                });
+                                setItinerary(result.text);
+                                generateWeatherAndPacking(locationInput);
+                                alert(language === "Marathi" ? "AI ने तुमच्या नवीन खर्चानुसार ट्रिप रि-ऑप्टिमाइझ केली आहे!" : "AI Itinerary has been successfully optimized based on your actual budget spent!");
+                              } catch (err) {
+                                alert("Failed to re-budget trip. Try again.");
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+                          >
+                            <Sparkles size={14} />
+                            {language === "Marathi" ? "✨ AI बजेट पुनर्गठन" : "✨ AI Auto-Adjust Itinerary"}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Log Input Form */}
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const form = e.currentTarget;
+                          const descInput = form.elements.namedItem('expenseDesc') as HTMLInputElement;
+                          const amountInput = form.elements.namedItem('expenseAmount') as HTMLInputElement;
+                          const daySelect = form.elements.namedItem('expenseDay') as HTMLSelectElement;
+
+                          if (descInput.value.trim() && amountInput.value) {
+                            const newExp = {
+                              id: Math.random().toString(36).substr(2, 9),
+                              desc: descInput.value.trim(),
+                              amount: Number(amountInput.value),
+                              day: Number(daySelect.value)
+                            };
+                            setActualExpenses([...actualExpenses, newExp]);
+                            descInput.value = "";
+                            amountInput.value = "";
+                          }
+                        }}
+                        className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 bg-gray-50 dark:bg-slate-850 p-4 rounded-2xl border border-gray-100 dark:border-slate-800"
+                      >
+                        <div className="flex flex-col text-left">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{language === "Marathi" ? "दिवस / Day" : "Day"}</label>
+                          <select name="expenseDay" className="bg-white dark:bg-slate-800 border border-gray-200 text-gray-700 dark:text-white rounded-xl px-2 py-2 text-xs outline-none">
+                            {Array.from({ length: duration }).map((_, i) => (
+                              <option key={i + 1} value={i + 1}>{language === "Marathi" ? `दिवस ${i + 1}` : `Day ${i + 1}`}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col text-left sm:col-span-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{language === "Marathi" ? "खर्चाचे वर्णन / What did you pay for?" : "What did you buy/pay for?"}</label>
+                          <input 
+                            name="expenseDesc" 
+                            type="text" 
+                            placeholder={language === "Marathi" ? "उदा. रिक्षा भाडे, कोल्हापुरी थाळी..." : "e.g. Lunch, taxi ride, souvenir..."}
+                            className="bg-white dark:bg-slate-800 border border-gray-200 text-gray-700 dark:text-white rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-[#1E90FF]"
+                            required
+                          />
+                        </div>
+
+                        <div className="flex flex-col text-left relative justify-end">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{language === "Marathi" ? "रक्कम (₹) / Amount" : "Amount (₹)"}</label>
+                          <div className="flex gap-2">
+                            <input 
+                              name="expenseAmount" 
+                              type="number" 
+                              placeholder="₹"
+                              className="w-full bg-white dark:bg-slate-800 border border-gray-200 text-gray-700 dark:text-white rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-[#1E90FF]"
+                              required
+                            />
+                            <button 
+                              type="submit"
+                              className="bg-[#000080] hover:bg-indigo-900 text-white font-black text-xs px-4 py-2 rounded-xl"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+
+                      {/* Expense Listing sheet */}
+                      {actualExpenses.length > 0 ? (
+                        <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                          <div className="flex justify-between items-center text-[10px] font-extrabold text-gray-400 uppercase tracking-wider px-1">
+                            <span>{language === "Marathi" ? "खर्च नोंदी" : "Logged Entries"}</span>
+                            <span className="text-[#000080]" id="expense-total">
+                              {language === "Marathi" ? "एकूण प्रत्यक्ष खर्च: " : "Total Spent: "} 
+                              {formatPrice(actualExpenses.reduce((s, e) => s + e.amount, 0))}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {actualExpenses.map((expense) => (
+                              <div 
+                                key={expense.id} 
+                                className="flex justify-between items-center p-3 rounded-xl border border-gray-100 bg-white dark:bg-slate-900 group hover:border-[#1E90FF] transition-all"
+                              >
+                                <div className="flex items-center gap-2.5 overflow-hidden">
+                                  <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-200 shrink-0">
+                                    Day {expense.day}
+                                  </span>
+                                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">{expense.desc}</span>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="text-xs font-black text-gray-800 dark:text-white font-mono">{formatPrice(expense.amount)}</span>
+                                  <button 
+                                    onClick={() => {
+                                      setActualExpenses(actualExpenses.filter(e => e.id !== expense.id));
+                                    }}
+                                    className="text-gray-300 hover:text-red-500 transition-colors"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-xs text-center italic py-2">
+                          {language === "Marathi" ? "अद्याप कोणताही प्रत्यक्ष खर्च नोंदवला गेला नाही." : "No actual expenses logged yet. Create entries to keep track!"}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );

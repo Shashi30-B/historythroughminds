@@ -898,7 +898,7 @@ async function startServer() {
 
   // Gemini API Routes
   app.post("/api/gemini/generate-itinerary", async (req, res) => {
-    const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch, transportType = "self_drive_car", customInstructions } = req.body;
+    const { startLocation, location, duration, travelStyle, numPeople, language = "en", enableThinking, useSearch, transportType = "self_drive_car", customInstructions, cravingFilter, travelMood, unlockHiddenGems } = req.body;
     
     // Proactive check to fall back cleanly if API key is not yet set
     const apiKey = process.env.GEMINI_API_KEY;
@@ -966,6 +966,18 @@ Rules:
 
     if (customInstructions && customInstructions.trim()) {
       prompt += `\n\n- ADDITIONAL CUSTOM PREFERENCES / INSTRUCTIONS: ${customInstructions}\nIMPORTANT: Please customize and adapt the activities, locations, and timings in the generated plan to fulfill these user instructions perfectly!`;
+    }
+
+    if (cravingFilter && cravingFilter.trim()) {
+      prompt += `\n\n- STREET FOOD / SNACK CRAVING CRITERIA (Hyper-Local Food Trails): Focus heavily on finding local, hyper-local street food stalls, snug snack trails, hidden lanes, or famous roadside spots matching: "${cravingFilter}". Explicitly list specific small street-food joints, stalls (e.g. for crispy vadapav, samosa, ghee-toast, sweet or savory toppings/farsan) and tell the user where to find them and what to order there!`;
+    }
+
+    if (travelMood && travelMood !== 'standard') {
+      prompt += `\n\n- TRAVEL MOOD SPECIALIZATION: The traveler is in a "${travelMood}" mood (options: peaceful_relaxed, adventure_thrills, nature_scenic, heritage_history, foodie_culinary). Customize the daily itinerary activities, sights, pacing, and locations to specifically fit this mood vibe beautifully (e.g., recommend quiet, serene spots for peaceful; thrilling hikes/sports for adventure; scenic viewpoints/parks for nature; fort/museum walk for heritage; multiple food tours/stalls for foodie).`;
+    }
+
+    if (unlockHiddenGems === true) {
+      prompt += `\n\n- OF-BEAT HIDDEN GEMS (Hidden Gems Unlocker): Actively search for and prioritize highly uncommon, off-beat, lesser-known secret sights (e.g. peaceful non-touristy lakes, ancient old libraries, local artisans' alleyways, hidden old quarters, secret sunrise vista points) that are NOT crowded commercial tourist spots. The traveler wants to feel like a true local explorer!`;
     }
 
     // Configure model selection based on thinking/grounding requested
