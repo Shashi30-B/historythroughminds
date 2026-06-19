@@ -509,7 +509,7 @@ const LocationInput = ({
 
 function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [activeTab, setActiveTab] = useState("explore");
-  const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string} | null>(null);
+  const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string, role?: string} | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
@@ -522,6 +522,22 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [headlineIndex, setHeadlineIndex] = useState(0);
+
+  // Admin Simulator and Profile Settings state variables
+  const [isAdminMode, setIsAdminMode] = useState(() => {
+    return localStorage.getItem('travolor_admin_mode') === 'true';
+  });
+  const [smsLogs, setSmsLogs] = useState<{phone: string, code: string, timestamp: string}[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('travolor_sms_logs') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+  const [allBookings, setAllBookings] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
 
   const headlines = ["Explore the World with Travolor", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
 
@@ -542,6 +558,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       return () => clearTimeout(timer);
     }
   }, [otpTimer]);
+
+  useEffect(() => {
+    if (activeTab === 'admin') {
+      try {
+        const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
+        setAllUsers(storedUsers);
+      } catch (e) {
+        setAllUsers([]);
+      }
+      try {
+        const storedBookings = JSON.parse(localStorage.getItem('travolor_bookings') || '[]');
+        setAllBookings(storedBookings);
+      } catch (e) {
+        setAllBookings([]);
+      }
+    }
+  }, [activeTab]);
 
   const [locationInput, setLocationInput] = useState("");
   const [startLocation, setStartLocation] = useState("");
@@ -1557,6 +1590,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     setOtpSentCode(code);
     setOtpSent(true);
     setOtpTimer(60);
+
+    // Save logs for admin simulator
+    const newLog = {
+      phone: phoneForm.phone,
+      code,
+      timestamp: new Date().toLocaleString()
+    };
+    const updated = [newLog, ...smsLogs];
+    setSmsLogs(updated);
+    localStorage.setItem('travolor_sms_logs', JSON.stringify(updated));
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -1640,6 +1683,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
       if (authMethod === 'email') {
         if (authMode === 'login') {
+          // Admin Check
+          if (authForm.email.toLowerCase() === 'admin@travolor.com' && authForm.password === 'admin') {
+            const activeUser = {
+              id: 'admin_user',
+              name: 'Travolor Director (Admin)',
+              email: 'admin@travolor.com',
+              role: 'admin'
+            };
+            setUser(activeUser);
+            setIsAdminMode(true);
+            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+            localStorage.setItem('travolor_admin_mode', 'true');
+            setActiveTab('explore');
+            setLoading(false);
+            return;
+          }
+
           try {
             await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
           } catch (err: any) {
@@ -1719,6 +1779,38 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         // Phone Auth Mode
         if (!phoneForm.phone || phoneForm.phone.length < 10) {
           throw new Error("कृपया वैध १० अंकी मोबाईल नंबर टाका. (Please enter a valid 10-digit mobile number.)");
+        }
+
+        // Admin Phone Check
+        if (phoneForm.phone === '9999999999' || phoneForm.phone === '9876543210') {
+          if (phoneMode === 'otp') {
+            if (!otpSent) {
+              handleSendSimulatedOtp();
+              setLoading(false);
+              return;
+            }
+            if (phoneForm.otp !== otpSentCode && phoneForm.otp !== "123456") {
+              throw new Error("चुकीचा OTP! (Incorrect OTP!)");
+            }
+          } else {
+            if (phoneForm.password !== 'admin') {
+              throw new Error("चुकीचा पासवर्ड! (Incorrect Password!)");
+            }
+          }
+          const activeUser = {
+            id: 'admin_user_phone',
+            name: 'Travolor Director (Admin)',
+            email: 'admin@travolor-user.com',
+            phone: phoneForm.phone,
+            role: 'admin'
+          };
+          setUser(activeUser);
+          setIsAdminMode(true);
+          localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+          localStorage.setItem('travolor_admin_mode', 'true');
+          setActiveTab('explore');
+          setLoading(false);
+          return;
         }
 
         const virtualEmail = `${phoneForm.phone}@travolor-user.com`;
@@ -2023,7 +2115,9 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       await signOut(auth);
     }
     setUser(null);
+    setIsAdminMode(false);
     localStorage.removeItem('travolor_current_user');
+    localStorage.removeItem('travolor_admin_mode');
     setActiveTab('explore');
   };
 
@@ -3523,17 +3617,28 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             </motion.div>
           )}
 
-          {/* Simulated OTP Notification Banner */}
-          {otpSent && authMethod === 'phone' && otpSentCode && (
+          {/* Simulated OTP Notification Banner - Show random code only in Admin mode, otherwise standard mock guidance */}
+          {otpSent && authMethod === 'phone' && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-2xl text-xs text-center font-bold shadow-sm relative overflow-hidden"
             >
-              <div className="flex flex-col gap-1 items-center">
+              <div className="flex flex-col gap-1.5 items-center">
                 <span className="uppercase tracking-widest text-[9px] text-emerald-600 font-extrabold">{curLang.otpSentToast} +91 {phoneForm.phone}</span>
-                <span className="text-2xl font-black text-emerald-900 tracking-[0.25em]">{otpSentCode}</span>
-                <span className="text-[10px] text-gray-400 font-medium">(Security simulation: verify by entering this code)</span>
+                {isAdminMode ? (
+                  <>
+                    <span className="text-2xl font-black text-emerald-990 tracking-[0.25em]">{otpSentCode || "123456"}</span>
+                    <span className="text-[10px] text-gray-400 font-medium">(Security simulation: verify by entering this code)</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm font-black text-emerald-900 mt-1">Verification Code Dispatched</span>
+                    <span className="text-[10px] text-emerald-600/90 font-medium max-w-[280px] leading-relaxed mt-1">
+                      For standard preview testing, please complete verification by typing the standard code **123456**.
+                    </span>
+                  </>
+                )}
               </div>
             </motion.div>
           )}
@@ -3827,15 +3932,45 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           </div>
         </div>
 
-        <p className="text-center text-gray-500 text-sm font-medium">
-          {authMode === 'login' ? "New user?" : "Already have an account?"}
-          <button 
-            onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-            className="ml-2 text-[#000080] font-black hover:text-orange-500 transition-colors"
-          >
-            {authMode === 'login' ? 'Sign Up' : 'Login'}
-          </button>
-        </p>
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-center text-gray-500 text-sm font-medium">
+            {authMode === 'login' ? "New user?" : "Already have an account?"}
+            <button 
+              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+              className="ml-2 text-[#000080] font-black hover:text-orange-500 transition-colors"
+            >
+              {authMode === 'login' ? 'Sign Up' : 'Login'}
+            </button>
+          </p>
+
+          <div className="pt-4 border-t border-gray-100 w-full flex flex-col items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <span className="text-[10px] uppercase tracking-widest text-[#000080] font-black">🔑 Admin Mode Simulator</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = !isAdminMode;
+                  setIsAdminMode(target);
+                  localStorage.setItem('travolor_admin_mode', target ? 'true' : 'false');
+                }}
+                className={cn(
+                  "w-10 h-5 rounded-full transition-all relative p-0.5",
+                  isAdminMode ? "bg-amber-500" : "bg-gray-200"
+                )}
+              >
+                <span 
+                  className={cn(
+                    "w-4 h-4 bg-white rounded-full shadow-sm transition-all absolute top-0.5 block",
+                    isAdminMode ? "left-5" : "left-0.5"
+                  )} 
+                />
+              </button>
+            </label>
+            <p className="text-[9px] text-gray-400 text-center font-medium max-w-[280px]">
+              Activate Admin mode to show/view real-time SMS dispatch keys, mock users list, and system metrics.
+            </p>
+          </div>
+        </div>
       </motion.div>
     </div>
   );
@@ -4517,6 +4652,162 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     );
   };
 
+  const renderAdminDashboard = () => {
+    return (
+      <div className="space-y-8 pb-24 px-4 md:px-0">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-8">
+          <div>
+            <h2 className="text-3xl font-serif font-black text-[#000080] tracking-tight">System Administration Console</h2>
+            <p className="text-gray-400 font-bold text-xs tracking-wider uppercase mt-1">Simulated Testing Environment & Master Control</p>
+          </div>
+          <button
+            onClick={() => {
+              setIsAdminMode(false);
+              localStorage.setItem('travolor_admin_mode', 'false');
+              setActiveTab('explore');
+            }}
+            className="bg-[#000080] text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md hover:glow-blue transition-all"
+          >
+            Switch to Customer View
+          </button>
+        </div>
+
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mock Accounts</p>
+              <h3 className="text-3xl font-serif font-black text-[#000080] mt-1">{allUsers.length}</h3>
+            </div>
+            <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500">
+              <Users size={24} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sent OTP logs</p>
+              <h3 className="text-3xl font-serif font-black text-[#000080] mt-1">{smsLogs.length}</h3>
+            </div>
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500">
+              <Mail size={24} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Bookings</p>
+              <h3 className="text-3xl font-serif font-black text-[#000080] mt-1">{allBookings.length}</h3>
+            </div>
+            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
+              <BookingIcon size={24} />
+            </div>
+          </div>
+        </div>
+
+        {/* Live SMS Dispatch Center */}
+        <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+          <div className="p-6 md:p-8 border-b border-gray-50 flex items-center justify-between bg-amber-50/20">
+            <div>
+              <h3 className="text-lg font-black text-[#000080]">📡 Simulated SMS Keys</h3>
+              <p className="text-gray-400 text-xs mt-1">Latest dispatch verification codes (No phone carrier costs)</p>
+            </div>
+            {smsLogs.length > 0 && (
+              <button 
+                onClick={() => {
+                  setSmsLogs([]);
+                  localStorage.removeItem('travolor_sms_logs');
+                }}
+                className="text-rose-600 hover:text-rose-700 font-bold text-xs"
+              >
+                Clear SMS Logs
+              </button>
+            )}
+          </div>
+          
+          <div className="p-6 md:p-8 space-y-4">
+            {smsLogs.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 space-y-2">
+                <p className="font-bold text-sm">No SMS Dispatched in this session yet.</p>
+                <p className="text-xs">Trigger one by entering a mobile number on the login screen and clicking 'Send OTP'.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-widest font-black text-[10px]">
+                      <th className="pb-4 pl-4">Timestamp</th>
+                      <th className="pb-4">Phone Number</th>
+                      <th className="pb-4 pr-4 text-right">Verification Code (OTP)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {smsLogs.map((log, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50/50">
+                        <td className="py-4 pl-4 font-mono text-gray-500">{log.timestamp}</td>
+                        <td className="py-4 font-bold text-[#000080]">+91 {log.phone}</td>
+                        <td className="py-4 pr-4 text-right">
+                          <span className="bg-emerald-50 text-emerald-700 font-mono font-black border border-emerald-100 px-3 py-1.5 rounded-lg text-sm tracking-widest">
+                            {log.code}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Registered Customer Database Fallback */}
+        <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+          <div className="p-6 md:p-8 border-b border-gray-50 bg-blue-50/10">
+            <h3 className="text-lg font-black text-[#000080]">👥 Fallback User Registration Registry</h3>
+            <p className="text-gray-400 text-xs mt-1">Active users stored locally inside browser's local sandbox</p>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-4">
+            {allUsers.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 space-y-2">
+                <p className="font-bold text-sm">Registry is Empty.</p>
+                <p className="text-xs">Customers registered locally will appear here instantly.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {allUsers.map((u, idx) => (
+                  <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-gray-50 border border-gray-100 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#1E90FF]/10 text-[#000080] flex items-center justify-center font-bold">
+                        {u.name?.charAt(0) || 'T'}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-[#000080]">{u.name}</h4>
+                        <p className="text-[10px] text-gray-400 font-medium">{u.email} {u.phone && `• +91 ${u.phone}`}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          const updated = allUsers.filter(usr => usr.id !== u.id && usr.email !== u.email);
+                          setAllUsers(updated);
+                          localStorage.setItem('travolor_local_users', JSON.stringify(updated));
+                        }}
+                        className="bg-white border border-rose-100 text-rose-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-rose-50 transition-all cursor-pointer"
+                      >
+                        Delete User
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={cn(
       "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#000080] dark:text-[#E2E8F0]",
@@ -4604,6 +4895,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {activeTab === 'trips' && renderMyTrips()}
             {activeTab === 'bookings' && renderBookings()}
             {activeTab === 'profile' && renderProfile()}
+            {activeTab === 'admin' && (isAdminMode || user?.role === 'admin') && renderAdminDashboard()}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -4826,7 +5118,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             { id: "explore", icon: Globe, label: "Explore" },
             { id: "trips", icon: MapIcon, label: "Trips" },
             { id: "bookings", icon: BookingIcon, label: "Bookings" },
-            { id: "profile", icon: Settings, label: "Settings" }
+            { id: "profile", icon: Settings, label: "Settings" },
+            ...(isAdminMode || user?.role === 'admin' ? [{ id: "admin", icon: ShieldCheck, label: "Admin" }] : [])
           ].map((tab) => (
             <button
               key={tab.id}
