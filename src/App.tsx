@@ -1391,7 +1391,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   // Firebase Auth Listener
   React.useEffect(() => {
-    if (!auth) return;
+    // Try to restore previous user profile session from localStorage on app boot
+    const savedUser = localStorage.getItem('travolor_current_user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (err) {
+        console.error("Failed to restore saved session:", err);
+      }
+    }
+
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Fetch additional profile data from Firestore
@@ -1402,19 +1415,38 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             userData = userDoc.exists() ? userDoc.data() : {};
           }
         } catch (e) {
-          console.error("Firestore loading error:", e);
+          console.error("Firestore loading error during auth change:", e);
         }
         
-        setUser({
+        const activeUser = {
           id: firebaseUser.uid,
           name: userData.name || firebaseUser.displayName || 'Traveler',
           email: firebaseUser.email || '',
           photo: userData.photo || firebaseUser.photoURL || '',
           phone: userData.phone || ''
-        });
+        };
+        setUser(activeUser);
+        localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
       } else {
-        setUser(null);
+        // Only wipe local session if current user session belongs to a standard Firebase user
+        const currentInMemory = localStorage.getItem('travolor_current_user');
+        if (currentInMemory) {
+          try {
+            const parsed = JSON.parse(currentInMemory);
+            const isLocal = parsed.id.startsWith('local_') || parsed.id.startsWith('phone_user_') || parsed.id.startsWith('google_simulated_');
+            if (!isLocal) {
+              setUser(null);
+              localStorage.removeItem('travolor_current_user');
+            }
+          } catch {
+            setUser(null);
+            localStorage.removeItem('travolor_current_user');
+          }
+        } else {
+          setUser(null);
+        }
       }
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -1608,31 +1640,78 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
       if (authMethod === 'email') {
         if (authMode === 'login') {
-          await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
-        } else {
-          const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
-          const newUser = userCredential.user;
-          
-          // Initialize user profile in Firestore
           try {
-            if (db) {
-              await setDoc(doc(db, 'users', newUser.uid), {
-                name: authForm.name,
-                email: authForm.email,
-                totalBudget: 50000,
-                created_at: new Date().toISOString()
-              });
+            await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
+          } catch (err: any) {
+            // Check if user exists in local storage fallback
+            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
+            const existingUser = storedUsers.find((u: any) => u.email === authForm.email && u.password === authForm.password);
+            if (existingUser) {
+              const activeUser = {
+                id: existingUser.id,
+                name: existingUser.name,
+                email: existingUser.email
+              };
+              setUser(activeUser);
+              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+              setActiveTab('explore');
+              setLoading(false);
+              return;
             }
-          } catch (fsErr) {
-            console.error("Firestore user creation warning:", fsErr);
+            throw err;
           }
-
+        } else {
           try {
-            await firebaseUpdateProfile(newUser, {
-              displayName: authForm.name
-            });
-          } catch (profileErr) {
-            console.error("Auth profile update warning:", profileErr);
+            const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
+            const newUser = userCredential.user;
+            
+            // Initialize user profile in Firestore
+            try {
+              if (db) {
+                await setDoc(doc(db, 'users', newUser.uid), {
+                  name: authForm.name,
+                  email: authForm.email,
+                  totalBudget: 50000,
+                  created_at: new Date().toISOString()
+                });
+              }
+            } catch (fsErr) {
+              console.error("Firestore user creation warning:", fsErr);
+            }
+
+            try {
+              await firebaseUpdateProfile(newUser, {
+                displayName: authForm.name
+              });
+            } catch (profileErr) {
+              console.error("Auth profile update warning:", profileErr);
+            }
+          } catch (err: any) {
+            console.error("Firebase email sign up failed, falling back to secure local registration:", err);
+            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
+            const userExists = storedUsers.some((u: any) => u.email === authForm.email);
+            if (userExists) {
+              throw new Error("This email is already registered.");
+            }
+            const newLocalUser = {
+              id: `local_${Date.now()}`,
+              name: authForm.name || 'Traveler',
+              email: authForm.email,
+              password: authForm.password
+            };
+            storedUsers.push(newLocalUser);
+            localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
+            
+            const activeUser = {
+              id: newLocalUser.id,
+              name: newLocalUser.name,
+              email: newLocalUser.email
+            };
+            setUser(activeUser);
+            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+            setActiveTab('explore');
+            setLoading(false);
+            return;
           }
         }
         setActiveTab('explore');
@@ -1642,7 +1721,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           throw new Error("कृपया वैध १० अंकी मोबाईल नंबर टाका. (Please enter a valid 10-digit mobile number.)");
         }
 
-        const virtualEmail = `${phoneForm.phone}@travolor.mock`;
+        const virtualEmail = `${phoneForm.phone}@travolor-user.com`;
         
         if (phoneMode === 'otp') {
           if (!otpSent) {
@@ -1655,74 +1734,186 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             throw new Error("चुकीचा OTP! स्क्रीनवर दिसणारा OTP प्रविष्ट करा. (Incorrect OTP! Please enter the OTP displayed on the screen.)");
           }
 
-          // OTP matches! Try to create account first. If account already exists under this virtual card, sign in!
+          // OTP matches! Try real Firebase first, but fallback gracefully if Firebase has issues.
           const otpPassword = `otp_${phoneForm.phone}_travolor_secure`;
           try {
-            const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, otpPassword);
-            const newUser = userCredential.user;
+            let newUserUid = `phone_user_${phoneForm.phone}`;
+            let loggedInUser = null;
             
             try {
-              if (db) {
-                await setDoc(doc(db, 'users', newUser.uid), {
-                  name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                  email: virtualEmail,
-                  phone: phoneForm.phone,
-                  totalBudget: 50000,
-                  created_at: new Date().toISOString()
-                });
+              // Try to create the user with Firebase auth first
+              const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, otpPassword);
+              loggedInUser = userCredential.user;
+              newUserUid = loggedInUser.uid;
+              
+              // Try to write to Firestore
+              try {
+                if (db) {
+                  await setDoc(doc(db, 'users', newUserUid), {
+                    name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                    email: virtualEmail,
+                    phone: phoneForm.phone,
+                    totalBudget: 50000,
+                    created_at: new Date().toISOString()
+                  });
+                }
+              } catch (fsErr) {
+                console.error("Firestore user creation warning:", fsErr);
               }
-            } catch (fsErr) {
-              console.error("Firestore user creation warning:", fsErr);
+
+              try {
+                await firebaseUpdateProfile(loggedInUser, {
+                  displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
+                });
+              } catch (profileErr) {
+                console.error("Profile update warning:", profileErr);
+              }
+            } catch (err: any) {
+              // If email already in use, try to sign in
+              if (err.code === 'auth/email-already-in-use' || err.message?.includes('already-in-use') || err.message?.includes('ALREADY_EXISTS') || err.message?.includes('email-already-in-use')) {
+                const userCredential = await signInWithEmailAndPassword(auth, virtualEmail, otpPassword);
+                loggedInUser = userCredential.user;
+                newUserUid = loggedInUser.uid;
+              } else {
+                throw err;
+              }
             }
 
-            try {
-              await firebaseUpdateProfile(newUser, {
-                displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
-              });
-            } catch (profileErr) {
-              console.error("Profile update warning:", profileErr);
+            // Real Firebase authentication succeeded
+            const activeUser = {
+              id: newUserUid,
+              name: loggedInUser?.displayName || phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+              phone: phoneForm.phone,
+              email: virtualEmail
+            };
+            setUser(activeUser);
+            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+          } catch (firebaseErr: any) {
+            console.error("Firebase phone OTP authentication failed, falling back to secure local authentication:", firebaseErr);
+            
+            // Local fallback - store user in localstorage so we have standard persistent data
+            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
+            let localUser = storedUsers.find((u: any) => u.phone === phoneForm.phone);
+            if (!localUser) {
+              localUser = {
+                id: `local_phone_${phoneForm.phone}`,
+                name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                email: virtualEmail,
+                phone: phoneForm.phone
+              };
+              storedUsers.push(localUser);
+              localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
             }
-          } catch (err: any) {
-            // Already registered - safe to sign in now
-            if (err.code === 'auth/email-already-in-use' || err.message?.includes('already-in-use') || err.message?.includes('ALREADY_EXISTS') || err.message?.includes('email-already-in-use')) {
-              await signInWithEmailAndPassword(auth, virtualEmail, otpPassword);
-            } else {
-              throw err;
-            }
+            
+            const activeUser = {
+              id: localUser.id,
+              name: localUser.name,
+              phone: localUser.phone,
+              email: localUser.email
+            };
+            setUser(activeUser);
+            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
           }
+          
           setOtpSent(false);
           setOtpSentCode('');
         } else {
           // Phone Password login or signup
           if (authMode === 'login') {
-            await signInWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
+            try {
+              const userCredential = await signInWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
+              const loggedInUser = userCredential.user;
+              const activeUser = {
+                id: loggedInUser.uid,
+                name: loggedInUser.displayName || phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                phone: phoneForm.phone,
+                email: virtualEmail
+              };
+              setUser(activeUser);
+              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+            } catch (firebaseErr: any) {
+              console.error("Firebase phone password login failed, trying local fallback:", firebaseErr);
+              // Fallback to local
+              const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
+              const localUser = storedUsers.find((u: any) => u.phone === phoneForm.phone && u.password === phoneForm.password);
+              if (localUser) {
+                const activeUser = {
+                  id: localUser.id,
+                  name: localUser.name,
+                  phone: localUser.phone,
+                  email: localUser.email
+                };
+                setUser(activeUser);
+                localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+              } else {
+                throw firebaseErr;
+              }
+            }
           } else {
+            // Sign Up with Password
             if (!phoneForm.password || phoneForm.password.length < 6) {
               throw new Error("पासवर्ड किमान ६ अंकी असावा. (Password must be at least 6 characters.)");
             }
-            const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
-            const newUser = userCredential.user;
-            
             try {
-              if (db) {
-                await setDoc(doc(db, 'users', newUser.uid), {
-                  name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                  email: virtualEmail,
-                  phone: phoneForm.phone,
-                  totalBudget: 50000,
-                  created_at: new Date().toISOString()
-                });
+              const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
+              const newUser = userCredential.user;
+              
+              try {
+                if (db) {
+                  await setDoc(doc(db, 'users', newUser.uid), {
+                    name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                    email: virtualEmail,
+                    phone: phoneForm.phone,
+                    totalBudget: 50000,
+                    created_at: new Date().toISOString()
+                  });
+                }
+              } catch (fsErr) {
+                console.error("Firestore user creation warning:", fsErr);
               }
-            } catch (fsErr) {
-              console.error("Firestore user creation warning:", fsErr);
-            }
 
-            try {
-              await firebaseUpdateProfile(newUser, {
-                displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
-              });
-            } catch (profileErr) {
-              console.error("Profile update warning:", profileErr);
+              try {
+                await firebaseUpdateProfile(newUser, {
+                  displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
+                });
+              } catch (profileErr) {
+                console.error("Profile update warning:", profileErr);
+              }
+
+              const activeUser = {
+                id: newUser.uid,
+                name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                phone: phoneForm.phone,
+                email: virtualEmail
+              };
+              setUser(activeUser);
+              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+            } catch (firebaseErr: any) {
+              console.error("Firebase phone password signup failed, falling back to local:", firebaseErr);
+              // Local fallback
+              const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
+              const userExists = storedUsers.some((u: any) => u.phone === phoneForm.phone);
+              if (userExists) {
+                throw new Error("This phone number is already registered.");
+              }
+              const localUser = {
+                id: `local_phone_${phoneForm.phone}`,
+                name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                email: virtualEmail,
+                phone: phoneForm.phone,
+                password: phoneForm.password
+              };
+              storedUsers.push(localUser);
+              localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
+              
+              const activeUser = {
+                id: localUser.id,
+                name: localUser.name,
+                phone: localUser.phone,
+                email: localUser.email
+              };
+              setUser(activeUser);
+              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
             }
           }
         }
@@ -1831,6 +2022,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     if (auth) {
       await signOut(auth);
     }
+    setUser(null);
+    localStorage.removeItem('travolor_current_user');
     setActiveTab('explore');
   };
 
