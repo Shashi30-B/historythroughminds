@@ -1395,8 +1395,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Fetch additional profile data from Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        const userData = userDoc.exists() ? userDoc.data() : {};
+        let userData: any = {};
+        try {
+          if (db) {
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            userData = userDoc.exists() ? userDoc.data() : {};
+          }
+        } catch (e) {
+          console.error("Firestore loading error:", e);
+        }
         
         setUser({
           id: firebaseUser.uid,
@@ -1607,16 +1614,26 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           const newUser = userCredential.user;
           
           // Initialize user profile in Firestore
-          await setDoc(doc(db, 'users', newUser.uid), {
-            name: authForm.name,
-            email: authForm.email,
-            totalBudget: 50000,
-            created_at: new Date().toISOString()
-          });
+          try {
+            if (db) {
+              await setDoc(doc(db, 'users', newUser.uid), {
+                name: authForm.name,
+                email: authForm.email,
+                totalBudget: 50000,
+                created_at: new Date().toISOString()
+              });
+            }
+          } catch (fsErr) {
+            console.error("Firestore user creation warning:", fsErr);
+          }
 
-          await firebaseUpdateProfile(newUser, {
-            displayName: authForm.name
-          });
+          try {
+            await firebaseUpdateProfile(newUser, {
+              displayName: authForm.name
+            });
+          } catch (profileErr) {
+            console.error("Auth profile update warning:", profileErr);
+          }
         }
         setActiveTab('explore');
       } else {
@@ -1638,25 +1655,37 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             throw new Error("चुकीचा OTP! स्क्रीनवर दिसणारा OTP प्रविष्ट करा. (Incorrect OTP! Please enter the OTP displayed on the screen.)");
           }
 
-          // OTP matches! Authenticate using stable under-the-hood credential to maintain data persistence!
+          // OTP matches! Try to create account first. If account already exists under this virtual card, sign in!
           const otpPassword = `otp_${phoneForm.phone}_travolor_secure`;
           try {
-            await signInWithEmailAndPassword(auth, virtualEmail, otpPassword);
-          } catch (err: any) {
-            if (err.code === 'auth/user-not-found' || err.message.includes('not-found') || err.message.includes('USER_NOT_FOUND')) {
-              // Create virtual persistent user profile
-              const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, otpPassword);
-              const newUser = userCredential.user;
-              await setDoc(doc(db, 'users', newUser.uid), {
-                name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                email: virtualEmail,
-                phone: phoneForm.phone,
-                totalBudget: 50000,
-                created_at: new Date().toISOString()
-              });
+            const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, otpPassword);
+            const newUser = userCredential.user;
+            
+            try {
+              if (db) {
+                await setDoc(doc(db, 'users', newUser.uid), {
+                  name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                  email: virtualEmail,
+                  phone: phoneForm.phone,
+                  totalBudget: 50000,
+                  created_at: new Date().toISOString()
+                });
+              }
+            } catch (fsErr) {
+              console.error("Firestore user creation warning:", fsErr);
+            }
+
+            try {
               await firebaseUpdateProfile(newUser, {
                 displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
               });
+            } catch (profileErr) {
+              console.error("Profile update warning:", profileErr);
+            }
+          } catch (err: any) {
+            // Already registered - safe to sign in now
+            if (err.code === 'auth/email-already-in-use' || err.message?.includes('already-in-use') || err.message?.includes('ALREADY_EXISTS') || err.message?.includes('email-already-in-use')) {
+              await signInWithEmailAndPassword(auth, virtualEmail, otpPassword);
             } else {
               throw err;
             }
@@ -1673,16 +1702,28 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             }
             const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
             const newUser = userCredential.user;
-            await setDoc(doc(db, 'users', newUser.uid), {
-              name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-              email: virtualEmail,
-              phone: phoneForm.phone,
-              totalBudget: 50000,
-              created_at: new Date().toISOString()
-            });
-            await firebaseUpdateProfile(newUser, {
-              displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
-            });
+            
+            try {
+              if (db) {
+                await setDoc(doc(db, 'users', newUser.uid), {
+                  name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+                  email: virtualEmail,
+                  phone: phoneForm.phone,
+                  totalBudget: 50000,
+                  created_at: new Date().toISOString()
+                });
+              }
+            } catch (fsErr) {
+              console.error("Firestore user creation warning:", fsErr);
+            }
+
+            try {
+              await firebaseUpdateProfile(newUser, {
+                displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
+              });
+            } catch (profileErr) {
+              console.error("Profile update warning:", profileErr);
+            }
           }
         }
         setActiveTab('explore');
@@ -1761,15 +1802,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       const user = result.user;
       
       // Check if user exists in Firestore, if not create
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName || 'Traveler',
-          email: user.email,
-          photo: user.photoURL,
-          totalBudget: 50000,
-          created_at: new Date().toISOString()
-        });
+      try {
+        if (db) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (!userDoc.exists()) {
+            await setDoc(doc(db, 'users', user.uid), {
+              name: user.displayName || 'Traveler',
+              email: user.email,
+              photo: user.photoURL,
+              totalBudget: 50000,
+              created_at: new Date().toISOString()
+            });
+          }
+        }
+      } catch (fsErr) {
+        console.error("Firestore loading or creation error during Google login:", fsErr);
       }
       setActiveTab('explore');
     } catch (err: any) {
