@@ -15,17 +15,17 @@ import {
   ArrowRight, ArrowLeft, Camera, ShoppingBag, Lightbulb,
   Bell, Moon, Sun, Languages, LogOut, Settings, HelpCircle, ShieldCheck, Phone,
   AlertTriangle, Check,
-  Mail, Lock, Eye, EyeOff, Github, Share2, Edit as EditIcon, RefreshCw,
+  Mail, Lock, Eye, EyeOff, Github, Share2,
   Plane, TrainFront, Bus, Car, Package,
   GripVertical, MapPin as MapPinIcon, Navigation2, Zap,
   MessageSquare, Send, Bot, Cpu, X,
-  Mic, MicOff, Volume2, VolumeX, CloudRain
+  Mic, MicOff, Volume2, VolumeX
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLoadScript, Autocomplete, GoogleMap, MarkerF, InfoWindowF } from '@react-google-maps/api';
-import { generateItinerary, getSuggestions, sendChatMessage, refineItinerary } from './services/geminiService';
+import { generateItinerary, getSuggestions, sendChatMessage } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
 
 const libraries: ("places")[] = ["places"];
@@ -38,8 +38,7 @@ import {
   signOut,
   updateProfile as firebaseUpdateProfile,
   GoogleAuthProvider,
-  signInWithPopup,
-  updatePassword
+  signInWithPopup
 } from 'firebase/auth';
 import { 
   doc, 
@@ -111,7 +110,11 @@ const TRAVEL_INSPIRATION = [
   { id: 'budget', title: 'Budget Trips', img: 'https://images.unsplash.com/photo-1530521954074-e64f6810b32d?auto=format&fit=crop&w=400&q=80' },
 ];
 
-const TRAVEL_STATS: any[] = [];
+const TRAVEL_STATS = [
+  { label: 'Trips Planned', value: '50K+' },
+  { label: 'Destinations', value: '100+' },
+  { label: 'Happy Travelers', value: '20K+' },
+];
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={cn("shimmer bg-white/10 rounded-xl", className)} />
@@ -231,7 +234,6 @@ const LocationInput = ({
   const [service, setService] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<any>(null);
   const [isListening, setIsListening] = useState(false);
-  const hasJustSelectedRef = React.useRef(false);
 
   const handleVoiceInput = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -289,14 +291,6 @@ const LocationInput = ({
   }, [isLoaded]);
 
   React.useEffect(() => {
-    if (hasJustSelectedRef.current) {
-      hasJustSelectedRef.current = false;
-      setSuggestions([]);
-      setAiSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
     if (!value || value.trim().length === 0) {
       setSuggestions([]);
       setAiSuggestions([]);
@@ -379,7 +373,6 @@ const LocationInput = ({
   }, [value, service, sessionToken]);
 
   const handleSelect = (suggestion: any) => {
-    hasJustSelectedRef.current = true;
     onChange(suggestion.description);
     setShowSuggestions(false);
     
@@ -412,10 +405,7 @@ const LocationInput = ({
       <input
         type="text"
         value={value}
-        onChange={(e) => {
-          hasJustSelectedRef.current = false;
-          onChange(e.target.value);
-        }}
+        onChange={(e) => onChange(e.target.value)}
         onFocus={() => value && suggestions.length > 0 && setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         placeholder={placeholder}
@@ -472,7 +462,6 @@ const LocationInput = ({
                 key={`ai-${idx}`}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  hasJustSelectedRef.current = true;
                   onChange(city);
                   setShowSuggestions(false);
                 }}
@@ -510,7 +499,7 @@ const LocationInput = ({
 
 function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [activeTab, setActiveTab] = useState("explore");
-  const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string, role?: string} | null>(null);
+  const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string} | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
@@ -523,23 +512,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [headlineIndex, setHeadlineIndex] = useState(0);
-
-  // Admin Simulator and Profile Settings state variables
-  const [isAdminMode, setIsAdminMode] = useState(() => {
-    return localStorage.getItem('travolor_admin_mode') === 'true';
-  });
-  const [smsLogs, setSmsLogs] = useState<{phone: string, code: string, timestamp: string}[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('travolor_sms_logs') || '[]');
-    } catch {
-      return [];
-    }
-  });
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
-  const [allBookings, setAllBookings] = useState<any[]>([]);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [logoClicks, setLogoClicks] = useState(0);
 
   const headlines = ["Explore the World with Travolor", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
 
@@ -561,108 +533,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     }
   }, [otpTimer]);
 
-  useEffect(() => {
-    if (activeTab === 'admin') {
-      try {
-        const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-        setAllUsers(storedUsers);
-      } catch (e) {
-        setAllUsers([]);
-      }
-      try {
-        const storedBookings = JSON.parse(localStorage.getItem('travolor_bookings') || '[]');
-        setAllBookings(storedBookings);
-      } catch (e) {
-        setAllBookings([]);
-      }
-    }
-  }, [activeTab]);
-
   const [locationInput, setLocationInput] = useState("");
   const [startLocation, setStartLocation] = useState("");
   const [duration, setDuration] = useState(3);
   const [numPeople, setNumPeople] = useState(2);
   const [travelStyle, setTravelStyle] = useState("standard");
-  const [customInstructions, setCustomInstructions] = useState("");
-  const [cravingFilter, setCravingFilter] = useState("");
-  const [travelMood, setTravelMood] = useState("standard");
-  const [unlockHiddenGems, setUnlockHiddenGems] = useState(false);
-  const [actualExpenses, setActualExpenses] = useState<Array<{ id: string; desc: string; amount: number; day: number }>>(() => {
-    try {
-      const stored = localStorage.getItem('travolor_actual_expenses');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [weatherPackingChecklist, setWeatherPackingChecklist] = useState<Array<{ item: string; checked: boolean }>>([
-    { item: "Power Bank & Charging Cables", checked: false },
-    { item: "Water Bottle (Stay Hydrated)", checked: false },
-    { item: "Comfortable Walking Shoes", checked: false },
-    { item: "Aadhaar Card / Driving ID Card", checked: false },
-    { item: "First Aid Kit & Aspirins", checked: false }
-  ]);
-  const [weatherForecast, setWeatherForecast] = useState<string>("Pleasant & Sunny, 22°C - 28°C");
-
-  const generateWeatherAndPacking = (dest: string) => {
-    const cleanDest = dest.trim().toLowerCase();
-    let forecast = "Pleasant & Sunny, 22°C - 28°C";
-    let list = [
-      { item: "Power Bank & Charging Cables", checked: false },
-      { item: "Water Bottle (Stay Hydrated)", checked: false },
-      { item: "Comfortable Walking Shoes", checked: false },
-      { item: "ID Cards (Aadhaar / Driving License)", checked: false },
-      { item: "First Aid Kit & Personal Medicines", checked: false }
-    ];
-
-    if (cleanDest.includes("goa") || cleanDest.includes("kerala") || cleanDest.includes("pondicherry") || cleanDest.includes("mumbai") || cleanDest.includes("kochi") || cleanDest.includes("alibaug")) {
-      forecast = "Coastal Humid Vibe, 26°C - 32°C";
-      list = [
-        { item: "Sunscreen & Sunglasses", checked: false },
-        { item: "Quick-Dry Beach Clothing", checked: false },
-        { item: "Sandals / Flip-flops", checked: false },
-        { item: "Waterproof Phone Pouch", checked: false },
-        ...list
-      ];
-    } else if (cleanDest.includes("manali") || cleanDest.includes("shimla") || cleanDest.includes("leh") || cleanDest.includes("srinagar") || cleanDest.includes("darjeeling") || cleanDest.includes("kashmir") || cleanDest.includes("ooty") || cleanDest.includes("mumbai")) {
-      forecast = "Crisp Mountain Breeze, 8°C - 16°C";
-      list = [
-        { item: "Thick Warm Jacket / Fleece Sweater", checked: false },
-        { item: "Thermals & Woolen Socks", checked: false },
-        { item: "Lip Balm & Cold Cream", checked: false },
-        { item: "Gloves & Woolen Cap / Beanie", checked: false },
-        ...list
-      ];
-    } else if (cleanDest.includes("lonavala") || cleanDest.includes("matheran") || cleanDest.includes("mahabaleshwar") || cleanDest.includes("cherrapunji")) {
-      forecast = "Misty Monsoon Showers expected, 20°C - 24°C";
-      list = [
-        { item: "Umbrella & Lightweight Raincoat", checked: false },
-        { item: "Waterproof Shoes or Sandals", checked: false },
-        { item: "Dry Bags for Electronics", checked: false },
-        { item: "Mosquito Repellent Gel", checked: false },
-        ...list
-      ];
-    }
-
-    setWeatherForecast(forecast);
-    setWeatherPackingChecklist(list);
-  };
-
-  useEffect(() => {
-    localStorage.setItem('travolor_actual_expenses', JSON.stringify(actualExpenses));
-  }, [actualExpenses]);
-
-  const [isEditingItinerary, setIsEditingItinerary] = useState(false);
-  const [refinementPrompt, setRefinementPrompt] = useState("");
-  const [refiningItinerary, setRefiningItinerary] = useState(false);
   const [loading, setLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
   const [itinerarySources, setItinerarySources] = useState<any[]>([]);
   const [mapMarkers, setMapMarkers] = useState<Array<{ name: string; lat: number; lng: number; description?: string }>>([]);
   const [selectedMapMarker, setSelectedMapMarker] = useState<any | null>(null);
+  const [mapViewMode, setMapViewMode] = useState<"api" | "vector">("vector");
 
   useEffect(() => {
-    if (!isLoaded || !itinerary || !window.google || !locationInput) {
+    if (!itinerary || !locationInput) {
       setMapMarkers([]);
       return;
     }
@@ -711,31 +595,87 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       return;
     }
 
-    const geocoder = new window.google.maps.Geocoder();
-    const loadedMarkers: Array<{ name: string; lat: number; lng: number; description?: string }> = [];
-    let completed = 0;
-    
-    attractionsList.forEach((attraction) => {
-      const searchQuery = `${attraction}, ${locationInput}`;
-      geocoder.geocode({ address: searchQuery }, (results, status) => {
-        completed++;
-        if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
-          const loc = results[0].geometry.location;
-          loadedMarkers.push({
-            name: attraction,
-            lat: loc.lat(),
-            lng: loc.lng(),
-            description: results[0].formatted_address
-          });
-        }
-
-        if (completed === attractionsList.length) {
-          if (loadedMarkers.length > 0) {
-            setMapMarkers(loadedMarkers);
+    // Check if Google Maps is fully initialized & loaded
+    if (isLoaded && window.google && window.google.maps) {
+      const geocoder = new window.google.maps.Geocoder();
+      const loadedMarkers: Array<{ name: string; lat: number; lng: number; description?: string }> = [];
+      let completed = 0;
+      
+      attractionsList.forEach((attraction) => {
+        const searchQuery = `${attraction}, ${locationInput}`;
+        geocoder.geocode({ address: searchQuery }, (results, status) => {
+          completed++;
+          if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
+            const loc = results[0].geometry.location;
+            loadedMarkers.push({
+              name: attraction,
+              lat: loc.lat(),
+              lng: loc.lng(),
+              description: results[0].formatted_address
+            });
           }
-        }
+
+          if (completed === attractionsList.length) {
+            if (loadedMarkers.length > 0) {
+              setMapMarkers(loadedMarkers);
+            } else {
+              // Geocode failed or returned zero, generate mock coordinates
+              generateMockCoords(attractionsList);
+            }
+          }
+        });
       });
-    });
+    } else {
+      // Maps API not loaded/blocked/offline, generate beautiful mock coordinates for Visual canvas
+      generateMockCoords(attractionsList);
+    }
+
+    function generateMockCoords(list: string[]) {
+      // Find a mock center coordinate for the destination
+      const locClean = locationInput.toLowerCase();
+      let center = { lat: 19.0760, lng: 72.8777 }; // default Mumbai
+
+      if (locClean.includes("goa")) {
+        center = { lat: 15.2993, lng: 74.1240 };
+      } else if (locClean.includes("delhi")) {
+        center = { lat: 28.7041, lng: 77.1025 };
+      } else if (locClean.includes("paris")) {
+        center = { lat: 48.8566, lng: 2.3522 };
+      } else if (locClean.includes("london")) {
+        center = { lat: 51.5074, lng: -0.1278 };
+      } else if (locClean.includes("tokyo")) {
+        center = { lat: 35.6762, lng: 139.6503 };
+      } else if (locClean.includes("york")) {
+        center = { lat: 40.7128, lng: -74.0060 };
+      } else if (locClean.includes("singapore")) {
+        center = { lat: 1.3521, lng: 103.8198 };
+      } else if (locClean.includes("bangkok")) {
+        center = { lat: 13.7563, lng: 100.5018 };
+      } else if (locClean.includes("dubai")) {
+        center = { lat: 25.2048, lng: 55.2708 };
+      } else if (locClean.includes("bali")) {
+        center = { lat: -8.4095, lng: 115.1889 };
+      } else if (locClean.includes("mumbai")) {
+        center = { lat: 19.0760, lng: 72.8777 };
+      }
+
+      // Distribute coordinates in a beautiful spiral arc shape
+      const deltaMarkers = list.map((attr, idx) => {
+        const angle = (idx / list.length) * Math.PI * 1.5; // curved arc spread
+        const radius = 0.012 + idx * 0.003; // spiral outward slightly
+        const latOffset = Math.sin(angle) * radius;
+        const lngOffset = Math.cos(angle) * radius;
+
+        return {
+          name: attr,
+          lat: center.lat + latOffset,
+          lng: center.lng + lngOffset,
+          description: `Virtual coordinate plot of ${attr} in ${locationInput}`
+        };
+      });
+
+      setMapMarkers(deltaMarkers);
+    }
   }, [itinerary, isLoaded, locationInput]);
 
   const [modelUsedForItinerary, setModelUsedForItinerary] = useState<string>("");
@@ -884,17 +824,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [startCoords, setStartCoords] = useState<{lat: number, lng: number} | null>(null);
   const [endCoords, setEndCoords] = useState<{lat: number, lng: number} | null>(null);
   const [userTotalBudget, setUserTotalBudget] = useState<number>(50000);
-  const [transportType, setTransportType] = useState("self_drive_car"); // self_drive_car, cab, train, bus, flight
+  const [transportType, setTransportType] = useState("public"); // public, private, flight
   const [accommodationType, setAccommodationType] = useState("standard"); // hostel, standard, luxury
 
   const liveBudget = useMemo(() => {
-    const transportRates: Record<string, number> = {
-      self_drive_car: 1800,
-      cab: 3000,
-      train: 600,
-      bus: 400,
-      flight: 6000
-    };
+    const transportRates: Record<string, number> = { public: 500, private: 2000, flight: 5000 };
     const hotelRates: Record<string, number> = { hostel: 800, standard: 2500, luxury: 8000 };
     const foodRates: Record<string, number> = { budget: 500, standard: 1200, luxury: 3000 };
     const activityRates: Record<string, number> = { low: 300, medium: 1000, high: 2500 };
@@ -1426,62 +1360,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   // Firebase Auth Listener
   React.useEffect(() => {
-    // Try to restore previous user profile session from localStorage on app boot
-    const savedUser = localStorage.getItem('travolor_current_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (err) {
-        console.error("Failed to restore saved session:", err);
-      }
-    }
-
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
+    if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Fetch additional profile data from Firestore
-        let userData: any = {};
-        try {
-          if (db) {
-            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-            userData = userDoc.exists() ? userDoc.data() : {};
-          }
-        } catch (e) {
-          console.error("Firestore loading error during auth change:", e);
-        }
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        const userData = userDoc.exists() ? userDoc.data() : {};
         
-        const activeUser = {
+        setUser({
           id: firebaseUser.uid,
           name: userData.name || firebaseUser.displayName || 'Traveler',
           email: firebaseUser.email || '',
           photo: userData.photo || firebaseUser.photoURL || '',
           phone: userData.phone || ''
-        };
-        setUser(activeUser);
-        localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
+        });
       } else {
-        // Only wipe local session if current user session belongs to a standard Firebase user
-        const currentInMemory = localStorage.getItem('travolor_current_user');
-        if (currentInMemory) {
-          try {
-            const parsed = JSON.parse(currentInMemory);
-            const isLocal = parsed.id.startsWith('local_') || parsed.id.startsWith('phone_user_') || parsed.id.startsWith('google_simulated_');
-            if (!isLocal) {
-              setUser(null);
-              localStorage.removeItem('travolor_current_user');
-            }
-          } catch {
-            setUser(null);
-            localStorage.removeItem('travolor_current_user');
-          }
-        } else {
-          setUser(null);
-        }
+        setUser(null);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -1491,31 +1386,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     if (!user) {
       setSavedTrips([]);
       setBookings([]);
-      return;
-    }
-
-    if (!db) {
-      // Local Backup / Fallback state synchronization
-      const storedTrips = JSON.parse(localStorage.getItem('travolor_local_trips') || '[]');
-      const userTrips = storedTrips.filter((t: any) => t.user_id === user.id);
-      setSavedTrips(userTrips);
-
-      const storedBookings = JSON.parse(localStorage.getItem('travolor_local_bookings') || '[]');
-      const userBookings = storedBookings.filter((b: any) => b.user_id === user.id);
-      setBookings(userBookings);
-
-      const storedWishlist = JSON.parse(localStorage.getItem('travolor_local_wishlist') || '[]');
-      const userWishlist = storedWishlist.filter((w: any) => w.user_id === user.id);
-      setWishlist(userWishlist);
-
-      const localBudget = localStorage.getItem(`travolor_budget_${user.id}`);
-      if (localBudget) {
-        setUserTotalBudget(Number(localBudget));
-      } else {
-        setUserTotalBudget(50000);
-      }
-
-      setEditForm({ name: user.name, phone: user.phone || '', photo: user.photo || '' });
       return;
     }
 
@@ -1592,189 +1462,35 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     setOtpSentCode(code);
     setOtpSent(true);
     setOtpTimer(60);
-
-    // Save logs for admin simulator
-    const newLog = {
-      phone: phoneForm.phone,
-      code,
-      timestamp: new Date().toLocaleString()
-    };
-    const updated = [newLog, ...smsLogs];
-    setSmsLogs(updated);
-    localStorage.setItem('travolor_sms_logs', JSON.stringify(updated));
   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) {
+      setAuthError("Firebase is not configured. Please add your API key to the environment variables.");
+      return;
+    }
     setAuthError(null);
     setLoading(true);
     try {
-      if (!auth) {
-        // Fallback to client-side local account authentication engine
-        if (authMethod === 'email') {
-          if (authMode === 'login') {
-            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-            const existingUser = storedUsers.find((u: any) => u.email === authForm.email && u.password === authForm.password);
-            if (!existingUser) {
-              throw new Error("Invalid email or password (Local Fallback Mode).");
-            }
-            setUser({
-              id: existingUser.id,
-              name: existingUser.name,
-              email: existingUser.email
-            });
-          } else {
-            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-            const userExists = storedUsers.some((u: any) => u.email === authForm.email);
-            if (userExists) {
-              throw new Error("Email already registered (Local Fallback).");
-            }
-            const newLocalUser = {
-              id: `local_${Date.now()}`,
-              name: authForm.name || 'Traveler',
-              email: authForm.email,
-              password: authForm.password
-            };
-            storedUsers.push(newLocalUser);
-            localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
-            setUser({
-              id: newLocalUser.id,
-              name: newLocalUser.name,
-              email: newLocalUser.email
-            });
-          }
-        } else {
-          // Phone Auth Local engine
-          if (!phoneForm.phone || phoneForm.phone.length < 10) {
-            throw new Error("कृपया वैध १० अंकी मोबाईल नंबर टाका. (Please enter a valid 10-digit mobile number.)");
-          }
-          const virtualEmail = `${phoneForm.phone}@travolor.mock`;
-          if (phoneMode === 'otp') {
-            if (!otpSent) {
-              handleSendSimulatedOtp();
-              setLoading(false);
-              return;
-            }
-            if (phoneForm.otp !== otpSentCode && phoneForm.otp !== "123456") {
-              throw new Error("चुकीचा OTP! स्क्रीनवर दिसणारा OTP प्रविष्ट करा. (Incorrect OTP! Please enter the OTP displayed on the screen.)");
-            }
-          }
-          const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-          let existingUser = storedUsers.find((u: any) => u.phone === phoneForm.phone);
-          if (!existingUser) {
-            existingUser = {
-              id: `local_${Date.now()}`,
-              name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-              email: virtualEmail,
-              phone: phoneForm.phone
-            };
-            storedUsers.push(existingUser);
-            localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
-          }
-          setUser({
-            id: existingUser.id,
-            name: existingUser.name,
-            email: existingUser.email,
-            phone: existingUser.phone
-          });
-        }
-        setActiveTab('explore');
-        setLoading(false);
-        return;
-      }
-
       if (authMethod === 'email') {
         if (authMode === 'login') {
-          // Admin Check
-          if (authForm.email.toLowerCase() === 'admin@travolor.com' && authForm.password === 'admin') {
-            const activeUser = {
-              id: 'admin_user',
-              name: 'Travolor Director (Admin)',
-              email: 'admin@travolor.com',
-              role: 'admin'
-            };
-            setUser(activeUser);
-            setIsAdminMode(true);
-            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-            localStorage.setItem('travolor_admin_mode', 'true');
-            setActiveTab('explore');
-            setLoading(false);
-            return;
-          }
-
-          try {
-            await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
-          } catch (err: any) {
-            // Check if user exists in local storage fallback
-            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-            const existingUser = storedUsers.find((u: any) => u.email === authForm.email && u.password === authForm.password);
-            if (existingUser) {
-              const activeUser = {
-                id: existingUser.id,
-                name: existingUser.name,
-                email: existingUser.email
-              };
-              setUser(activeUser);
-              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-              setActiveTab('explore');
-              setLoading(false);
-              return;
-            }
-            throw err;
-          }
+          await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
         } else {
-          try {
-            const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
-            const newUser = userCredential.user;
-            
-            // Initialize user profile in Firestore
-            try {
-              if (db) {
-                await setDoc(doc(db, 'users', newUser.uid), {
-                  name: authForm.name,
-                  email: authForm.email,
-                  totalBudget: 50000,
-                  created_at: new Date().toISOString()
-                });
-              }
-            } catch (fsErr) {
-              console.error("Firestore user creation warning:", fsErr);
-            }
+          const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
+          const newUser = userCredential.user;
+          
+          // Initialize user profile in Firestore
+          await setDoc(doc(db, 'users', newUser.uid), {
+            name: authForm.name,
+            email: authForm.email,
+            totalBudget: 50000,
+            created_at: new Date().toISOString()
+          });
 
-            try {
-              await firebaseUpdateProfile(newUser, {
-                displayName: authForm.name
-              });
-            } catch (profileErr) {
-              console.error("Auth profile update warning:", profileErr);
-            }
-          } catch (err: any) {
-            console.error("Firebase email sign up failed, falling back to secure local registration:", err);
-            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-            const userExists = storedUsers.some((u: any) => u.email === authForm.email);
-            if (userExists) {
-              throw new Error("This email is already registered.");
-            }
-            const newLocalUser = {
-              id: `local_${Date.now()}`,
-              name: authForm.name || 'Traveler',
-              email: authForm.email,
-              password: authForm.password
-            };
-            storedUsers.push(newLocalUser);
-            localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
-            
-            const activeUser = {
-              id: newLocalUser.id,
-              name: newLocalUser.name,
-              email: newLocalUser.email
-            };
-            setUser(activeUser);
-            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-            setActiveTab('explore');
-            setLoading(false);
-            return;
-          }
+          await firebaseUpdateProfile(newUser, {
+            displayName: authForm.name
+          });
         }
         setActiveTab('explore');
       } else {
@@ -1783,39 +1499,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           throw new Error("कृपया वैध १० अंकी मोबाईल नंबर टाका. (Please enter a valid 10-digit mobile number.)");
         }
 
-        // Admin Phone Check
-        if (phoneForm.phone === '9999999999' || phoneForm.phone === '9876543210') {
-          if (phoneMode === 'otp') {
-            if (!otpSent) {
-              handleSendSimulatedOtp();
-              setLoading(false);
-              return;
-            }
-            if (phoneForm.otp !== otpSentCode && phoneForm.otp !== "123456") {
-              throw new Error("चुकीचा OTP! (Incorrect OTP!)");
-            }
-          } else {
-            if (phoneForm.password !== 'admin') {
-              throw new Error("चुकीचा पासवर्ड! (Incorrect Password!)");
-            }
-          }
-          const activeUser = {
-            id: 'admin_user_phone',
-            name: 'Travolor Director (Admin)',
-            email: 'admin@travolor-user.com',
-            phone: phoneForm.phone,
-            role: 'admin'
-          };
-          setUser(activeUser);
-          setIsAdminMode(true);
-          localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-          localStorage.setItem('travolor_admin_mode', 'true');
-          setActiveTab('explore');
-          setLoading(false);
-          return;
-        }
-
-        const virtualEmail = `${phoneForm.phone}@travolor-user.com`;
+        const virtualEmail = `${phoneForm.phone}@travolor.mock`;
         
         if (phoneMode === 'otp') {
           if (!otpSent) {
@@ -1825,240 +1509,61 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           }
 
           if (phoneForm.otp !== otpSentCode && phoneForm.otp !== "123456") {
-            throw new Error("चुकीचा OTP! कृपया पडताळणीसाठी १२३४५६ प्रविष्ट करा. (Incorrect OTP! Please enter 123456 for verification.)");
+            throw new Error("चुकीचा OTP! स्क्रीनवर दिसणारा OTP प्रविष्ट करा. (Incorrect OTP! Please enter the OTP displayed on the screen.)");
           }
 
-          // OTP matches! Try real Firebase first, but fallback gracefully if Firebase has issues.
+          // OTP matches! Authenticate using stable under-the-hood credential to maintain data persistence!
           const otpPassword = `otp_${phoneForm.phone}_travolor_secure`;
           try {
-            let newUserUid = `phone_user_${phoneForm.phone}`;
-            let loggedInUser = null;
-            
-            try {
-              // Try to create the user with Firebase auth first
+            await signInWithEmailAndPassword(auth, virtualEmail, otpPassword);
+          } catch (err: any) {
+            if (err.code === 'auth/user-not-found' || err.message.includes('not-found') || err.message.includes('USER_NOT_FOUND')) {
+              // Create virtual persistent user profile
               const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, otpPassword);
-              loggedInUser = userCredential.user;
-              newUserUid = loggedInUser.uid;
-              
-              // Try to write to Firestore
-              try {
-                if (db) {
-                  await setDoc(doc(db, 'users', newUserUid), {
-                    name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                    email: virtualEmail,
-                    phone: phoneForm.phone,
-                    totalBudget: 50000,
-                    created_at: new Date().toISOString()
-                  });
-                }
-              } catch (fsErr) {
-                console.error("Firestore user creation warning:", fsErr);
-              }
-
-              try {
-                await firebaseUpdateProfile(loggedInUser, {
-                  displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
-                });
-              } catch (profileErr) {
-                console.error("Profile update warning:", profileErr);
-              }
-            } catch (err: any) {
-              // If email already in use, try to sign in
-              if (err.code === 'auth/email-already-in-use' || err.message?.includes('already-in-use') || err.message?.includes('ALREADY_EXISTS') || err.message?.includes('email-already-in-use')) {
-                const userCredential = await signInWithEmailAndPassword(auth, virtualEmail, otpPassword);
-                loggedInUser = userCredential.user;
-                newUserUid = loggedInUser.uid;
-              } else {
-                throw err;
-              }
-            }
-
-            // Real Firebase authentication succeeded
-            const activeUser = {
-              id: newUserUid,
-              name: loggedInUser?.displayName || phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-              phone: phoneForm.phone,
-              email: virtualEmail
-            };
-            setUser(activeUser);
-            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-          } catch (firebaseErr: any) {
-            console.error("Firebase phone OTP authentication failed, falling back to secure local authentication:", firebaseErr);
-            
-            // Local fallback - store user in localstorage so we have standard persistent data
-            const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-            let localUser = storedUsers.find((u: any) => u.phone === phoneForm.phone);
-            if (!localUser) {
-              localUser = {
-                id: `local_phone_${phoneForm.phone}`,
+              const newUser = userCredential.user;
+              await setDoc(doc(db, 'users', newUser.uid), {
                 name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
                 email: virtualEmail,
-                phone: phoneForm.phone
-              };
-              storedUsers.push(localUser);
-              localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
+                phone: phoneForm.phone,
+                totalBudget: 50000,
+                created_at: new Date().toISOString()
+              });
+              await firebaseUpdateProfile(newUser, {
+                displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
+              });
+            } else {
+              throw err;
             }
-            
-            const activeUser = {
-              id: localUser.id,
-              name: localUser.name,
-              phone: localUser.phone,
-              email: localUser.email
-            };
-            setUser(activeUser);
-            localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
           }
-          
           setOtpSent(false);
           setOtpSentCode('');
         } else {
           // Phone Password login or signup
           if (authMode === 'login') {
-            try {
-              const userCredential = await signInWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
-              const loggedInUser = userCredential.user;
-              const activeUser = {
-                id: loggedInUser.uid,
-                name: loggedInUser.displayName || phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                phone: phoneForm.phone,
-                email: virtualEmail
-              };
-              setUser(activeUser);
-              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-            } catch (firebaseErr: any) {
-              console.error("Firebase phone password login failed, trying local fallback:", firebaseErr);
-              // Fallback to local
-              const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-              const localUser = storedUsers.find((u: any) => u.phone === phoneForm.phone && u.password === phoneForm.password);
-              if (localUser) {
-                const activeUser = {
-                  id: localUser.id,
-                  name: localUser.name,
-                  phone: localUser.phone,
-                  email: localUser.email
-                };
-                setUser(activeUser);
-                localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-              } else {
-                throw firebaseErr;
-              }
-            }
+            await signInWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
           } else {
-            // Sign Up with Password
             if (!phoneForm.password || phoneForm.password.length < 6) {
               throw new Error("पासवर्ड किमान ६ अंकी असावा. (Password must be at least 6 characters.)");
             }
-            try {
-              const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
-              const newUser = userCredential.user;
-              
-              try {
-                if (db) {
-                  await setDoc(doc(db, 'users', newUser.uid), {
-                    name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                    email: virtualEmail,
-                    phone: phoneForm.phone,
-                    totalBudget: 50000,
-                    created_at: new Date().toISOString()
-                  });
-                }
-              } catch (fsErr) {
-                console.error("Firestore user creation warning:", fsErr);
-              }
-
-              try {
-                await firebaseUpdateProfile(newUser, {
-                  displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
-                });
-              } catch (profileErr) {
-                console.error("Profile update warning:", profileErr);
-              }
-
-              const activeUser = {
-                id: newUser.uid,
-                name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                phone: phoneForm.phone,
-                email: virtualEmail
-              };
-              setUser(activeUser);
-              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-            } catch (firebaseErr: any) {
-              console.error("Firebase phone password signup failed, falling back to local:", firebaseErr);
-              // Local fallback
-              const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-              const userExists = storedUsers.some((u: any) => u.phone === phoneForm.phone);
-              if (userExists) {
-                throw new Error("This phone number is already registered.");
-              }
-              const localUser = {
-                id: `local_phone_${phoneForm.phone}`,
-                name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
-                email: virtualEmail,
-                phone: phoneForm.phone,
-                password: phoneForm.password
-              };
-              storedUsers.push(localUser);
-              localStorage.setItem('travolor_local_users', JSON.stringify(storedUsers));
-              
-              const activeUser = {
-                id: localUser.id,
-                name: localUser.name,
-                phone: localUser.phone,
-                email: localUser.email
-              };
-              setUser(activeUser);
-              localStorage.setItem('travolor_current_user', JSON.stringify(activeUser));
-            }
+            const userCredential = await createUserWithEmailAndPassword(auth, virtualEmail, phoneForm.password);
+            const newUser = userCredential.user;
+            await setDoc(doc(db, 'users', newUser.uid), {
+              name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+              email: virtualEmail,
+              phone: phoneForm.phone,
+              totalBudget: 50000,
+              created_at: new Date().toISOString()
+            });
+            await firebaseUpdateProfile(newUser, {
+              displayName: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`
+            });
           }
         }
         setActiveTab('explore');
       }
     } catch (err: any) {
       console.error(err);
-      let friendlyMessage = err.message || "Authentication failed.";
-      
-      const isMarathi = language === "Marathi";
-      const isHindi = language === "Hindi";
-
-      if (err.code === 'auth/invalid-credential') {
-        friendlyMessage = isMarathi
-          ? "चुकीचा ईमेल किंवा पासवर्ड. कृपया पुन्हा तपासा आणि प्रयत्न करा."
-          : (isHindi
-            ? "अमान्य ईमेल या पासवर्ड। कृपया जाँचें और पुनः प्रयास करें।"
-            : "Invalid email or password. Please verify your credentials and try again.");
-      } else if (err.code === 'auth/email-already-in-use') {
-        friendlyMessage = isMarathi
-          ? "हा ईमेल पत्ता आधीपासूनच नोंदणीकृत आहे. कृपया लॉगिन करा."
-          : (isHindi
-            ? "यह ईमेल पता पहले से ही पंजीकृत है। कृपया लॉगिन करें।"
-            : "This email address is already registered. Please login instead.");
-      } else if (err.code === 'auth/user-not-found') {
-        friendlyMessage = isMarathi
-          ? "या ईमेलचा कोणताही युझर सापडला नाही. कृपया प्रथम नोंदणी (Sign Up) करा."
-          : (isHindi
-            ? "इस ईमेल के साथ कोई उपयोगकर्ता नहीं मिला। कृपया पहले पंजीकरण (Sign Up) करें।"
-            : "No user found with this email. Please sign up first.");
-      } else if (err.message && (err.message.includes("invalid-credential") || err.message.includes("INVALID_LOGIN_CREDENTIALS"))) {
-        friendlyMessage = isMarathi
-          ? "चुकीचा ईमेल किंवा पासवर्ड. कृपया पुन्हा तपासा आणि प्रयत्न करा."
-          : (isHindi
-            ? "अमान्य ईमेल या पासवर्ड। कृपया जाँचें और पुनः प्रयास करें।"
-            : "Invalid email or password. Please verify your credentials and try again.");
-      } else if (err.message && err.message.includes("email-already-in-use")) {
-        friendlyMessage = isMarathi
-          ? "हा ईमेल पत्ता आधीपासूनच नोंदणीकृत आहे. कृपया लॉगिन करा."
-          : (isHindi
-            ? "यह ईमेल पता पहले से ही पंजीकृत है। कृपया लॉगिन करें।"
-            : "This email address is already registered. Please login instead.");
-      } else if (err.message && err.message.includes("user-not-found")) {
-        friendlyMessage = isMarathi
-          ? "या ईमेलचा कोणताही युझर सापडला नाही. कृपया प्रथम नोंदणी (Sign Up) करा."
-          : (isHindi
-            ? "इस ईमेल के साथ कोई उपयोगकर्ता नहीं मिला। कृपया पहले पंजीकरण (Sign Up) करें।"
-            : "No user found with this email. Please sign up first.");
-      }
-
-      setAuthError(friendlyMessage);
+      setAuthError(err.message || "Authentication failed.");
     } finally {
       setLoading(false);
     }
@@ -2066,18 +1571,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   const handleGoogleLogin = async () => {
     if (!auth) {
-      // Offline fallback Google Login simulator to guarantee user success
-      setLoading(true);
-      setTimeout(() => {
-        setUser({
-          id: `google_simulated_${Date.now()}`,
-          name: 'Google Traveler',
-          email: 'traveler@google-simulated.com',
-          photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80'
-        });
-        setActiveTab('explore');
-        setLoading(false);
-      }, 500);
+      setAuthError("Firebase is not configured. Please add your API key to the environment variables.");
       return;
     }
     setLoading(true);
@@ -2087,21 +1581,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       const user = result.user;
       
       // Check if user exists in Firestore, if not create
-      try {
-        if (db) {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (!userDoc.exists()) {
-            await setDoc(doc(db, 'users', user.uid), {
-              name: user.displayName || 'Traveler',
-              email: user.email,
-              photo: user.photoURL,
-              totalBudget: 50000,
-              created_at: new Date().toISOString()
-            });
-          }
-        }
-      } catch (fsErr) {
-        console.error("Firestore loading or creation error during Google login:", fsErr);
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName || 'Traveler',
+          email: user.email,
+          photo: user.photoURL,
+          totalBudget: 50000,
+          created_at: new Date().toISOString()
+        });
       }
       setActiveTab('explore');
     } catch (err: any) {
@@ -2116,10 +1604,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     if (auth) {
       await signOut(auth);
     }
-    setUser(null);
-    setIsAdminMode(false);
-    localStorage.removeItem('travolor_current_user');
-    localStorage.removeItem('travolor_admin_mode');
     setActiveTab('explore');
   };
 
@@ -2146,30 +1630,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         duration,
         numPeople,
         travelStyle: styleToUse,
-        transportType: transportType,
         language: language,
         enableThinking: enableThinking,
-        useSearch: useSearch,
-        customInstructions: customInstructions,
-        cravingFilter: cravingFilter,
-        travelMood: travelMood,
-        unlockHiddenGems: unlockHiddenGems
+        useSearch: useSearch
       });
       setItinerary(result.text);
-      generateWeatherAndPacking(locationInput);
       if (result.sources) {
         setItinerarySources(result.sources);
       }
       if (result.modelUsed) {
         setModelUsedForItinerary(result.modelUsed);
       }
-      // Automate smooth view scrolling to make the planned itinerary immediately visible!
-      setTimeout(() => {
-        const resultsEl = document.getElementById("results-section");
-        if (resultsEl) {
-          resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }, 200);
       // Simple heuristic to extract some info for the route card if possible
       // Or just set defaults for the visual card
       setRouteSummary({
@@ -2182,22 +1653,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       alert("Failed to generate itinerary. Please try again.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRefineItinerary = async () => {
-    if (!itinerary || !refinementPrompt.trim() || refiningItinerary) return;
-
-    setRefiningItinerary(true);
-    try {
-      const updatedItinerary = await refineItinerary(itinerary, refinementPrompt, language);
-      setItinerary(updatedItinerary);
-      setRefinementPrompt("");
-    } catch (error) {
-      console.error(error);
-      alert("Failed to customize itinerary. Please try again.");
-    } finally {
-      setRefiningItinerary(false);
     }
   };
 
@@ -2297,16 +1752,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     };
 
     try {
-      if (!db) {
-        // Offline Local Storage backing
-        const storedTrips = JSON.parse(localStorage.getItem('travolor_local_trips') || '[]');
-        const newTrip = { id: `trip_${Date.now()}`, ...tripData };
-        storedTrips.push(newTrip);
-        localStorage.setItem('travolor_local_trips', JSON.stringify(storedTrips));
-        setSavedTrips(prev => [newTrip, ...prev]);
-        alert("Trip saved to My Trips! (Saved Offline)");
-        return;
-      }
       await addDoc(collection(db, 'trips'), tripData);
       alert("Trip saved to My Trips!");
     } catch (err) {
@@ -2513,202 +1958,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                     </label>
                   </div>
-
-                  {/* Hidden Gems Unlocker */}
-                  <div className="flex items-center justify-between border-t border-dashed border-gray-100 dark:border-slate-800 pt-3">
-                    <div className="flex items-center gap-3 text-left">
-                      <div className="w-9 h-9 rounded-xl bg-yellow-100/70 dark:bg-yellow-950/20 text-amber-500 flex items-center justify-center">
-                        <Compass size={18} />
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-bold text-[#000080] dark:text-indigo-400">
-                            {language === "Marathi" ? "🔑 ऑफ-बीट 'हिडन जेम्स'" : "🔑 Unlock Hidden Gems"}
-                          </span>
-                        </div>
-                        <span className="text-gray-400 text-[11px]">
-                          {language === "Marathi" ? "गर्दी नसलेली छुप्या स्थानिक जागांचा शोध" : "Avoid tourist trap spots for unique secrets"}
-                        </span>
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={unlockHiddenGems} 
-                        onChange={(e) => setUnlockHiddenGems(e.target.checked)} 
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-yellow-300 dark:peer-focus:ring-yellow-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Mode of Transportation Selector */}
-                <div className="col-span-1 md:col-span-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col text-left">
-                      <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">
-                        {language === "Marathi" ? "सहलीचा प्रवास कसा करणार? / TRIP MODE" : (language === "Hindi" ? "यात्रा कैसे करेंगे? / TRIP MODE" : "How will you travel? / Trip Mode")}
-                      </span>
-                      <span className="text-sm font-bold text-[#000080]" id="transport-selection-title">
-                        {language === "Marathi" ? "प्रवास माध्यम निवडा (यानुसार प्रवासाचे नियोजन बदलेल)" : (language === "Hindi" ? "परिवहन का चयन करें (इसके अनुसार यात्रा का नियोजन बदलेगा)" : "Select Transportation Mode (itinerary changes accordingly)")}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 mt-1">
-                      {[
-                        { id: "self_drive_car", icon: Car, color: "text-amber-500 bg-amber-50 dark:bg-amber-950/20" },
-                        { id: "cab", icon: Car, color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20" },
-                        { id: "train", icon: TrainFront, color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20" },
-                        { id: "bus", icon: Bus, color: "text-purple-500 bg-purple-50 dark:bg-purple-950/20" },
-                        { id: "flight", icon: Plane, color: "text-sky-500 bg-sky-50 dark:bg-sky-950/20" }
-                      ].map((opt) => {
-                        const Icon = opt.icon;
-                        const isSelected = transportType === opt.id;
-                        return (
-                          <button
-                            key={opt.id}
-                            id={`btn-transport-${opt.id}`}
-                            onClick={() => setTransportType(opt.id || "self_drive_car")}
-                            className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-center transition-all cursor-pointer group ${
-                              isSelected 
-                                ? "bg-[#000080] border-[#000080] text-white shadow-md transform scale-[1.03]" 
-                                : "bg-gray-50 border-gray-100 hover:bg-white hover:border-[#1E90FF] text-gray-600 dark:text-slate-300 dark:bg-slate-800 dark:border-slate-700"
-                            }`}
-                          >
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-1.5 transition-all group-hover:scale-110 ${
-                              isSelected ? "bg-white/20 text-white" : opt.color
-                            }`}>
-                              <Icon size={20} />
-                            </div>
-                            <span className="text-xs font-black tracking-tight block">
-                              {language === "Marathi" 
-                                ? (opt.id === "self_drive_car" ? "स्वतःची कार" : opt.id === "cab" ? "कॅब / टॅक्सी" : opt.id === "train" ? "रेल्वे / ट्रेन" : opt.id === "bus" ? "एसटी/बस" : "विमान प्रवास") 
-                                : (language === "Hindi" 
-                                  ? (opt.id === "self_drive_car" ? "स्वयं ड्राइव कार" : opt.id === "cab" ? "कैब / टैक्सी" : opt.id === "train" ? "ट्रेन सफर" : opt.id === "bus" ? "बस द्वारा" : "फ़्लाइट")
-                                  : (opt.id === "self_drive_car" ? "Self-Drive" : opt.id === "cab" ? "Cab / Taxi" : opt.id === "train" ? "Train" : opt.id === "bus" ? "Bus" : "Flight"))}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Mood-Based Itinerary & 1. Hyper-Local Food Trails */}
-                <div className="col-span-1 md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Mood Selector card */}
-                  <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left flex flex-col justify-between">
-                    <div>
-                      <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">
-                        {language === "Marathi" ? "३. मूळ-बेस्ड ट्रिप नियोजन / SELECT YOUR MOOD" : "3. Mood-Based Itinerary Vibe"}
-                      </span>
-                      <span className="text-sm font-bold text-[#000080] dark:text-indigo-400 block mb-3">
-                        {language === "Marathi" ? "तुमचा आजचा मूड कसा आहे? (यानुसार पर्यटन स्थळांचे पर्याय बदलतील)" : "Choose trip flavor according to your active state of mind"}
-                      </span>
-
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { id: "standard", label: language === "Marathi" ? "सामान्य (Standard)" : "Standard", icon: Sparkles, color: "text-blue-500 bg-blue-50/75 dark:bg-blue-950/20" },
-                          { id: "peaceful_relaxed", label: language === "Marathi" ? "शांतता (Peaceful/Quiet)" : "Peaceful & Semi-Chill", icon: Heart, color: "text-rose-500 bg-rose-50/75 dark:bg-rose-950/20" },
-                          { id: "adventure_thrills", label: language === "Marathi" ? "ॲडव्हेंचर (Adventure/Thrills)" : "Adventure & Action", icon: Zap, color: "text-amber-500 bg-amber-50/75 dark:bg-amber-950/20" },
-                          { id: "nature_scenic", label: language === "Marathi" ? "निसर्ग (Scenic/Nature)" : "Nature Escape", icon: Globe, color: "text-emerald-500 bg-emerald-50/75 dark:bg-emerald-950/20" },
-                          { id: "heritage_history", label: language === "Marathi" ? "इतिहास (Heritage/History)" : "Heritage Walk", icon: ShieldCheck, color: "text-indigo-500 bg-indigo-50/75 dark:bg-indigo-950/20" },
-                          { id: "foodie_culinary", label: language === "Marathi" ? "खादाडी (Foodie)" : "Culinary Vibe", icon: ShoppingBag, color: "text-purple-500 bg-purple-50/75 dark:bg-purple-950/20" }
-                        ].map((m) => {
-                          const MoodIcon = m.icon;
-                          const active = travelMood === m.id;
-                          return (
-                            <button
-                              key={m.id}
-                              onClick={() => setTravelMood(m.id)}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                                active 
-                                  ? "bg-[#000080] border-[#000080] text-white shadow-sm" 
-                                  : "bg-gray-50 border-gray-100 hover:bg-white text-gray-600 dark:bg-slate-800 dark:border-slate-750 dark:text-slate-200"
-                              }`}
-                            >
-                              <MoodIcon size={14} className={active ? "text-white" : m.color} />
-                              {m.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Hyperlocal Craving filter card */}
-                  <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left flex flex-col justify-between space-y-3">
-                    <div>
-                      <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">
-                        {language === "Marathi" ? "१. स्ट्रीट फूड आणि स्नॅक ट्रेल्स / STREET FOOD FOODIE COIL" : "1. Hyper-Local Food Craving Trail"}
-                      </span>
-                      <span className="text-sm font-bold text-[#000080] dark:text-indigo-400 block mb-3">
-                        {language === "Marathi" ? "तुम्हाला तिथले कोणते प्रसिद्ध पदार्थ शोधायचे आहेत?" : "AI will search famous small food stands and hidden food lanes"}
-                      </span>
-
-                      <input 
-                        type="text"
-                        value={cravingFilter}
-                        onChange={(e) => setCravingFilter(e.target.value)}
-                        placeholder={
-                          language === "Marathi" 
-                            ? "उदा. कोल्हापुरी मिसळ, तुपातील मऊ शेव टोस्ट, क्रिस्पी बटाटा वडा..." 
-                            : "e.g. Crispy Vadapav, Ghee-based toast, scattered savory farsan..."
-                        }
-                        className="w-full px-4 py-2.5 border border-gray-150 dark:border-slate-750 bg-gray-50 dark:bg-slate-850 text-gray-800 dark:text-white rounded-xl focus:ring-1 focus:ring-blue-500 outline-none text-xs transition-all mb-2"
-                      />
-
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {[
-                          { text: "क्रिस्पी वडापाव / क्रिस्पी समोसा", english: "Crispy Vadapav & Samosa" },
-                          { text: "तूप टोस्ट / ग्रील्ड ब्रेड", english: "Ghee Toast & Grilled Bread" },
-                          { text: "वरून क्रश शेव / चविष्ट फरसाण", english: "Savory Farsan & Crushed Sev" },
-                          { text: "चटपटीत पाणीपुरी / चाट", english: "Tangy Chaat & Street Eats" }
-                        ].map((chip) => {
-                          const active = cravingFilter === chip.text || cravingFilter === chip.english;
-                          return (
-                            <button
-                              key={chip.text}
-                              onClick={() => setCravingFilter(language === "Marathi" ? chip.text : chip.english)}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                active 
-                                  ? "bg-[#1E90FF] border-[#1E90FF] text-white shadow-xs" 
-                                  : "bg-gray-50 border-gray-100 hover:bg-white text-gray-500 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
-                              }`}
-                            >
-                              {language === "Marathi" ? chip.text.split(" / ")[0] : chip.english.split(" & ")[0]}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Custom Preferences / Instructions Field */}
-                <div className="col-span-1 md:col-span-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col text-left">
-                      <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest">
-                        {language === "Marathi" ? "खास पसंती आणि सूचना / CUSTOM PREFERENCES" : (language === "Hindi" ? "विशेष प्राथमिकता और निर्देश / CUSTOM PREFERENCES" : "Custom Preferences & Instructions")}
-                      </span>
-                      <span className="text-sm font-bold text-[#000080] dark:text-indigo-400" id="custom-pref-title">
-                        {language === "Marathi" ? "तुमच्या आवडीनुसार नियोजन करा (उदा. 'फक्त शाकाहारी जेवण', 'काशी विश्वनाथ दर्शन', 'जास्त दगदग नको')" : (language === "Hindi" ? "अपनी इच्छानुसार योजना बनाएं (जैसे 'केवल शाकाहारी भोजन', 'काशी विश्वनाथ दर्शन', 'जल्दी न उठें')" : "Tailor to your taste (e.g. 'only vegetarian food', 'Kashi Vishwanath visit', 'not too hectic')")}
-                      </span>
-                    </div>
-                    <textarea
-                      value={customInstructions}
-                      onChange={(e) => setCustomInstructions(e.target.value)}
-                      placeholder={
-                        language === "Marathi" 
-                          ? "तुमची खास इच्छा किंवा मार्गदर्शक तत्त्वे येथे लिहा (उदा. कस्टमायझेशन)..." 
-                          : (language === "Hindi" ? "अपनी विशेष इच्छा या निर्देश यहाँ लिखें..." : "Enter special requests or preferences here...")
-                      }
-                      rows={2}
-                      className="w-full px-4 py-3 border border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 text-gray-800 dark:text-white rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm transition-all"
-                    />
-                  </div>
                 </div>
 
                 <motion.button
@@ -2747,7 +1996,21 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           </div>
         </section>
 
-
+        {/* Travel Stats Section */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
+          {TRAVEL_STATS.map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-white/50 backdrop-blur-sm border border-white/20 p-8 rounded-[2.5rem] text-center space-y-2 shadow-sm"
+            >
+              <h4 className="text-4xl font-black text-[#000080] tracking-tighter">{stat.value}</h4>
+              <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">{stat.label}</p>
+            </motion.div>
+          ))}
+        </section>
 
 
 
@@ -2781,7 +2044,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
         {itinerary && !loading && (
           <motion.div
-            id="results-section"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-12"
@@ -2812,7 +2074,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       AI Optimized
                     </span>
                   </motion.div>
-                  <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tight">{locationInput}</h2>
+                  <h2 className="text-4xl md:text-6xl font-bold text-[#000080] tracking-tight">{locationInput}</h2>
                 </div>
                 <div className="flex gap-4">
                   <motion.button 
@@ -2995,70 +2257,183 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 </div>
 
                 {/* Interactive Google Map Card */}
-                {isLoaded && mapMarkers.length > 0 && (
+                {mapMarkers.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="bg-white dark:bg-[#0B0F2B] rounded-[3rem] p-6 md:p-8 shadow-xl border border-gray-100 dark:border-slate-800/80 space-y-6"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/20 text-[#1E90FF] flex items-center justify-center">
-                        <MapIcon size={22} />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/20 text-[#1E90FF] flex items-center justify-center">
+                          <MapIcon size={22} />
+                        </div>
+                        <div className="text-left">
+                          <h4 className="text-[#000080] dark:text-[#1E90FF] font-bold text-lg tracking-tight">Interactive Map</h4>
+                          <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">Attractions Route View</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-[#000080] dark:text-[#1E90FF] font-bold text-lg tracking-tight">Interactive Map</h4>
-                        <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">Attractions Route View</p>
-                      </div>
+
+                      {/* View Switcher Toggle */}
+                      {isLoaded && window.google && (
+                        <div className="bg-gray-100 dark:bg-slate-900/60 p-1 rounded-2xl flex items-center gap-1 text-[11px] font-bold self-start sm:self-auto shadow-inner">
+                          <button
+                            type="button"
+                            onClick={() => setMapViewMode("api")}
+                            className={cn(
+                              "px-3 py-1.5 rounded-xl transition-all",
+                              mapViewMode === "api"
+                                ? "bg-white dark:bg-[#1E90FF]/25 text-[#103090] dark:text-[#1E90FF] shadow-sm font-black"
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            )}
+                          >
+                            🗺️ API Map
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMapViewMode("vector")}
+                            className={cn(
+                              "px-3 py-1.5 rounded-xl transition-all",
+                              mapViewMode === "vector"
+                                ? "bg-white dark:bg-[#1E90FF]/25 text-[#103090] dark:text-[#1E90FF] shadow-sm font-black"
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            )}
+                          >
+                            🎨 Visual Route
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="h-[300px] w-full rounded-3xl overflow-hidden border border-gray-100 dark:border-slate-805 relative shadow-inner">
-                      <GoogleMap
-                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                        center={selectedMapMarker ? { lat: selectedMapMarker.lat, lng: selectedMapMarker.lng } : (mapMarkers[0] ? { lat: mapMarkers[0].lat, lng: mapMarkers[0].lng } : { lat: 19.076, lng: 72.877 })}
-                        zoom={selectedMapMarker ? 14 : 12}
-                        options={{
-                          disableDefaultUI: false,
-                          mapTypeControl: false,
-                          streetViewControl: false,
-                          fullscreenControl: true,
-                          styles: [
-                            {
-                              featureType: "poi",
-                              elementType: "labels",
-                              stylers: [{ visibility: "off" }]
-                            }
-                          ]
-                        }}
-                      >
-                        {mapMarkers.map((marker, mIdx) => (
-                          <MarkerF
-                            key={mIdx}
-                            position={{ lat: marker.lat, lng: marker.lng }}
-                            title={marker.name}
-                            onClick={() => setSelectedMapMarker(marker)}
-                            label={{
-                              text: `${mIdx + 1}`,
-                              color: "white",
-                              fontWeight: "bold",
-                              fontSize: "12px"
-                            }}
-                          />
-                        ))}
+                    <div className="h-[300px] w-full rounded-3xl overflow-hidden border border-gray-100 dark:border-slate-800 relative shadow-inner">
+                      {mapViewMode === "api" && isLoaded && window.google ? (
+                        <GoogleMap
+                          mapContainerStyle={{ width: '100%', height: '100%' }}
+                          center={selectedMapMarker ? { lat: selectedMapMarker.lat, lng: selectedMapMarker.lng } : (mapMarkers[0] ? { lat: mapMarkers[0].lat, lng: mapMarkers[0].lng } : { lat: 19.076, lng: 72.877 })}
+                          zoom={selectedMapMarker ? 14 : 12}
+                          options={{
+                            disableDefaultUI: false,
+                            mapTypeControl: false,
+                            streetViewControl: false,
+                            fullscreenControl: true,
+                            styles: [
+                              {
+                                featureType: "poi",
+                                elementType: "labels",
+                                stylers: [{ visibility: "off" }]
+                              }
+                            ]
+                          }}
+                        >
+                          {mapMarkers.map((marker, mIdx) => (
+                            <MarkerF
+                              key={mIdx}
+                              position={{ lat: marker.lat, lng: marker.lng }}
+                              title={marker.name}
+                              onClick={() => setSelectedMapMarker(marker)}
+                              label={{
+                                text: `${mIdx + 1}`,
+                                color: "white",
+                                fontWeight: "bold",
+                                fontSize: "12px"
+                              }}
+                            />
+                          ))}
 
-                        {selectedMapMarker && (
-                          <InfoWindowF
-                            position={{ lat: selectedMapMarker.lat, lng: selectedMapMarker.lng }}
-                            onCloseClick={() => setSelectedMapMarker(null)}
-                          >
-                            <div className="p-2 text-slate-800 dark:text-slate-200 max-w-[200px] text-left">
-                              <h5 className="font-bold text-xs text-[#000080] dark:text-[#1E90FF]">{selectedMapMarker.name}</h5>
-                              <p className="text-[10px] text-gray-500 mt-1 dark:text-gray-450 leading-relaxed">
-                                {selectedMapMarker.description || "Main attraction listed in your AI travel itinerary."}
-                              </p>
+                          {selectedMapMarker && (
+                            <InfoWindowF
+                              position={{ lat: selectedMapMarker.lat, lng: selectedMapMarker.lng }}
+                              onCloseClick={() => setSelectedMapMarker(null)}
+                            >
+                              <div className="p-2 text-slate-800 dark:text-slate-200 max-w-[200px] text-left">
+                                <h5 className="font-bold text-xs text-[#000080] dark:text-[#1E90FF]">{selectedMapMarker.name}</h5>
+                                <p className="text-[10px] text-gray-500 mt-1 dark:text-gray-400 leading-relaxed">
+                                  {selectedMapMarker.description || "Main attraction listed in your AI travel itinerary."}
+                                </p>
+                              </div>
+                            </InfoWindowF>
+                          )}
+                        </GoogleMap>
+                      ) : (
+                        // Customized, exquisite aesthetic visual vector route fallback
+                        (() => {
+                          const lats = mapMarkers.map(m => m.lat);
+                          const lngs = mapMarkers.map(m => m.lng);
+                          const minLat = Math.min(...lats);
+                          const maxLat = Math.max(...lats);
+                          const minLng = Math.min(...lngs);
+                          const maxLng = Math.max(...lngs);
+                          const latRange = maxLat - minLat || 0.001;
+                          const lngRange = maxLng - minLng || 0.001;
+                          const padding = 45;
+                          const width = 500;
+                          const height = 300;
+                          const getXY = (lat: number, lng: number) => {
+                            const x = padding + ((lng - minLng) / lngRange) * (width - padding * 2);
+                            const y = height - padding - ((lat - minLat) / latRange) * (height - padding * 2);
+                            return { x, y };
+                          };
+                          const projectedPoints = mapMarkers.map((marker, idx) => {
+                            const { x, y } = getXY(marker.lat, marker.lng);
+                            return { ...marker, x, y, index: idx + 1 };
+                          });
+                          let pathD = "";
+                          if (projectedPoints.length > 1) {
+                            pathD = `M ${projectedPoints[0].x} ${projectedPoints[0].y}`;
+                            for (let i = 1; i < projectedPoints.length; i++) {
+                              const prev = projectedPoints[i - 1];
+                              const curr = projectedPoints[i];
+                              const cpX1 = prev.x + (curr.x - prev.x) * 0.5;
+                              const cpY1 = prev.y;
+                              const cpX2 = prev.x + (curr.x - prev.x) * 0.5;
+                              const cpY2 = curr.y;
+                              pathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${curr.x} ${curr.y}`;
+                            }
+                          }
+                          return (
+                            <div className="relative w-full h-full bg-[#FAFAFE] dark:bg-[#0A0D23] select-none flex flex-col items-center justify-center p-2 rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
+                              <svg className="absolute inset-0 w-full h-full opacity-40 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                  <pattern id="gmaps-fallback-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                                    <path d="M 30 0 L 0 0 0 30" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-gray-200 dark:text-slate-800/40" />
+                                    <circle cx="0" cy="0" r="1" fill="currentColor" className="text-gray-300 dark:text-slate-700" />
+                                  </pattern>
+                                </defs>
+                                <rect width="100%" height="100%" fill="url(#gmaps-fallback-grid)" />
+                              </svg>
+                              <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full relative z-10 p-4">
+                                {projectedPoints.length > 1 && (
+                                  <>
+                                    <path d={pathD} fill="none" stroke="#1E90FF" strokeWidth="5" strokeLinecap="round" className="opacity-20 dark:opacity-30 blur-[2px]" />
+                                    <path d={pathD} fill="none" stroke="#1E90FF" strokeWidth="2" strokeLinecap="round" strokeDasharray="6,4" />
+                                  </>
+                                )}
+                                {projectedPoints.map((pt, idx) => {
+                                  const isSelected = selectedMapMarker?.name === pt.name;
+                                  return (
+                                    <g key={idx} className="cursor-pointer group transition-all duration-300" onClick={() => setSelectedMapMarker(pt)}>
+                                      {isSelected && <circle cx={pt.x} cy={pt.y} r="18" fill="#1E90FF" className="opacity-25 animate-pulse" />}
+                                      <circle cx={pt.x} cy={pt.y} r={isSelected ? "11" : "8"} fill={isSelected ? "#1E90FF" : "#000080"} stroke="white" strokeWidth="2" className="transition-all duration-300 shadow" />
+                                      <circle cx={pt.x} cy={pt.y} r="3" fill="white" />
+                                      <text x={pt.x} y={pt.y - 14} textAnchor="middle" className="fill-gray-600 dark:fill-gray-300 text-[9px] font-bold font-mono tracking-tight">{pt.index}</text>
+                                    </g>
+                                  );
+                                })}
+                              </svg>
+                              {selectedMapMarker && (
+                                <div className="absolute top-3 left-3 bg-white/95 dark:bg-[#0B0F2B]/95 border border-gray-100 dark:border-slate-800 p-3 rounded-2xl shadow-xl max-w-[210px] text-left z-20 backdrop-blur animate-fade-in mini-card">
+                                  <h5 className="font-bold text-xs text-[#000080] dark:text-[#1E90FF]">{selectedMapMarker.name}</h5>
+                                  <p className="text-[10px] text-gray-500 mt-1 dark:text-gray-400 leading-relaxed truncate">{selectedMapMarker.description || "Main attraction in travel itinerary."}</p>
+                                </div>
+                              )}
+                              <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[8px] font-mono text-gray-400 dark:text-slate-500 z-10 bg-white/70 dark:bg-[#0A0D23]/70 backdrop-blur px-2 py-0.5 rounded-lg">
+                                <div>Lat bounds: {minLat.toFixed(3)}° – {maxLat.toFixed(3)}°N</div>
+                                <div className="text-right">Lng bounds: {minLng.toFixed(3)}° – {maxLng.toFixed(3)}°E</div>
+                              </div>
                             </div>
-                          </InfoWindowF>
-                        )}
-                      </GoogleMap>
+                          );
+                        })()
+                      )}
                     </div>
 
                     <div className="space-y-3">
@@ -3114,107 +2489,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                {/* 4. Smart Weather-Synced Packing Checklist */}
-                <div className="bg-white rounded-[3rem] p-8 md:p-10 shadow-xl border border-gray-100/70 space-y-6 text-left">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/20 text-sky-500 flex items-center justify-center">
-                      <Thermometer size={22} />
-                    </div>
-                    <div>
-                      <h4 className="text-[#000080] font-bold text-lg tracking-tight">
-                        {language === "Marathi" ? "४. स्मार्ट पॅकिंग आणि हवामान" : "4. Weather & Packing"}
-                      </h4>
-                      <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">
-                        {language === "Marathi" ? "हवामानानुसार चेकलिस्ट" : "Weather-Synced Checklists"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Forecast alert banner */}
-                  <div className="bg-sky-50/70 dark:bg-sky-950/10 border border-sky-150 rounded-2xl p-4 flex gap-3 text-sky-800 dark:text-sky-300">
-                    <CloudRain size={20} className="shrink-0 mt-0.5" />
-                    <div className="space-y-0.5">
-                      <p className="text-[10px] uppercase font-bold tracking-widest opacity-60">
-                        {language === "Marathi" ? "अपेक्षित हवामान" : "Expected Weather"}
-                      </p>
-                      <p className="text-sm font-bold">{weatherForecast}</p>
-                    </div>
-                  </div>
-
-                  {/* Packing items checklist */}
-                  <div className="space-y-3.5">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
-                      {language === "Marathi" ? "तुमची बॅग बॅक करा (चेकलिस्ट)" : "YOUR SMART PACKING LIST"}
-                    </p>
-
-                    <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-                      {weatherPackingChecklist.map((itemObj, idx) => (
-                        <div 
-                          key={idx}
-                          onClick={() => {
-                            const updated = [...weatherPackingChecklist];
-                            updated[idx].checked = !updated[idx].checked;
-                            setWeatherPackingChecklist(updated);
-                          }}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all",
-                            itemObj.checked 
-                              ? "bg-slate-50/50 border-emerald-200 text-gray-400Line line-through" 
-                              : "bg-gray-50/50 border-gray-100 hover:bg-white text-gray-700 hover:shadow-sm"
-                          )}
-                        >
-                          <div className={cn(
-                            "w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all",
-                            itemObj.checked 
-                              ? "border-emerald-500 bg-emerald-500 text-white" 
-                              : "border-gray-300 bg-white"
-                          )}>
-                            {itemObj.checked && <Check size={12} strokeWidth={3} />}
-                          </div>
-                          <span className={cn("text-xs font-semibold select-none", itemObj.checked ? "line-through text-gray-400" : "text-gray-75 *")}>{itemObj.item}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Add Packing Item Bar */}
-                    <div className="flex gap-2 pt-2 border-t border-gray-50">
-                      <input 
-                        type="text"
-                        id="new-packing-item-input"
-                        placeholder={language === "Marathi" ? "नवीन वस्तू जोडा..." : "Add to pack list..."}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const input = e.currentTarget;
-                            if (input.value.trim()) {
-                              setWeatherPackingChecklist([
-                                ...weatherPackingChecklist,
-                                { item: input.value.trim(), checked: false }
-                              ]);
-                              input.value = "";
-                            }
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50/50 rounded-xl outline-none focus:ring-1 focus:ring-sky-500 text-xs text-gray-700"
-                      />
-                      <button 
-                        onClick={() => {
-                          const input = document.getElementById('new-packing-item-input') as HTMLInputElement;
-                          if (input && input.value.trim()) {
-                            setWeatherPackingChecklist([
-                              ...weatherPackingChecklist,
-                              { item: input.value.trim(), checked: false }
-                            ]);
-                            input.value = "";
-                          }
-                        }}
-                        className="bg-sky-500 hover:bg-sky-600 text-white px-3 py-2 rounded-xl text-xs font-black"
-                      >
-                        +
-                      </button>
-                    </div>
                   </div>
                 </div>
               </aside>
@@ -3353,162 +2627,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         );
                       })}
                     </div>
-
-                    {/* 2. Interactive Expense Logger Panel */}
-                    <div className="border-t border-dashed border-gray-150 dark:border-slate-800 pt-8 mt-5 space-y-6 text-left">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div>
-                          <h4 className="text-xl font-bold text-[#000080] dark:text-[#1E90FF] flex items-center gap-2">
-                            <span>₹ {language === "Marathi" ? "प्रत्यक्ष रोजचा खर्च ट्रॅकर" : "2. Actual Day-by-Day Expenses"}</span>
-                          </h4>
-                          <p className="text-gray-400 text-xs mt-1">
-                            {language === "Marathi" ? "तुमचे प्रत्यक्षातील खर्च नोंदवा. बजेट अधिक झाल्यास AI तुमच्या सहलीचे आयोजन बदलून देईल!" : "Log what you actually spend on the go. Over-budget? Let AI optimize your activities!"}
-                          </p>
-                        </div>
-
-                        {actualExpenses.length > 0 && (
-                          <button 
-                            onClick={async () => {
-                              const expenseSum = actualExpenses.reduce((s, e) => s + e.amount, 0);
-                              const dynamicPrompt = `\n\n- REAL-TIME RE-BUDGET ADJUSTMENT FORCE: The traveler has already spent ${expenseSum} INR out of their total original budget of ${userTotalBudget} INR. Re-optimize the remaining schedule days of the trip to prioritize free attractions, inexpensive street food joints, and much cheaper local travel options to prevent going over budget!`;
-                              setLoading(true);
-                              try {
-                                const result = await generateItinerary({
-                                  location: locationInput,
-                                  startLocation: startLocation,
-                                  duration,
-                                  numPeople,
-                                  travelStyle: "budget", // Auto-downgrade style to keep them safe
-                                  transportType: transportType,
-                                  language: language,
-                                  enableThinking: enableThinking,
-                                  useSearch: true,
-                                  customInstructions: (customInstructions ? customInstructions + dynamicPrompt : dynamicPrompt)
-                                });
-                                setItinerary(result.text);
-                                generateWeatherAndPacking(locationInput);
-                                alert(language === "Marathi" ? "AI ने तुमच्या नवीन खर्चानुसार ट्रिप रि-ऑप्टिमाइझ केली आहे!" : "AI Itinerary has been successfully optimized based on your actual budget spent!");
-                              } catch (err) {
-                                alert("Failed to re-budget trip. Try again.");
-                              } finally {
-                                setLoading(false);
-                              }
-                            }}
-                            className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
-                          >
-                            <Sparkles size={14} />
-                            {language === "Marathi" ? "✨ AI बजेट पुनर्गठन" : "✨ AI Auto-Adjust Itinerary"}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Log Input Form */}
-                      <form 
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          const form = e.currentTarget;
-                          const descInput = form.elements.namedItem('expenseDesc') as HTMLInputElement;
-                          const amountInput = form.elements.namedItem('expenseAmount') as HTMLInputElement;
-                          const daySelect = form.elements.namedItem('expenseDay') as HTMLSelectElement;
-
-                          if (descInput.value.trim() && amountInput.value) {
-                            const newExp = {
-                              id: Math.random().toString(36).substr(2, 9),
-                              desc: descInput.value.trim(),
-                              amount: Number(amountInput.value),
-                              day: Number(daySelect.value)
-                            };
-                            setActualExpenses([...actualExpenses, newExp]);
-                            descInput.value = "";
-                            amountInput.value = "";
-                          }
-                        }}
-                        className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 bg-gray-50 dark:bg-slate-850 p-4 rounded-2xl border border-gray-100 dark:border-slate-800"
-                      >
-                        <div className="flex flex-col text-left">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{language === "Marathi" ? "दिवस / Day" : "Day"}</label>
-                          <select name="expenseDay" className="bg-white dark:bg-slate-800 border border-gray-200 text-gray-700 dark:text-white rounded-xl px-2 py-2 text-xs outline-none">
-                            {Array.from({ length: duration }).map((_, i) => (
-                              <option key={i + 1} value={i + 1}>{language === "Marathi" ? `दिवस ${i + 1}` : `Day ${i + 1}`}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex flex-col text-left sm:col-span-2">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{language === "Marathi" ? "खर्चाचे वर्णन / What did you pay for?" : "What did you buy/pay for?"}</label>
-                          <input 
-                            name="expenseDesc" 
-                            type="text" 
-                            placeholder={language === "Marathi" ? "उदा. रिक्षा भाडे, कोल्हापुरी थाळी..." : "e.g. Lunch, taxi ride, souvenir..."}
-                            className="bg-white dark:bg-slate-800 border border-gray-200 text-gray-700 dark:text-white rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-[#1E90FF]"
-                            required
-                          />
-                        </div>
-
-                        <div className="flex flex-col text-left relative justify-end">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{language === "Marathi" ? "रक्कम (₹) / Amount" : "Amount (₹)"}</label>
-                          <div className="flex gap-2">
-                            <input 
-                              name="expenseAmount" 
-                              type="number" 
-                              placeholder="₹"
-                              className="w-full bg-white dark:bg-slate-800 border border-gray-200 text-gray-700 dark:text-white rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-[#1E90FF]"
-                              required
-                            />
-                            <button 
-                              type="submit"
-                              className="bg-[#000080] hover:bg-indigo-900 text-white font-black text-xs px-4 py-2 rounded-xl"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-
-                      {/* Expense Listing sheet */}
-                      {actualExpenses.length > 0 ? (
-                        <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                          <div className="flex justify-between items-center text-[10px] font-extrabold text-gray-400 uppercase tracking-wider px-1">
-                            <span>{language === "Marathi" ? "खर्च नोंदी" : "Logged Entries"}</span>
-                            <span className="text-[#000080]" id="expense-total">
-                              {language === "Marathi" ? "एकूण प्रत्यक्ष खर्च: " : "Total Spent: "} 
-                              {formatPrice(actualExpenses.reduce((s, e) => s + e.amount, 0))}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {actualExpenses.map((expense) => (
-                              <div 
-                                key={expense.id} 
-                                className="flex justify-between items-center p-3 rounded-xl border border-gray-100 bg-white dark:bg-slate-900 group hover:border-[#1E90FF] transition-all"
-                              >
-                                <div className="flex items-center gap-2.5 overflow-hidden">
-                                  <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-200 shrink-0">
-                                    Day {expense.day}
-                                  </span>
-                                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">{expense.desc}</span>
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <span className="text-xs font-black text-gray-800 dark:text-white font-mono">{formatPrice(expense.amount)}</span>
-                                  <button 
-                                    onClick={() => {
-                                      setActualExpenses(actualExpenses.filter(e => e.id !== expense.id));
-                                    }}
-                                    className="text-gray-300 hover:text-red-500 transition-colors"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-gray-400 text-xs text-center italic py-2">
-                          {language === "Marathi" ? "अद्याप कोणताही प्रत्यक्ष खर्च नोंदवला गेला नाही." : "No actual expenses logged yet. Create entries to keep track!"}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 );
               })()}
@@ -3593,24 +2711,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <motion.div 
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
-              onClick={() => {
-                const nextClicks = logoClicks + 1;
-                setLogoClicks(nextClicks);
-                if (nextClicks >= 5) {
-                  const target = !isAdminMode;
-                  setIsAdminMode(target);
-                  localStorage.setItem('travolor_admin_mode', target ? 'true' : 'false');
-                  setLogoClicks(0);
-                  setAuthError(`🔑 Admin Mode Simulation ${target ? "Enabled" : "Disabled"}!`);
-                }
-              }}
-              className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-[0_12px_45px_rgba(10,31,68,0.15)] mx-auto relative group overflow-hidden p-0.5 border-2 border-[#000080]/10 cursor-pointer select-none"
+              className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group overflow-hidden p-4"
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/25 to-transparent opacity-50" />
               <img 
                 src="/logo.png" 
-                alt="Travolor Logo"  
-                className="w-full h-full object-cover rounded-full relative z-10 group-hover:scale-105 transition-transform duration-500"
+                alt="Travolor Logo" 
+                className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
                 referrerPolicy="no-referrer"
               />
             </motion.div>
@@ -3630,7 +2738,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             </motion.div>
           )}
 
-
+          {/* Simulated OTP Notification Banner */}
+          {otpSent && authMethod === 'phone' && otpSentCode && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-2xl text-xs text-center font-bold shadow-sm relative overflow-hidden"
+            >
+              <div className="flex flex-col gap-1 items-center">
+                <span className="uppercase tracking-widest text-[9px] text-emerald-600 font-extrabold">{curLang.otpSentToast} +91 {phoneForm.phone}</span>
+                <span className="text-2xl font-black text-emerald-900 tracking-[0.25em]">{otpSentCode}</span>
+                <span className="text-[10px] text-gray-400 font-medium">(Security simulation: verify by entering this code)</span>
+              </div>
+            </motion.div>
+          )}
 
           <div className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.055)] space-y-6">
             {/* Toggle tabs for Email / Phone */}
@@ -3787,7 +2908,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         placeholder="98765 43210"
                         value={phoneForm.phone}
                         onChange={(e) => {
-                          const sanitized = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          const sanitized = e.target.value.replace(/D/g, '').slice(0, 10);
                           setPhoneForm({...phoneForm, phone: sanitized});
                         }}
                         className={cn(
@@ -3822,123 +2943,140 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     </div>
                   )}
 
-                  {phoneMode === 'otp' && otpSent && (
-                    <div className="space-y-1 py-1">
-                      <div className="flex justify-between items-center px-1">
-                        <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-2">{curLang.enterOtp}</label>
-                        <span className="text-[10px] font-bold text-blue-500">
-                          {otpTimer > 0 ? (
-                            `${curLang.resendOtp} ${otpTimer}s`
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleSendSimulatedOtp}
-                              className="hover:underline font-black focus:outline-none"
-                            >
-                              {curLang.resendNow}
-                            </button>
-                          )}
-                        </span>
-                      </div>
+                  {phoneMode === 'otp' && (
+                    <>
+                      {/* Send OTP button if OTP not sent yet */}
+                      {!otpSent && (
+                        <div className="py-1">
+                          <button
+                            type="button"
+                            onClick={handleSendSimulatedOtp}
+                            disabled={loading || !phoneForm.phone}
+                            className="w-full py-3 rounded-xl bg-[#1E90FF]/15 hover:bg-[#1E90FF]/25 text-[#1E90FF] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                          >
+                            {loading ? <Loader2 className="animate-spin" size={14} /> : 'Send Verification OTP'}
+                          </button>
+                        </div>
+                      )}
 
-                      <div className="relative group">
-                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 group-focus-within:text-[#000080] transition-colors" size={16} />
-                        <input 
-                          type="text" 
-                          required
-                          pattern="\d{6}"
-                          placeholder="******"
-                          value={phoneForm.otp}
-                          onChange={(e) => {
-                            const sanitized = e.target.value.replace(/\D/g, '').slice(0, 6);
-                            setPhoneForm({...phoneForm, otp: sanitized});
-                          }}
-                          className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-4 py-3.5 text-[#000080] font-black tracking-[0.5em] text-center text-lg placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-emerald-100 focus:bg-white transition-all"
-                        />
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-1.5 text-center font-semibold">
-                        कृपया पडताळणीसाठी <strong className="text-emerald-600 font-extrabold">123456</strong> प्रविष्ट करा. (Please enter 123456 for verification.)
-                      </p>
-                    </div>
+                      {/* Code verify input if OTP is sent */}
+                      {otpSent && (
+                        <div className="space-y-1 py-1">
+                          <div className="flex justify-between items-center px-1">
+                            <label className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-2">{curLang.enterOtp}</label>
+                            <span className="text-[10px] font-bold text-blue-500">
+                              {otpTimer > 0 ? (
+                                `${curLang.resendOtp} ${otpTimer}s`
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleSendSimulatedOtp}
+                                  className="hover:underline font-black focus:outline-none"
+                                >
+                                  {curLang.resendNow}
+                                </button>
+                              )}
+                            </span>
+                          </div>
+                          <div className="relative group">
+                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 group-focus-within:text-[#000080] transition-colors" size={16} />
+                            <input 
+                              type="text" 
+                              required
+                              pattern="\d{6}"
+                              placeholder="******"
+                              value={phoneForm.otp}
+                              onChange={(e) => {
+                                const sanitized = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                setPhoneForm({...phoneForm, otp: sanitized});
+                              }}
+                              className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-12 pr-4 py-3.5 text-[#000080] font-black tracking-[0.5em] text-center text-lg placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-emerald-100 focus:bg-white transition-all"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
 
+              <div className="flex items-center justify-between px-2 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer group select-none">
+                  <div 
+                    onClick={() => setRememberMe(!rememberMe)}
+                    className={cn(
+                      "w-4 h-4 rounded border transition-all flex items-center justify-center",
+                      rememberMe ? "bg-[#000080] border-[#000080]" : "border-gray-200 group-hover:border-gray-300"
+                    )}
+                  >
+                    {rememberMe && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-gray-500">Remember me</span>
+                </label>
+                <button type="button" className="font-bold text-[#1E90FF] hover:underline hover:text-[#000080]">Forgot?</button>
+              </div>
 
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                type="submit"
+                disabled={loading}
+                className="w-full btn-primary py-4 rounded-xl font-black text-xs uppercase tracking-[0.15em] disabled:opacity-50 flex items-center justify-center gap-3 shadow-md"
+              >
+                {loading ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <>
+                    {authMethod === 'phone' && phoneMode === 'otp' && !otpSent ? curLang.sendOtp : 'Continue'}
+                    {!(authMethod === 'phone' && phoneMode === 'otp' && !otpSent) && <Plane size={14} className="rotate-45" />}
+                  </>
+                )}
+              </motion.button>
+            </form>
 
-            <div className="flex items-center justify-between px-2">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <div 
-                  onClick={() => setRememberMe(!rememberMe)}
-                  className={cn(
-                    "w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center",
-                    rememberMe ? "bg-[#000080] border-[#000080]" : "border-gray-200 group-hover:border-gray-300"
-                  )}
-                >
-                  {rememberMe && <Check size={14} className="text-white" />}
-                </div>
-                <span className="text-xs font-bold text-gray-500">Remember me</span>
-              </label>
-              <button type="button" className="text-xs font-bold text-orange-500 hover:underline">Forgot Password?</button>
+            <div className="relative flex items-center py-1">
+              <div className="flex-grow border-t border-gray-100"></div>
+              <span className="flex-shrink mx-4 text-gray-300 text-[9px] font-black uppercase tracking-widest">or</span>
+              <div className="flex-grow border-t border-gray-100"></div>
             </div>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={loading}
-              className="w-full btn-primary py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] disabled:opacity-50 flex items-center justify-center gap-3"
-            >
-              {loading ? <Loader2 className="animate-spin" /> : 'Start Your Journey'}
-              {!loading && <Plane size={18} className="rotate-45" />}
-            </motion.button>
-          </form>
-
-          <div className="relative flex items-center py-2">
-            <div className="flex-grow border-t border-gray-100"></div>
-            <span className="flex-shrink mx-4 text-gray-300 text-[10px] font-black uppercase tracking-widest">OR</span>
-            <div className="flex-grow border-t border-gray-100"></div>
+            <div className="grid grid-cols-1 gap-3">
+              <button 
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full bg-white border border-gray-100 text-[#000080] py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continue with Google
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            <button 
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full bg-white border border-gray-100 text-[#000080] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Continue with Google
-            </button>
-            <button 
-              disabled={loading}
-              className="w-full bg-white border border-gray-100 text-[#000080] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
-            >
-              <Phone size={18} className="text-emerald-500" />
-              Continue with Phone OTP
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-center text-gray-400 text-xs font-semibold">
+          <p className="text-center text-gray-500 text-sm font-medium">
             {authMode === 'login' ? "New user?" : "Already have an account?"}
             <button 
-              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-              className="ml-2 text-[#1E90FF] font-black hover:text-[#000080] transition-colors"
+              type="button"
+              onClick={() => {
+                setAuthMode(authMode === 'login' ? 'signup' : 'login');
+                setOtpSent(false);
+                setOtpSentCode('');
+                setAuthError(null);
+              }}
+              className="ml-2 text-[#000080] font-black hover:text-orange-500 transition-colors"
             >
               {authMode === 'login' ? 'Sign Up' : 'Login'}
             </button>
           </p>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
+        </motion.div>
+      </div>
+    );
+  };
 
   const renderMyTrips = () => (
     <div className="space-y-10 pb-12">
@@ -4245,161 +3383,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     </div>
   );
 
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-
-  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordError(null);
-    setPasswordSuccess(null);
-
-    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmNewPassword) {
-      setPasswordError("कृपया सर्व फील्ड भरा. (Please fill in all fields.)");
-      return;
-    }
-
-    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      setPasswordError("नवीन पासवर्ड आणि पुष्टीकरण पासवर्ड जुळत नाहीत. (New passwords do not match.)");
-      return;
-    }
-
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError("पासवर्ड किमान ६ अक्षरी असावा. (Password must be at least 6 characters.)");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const currentUserData = JSON.parse(localStorage.getItem('travolor_current_user') || '{}');
-      if (currentUserData.id && currentUserData.id.startsWith('local_')) {
-        const storedUsers = JSON.parse(localStorage.getItem('travolor_local_users') || '[]');
-        const updatedUsers = storedUsers.map((u: any) => {
-          if (u.id === currentUserData.id) {
-            return { ...u, password: passwordForm.newPassword };
-          }
-          return u;
-        });
-        localStorage.setItem('travolor_local_users', JSON.stringify(updatedUsers));
-      } else {
-        const currentUserFirebase = auth.currentUser;
-        if (currentUserFirebase) {
-          await updatePassword(currentUserFirebase, passwordForm.newPassword);
-        }
-      }
-
-      setPasswordSuccess("पासवर्ड यशस्वीरित्या बदलला आहे! (Password updated successfully!)");
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
-      setTimeout(() => {
-        setIsChangingPassword(false);
-        setPasswordSuccess(null);
-      }, 2000);
-    } catch (err: any) {
-      console.error(err);
-      setPasswordError(err.message || "पासवर्ड बदलण्यात त्रुटी आली. (Failed to update password.)");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderChangePassword = () => {
-    return (
-      <div className="space-y-8 pb-24 px-4 md:px-0">
-        <div className="flex items-center gap-4 pt-8">
-          <button type="button" onClick={() => {
-            setIsChangingPassword(false);
-            setPasswordError(null);
-            setPasswordSuccess(null);
-          }} className="p-2 hover:bg-gray-100 rounded-full transition-all">
-            <ArrowLeft size={24} className="text-[#000080]" />
-          </button>
-          <h2 className="text-3xl font-serif font-black text-[#000080] tracking-tight">Change Password</h2>
-        </div>
-
-        <form onSubmit={handlePasswordChangeSubmit} className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-          {passwordError && (
-            <div className="bg-rose-50 border border-rose-100 text-rose-600 p-4 rounded-xl text-xs font-bold text-center">
-              {passwordError}
-            </div>
-          )}
-
-          {passwordSuccess && (
-            <div className="bg-emerald-50 border border-emerald-100 text-emerald-600 p-4 rounded-xl text-xs font-bold text-center">
-              {passwordSuccess}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Current Password</label>
-            <div className="relative">
-              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-              <input 
-                type="password"
-                required
-                value={passwordForm.currentPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all text-sm animate-none"
-                placeholder="Current password"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">New Password</label>
-            <div className="relative">
-              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-              <input 
-                type="password"
-                required
-                value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all text-sm animate-none"
-                placeholder="New password (min 6 characters)"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Confirm New Password</label>
-            <div className="relative">
-              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-              <input 
-                type="password"
-                required
-                value={passwordForm.confirmNewPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-4 text-[#000080] font-bold outline-none focus:border-[#1E90FF] focus:bg-white transition-all text-sm animate-none"
-                placeholder="Confirm new password"
-              />
-            </div>
-          </div>
-
-          <div className="pt-4 space-y-4">
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#000080] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:glow-blue transition-all disabled:opacity-50"
-            >
-              {loading ? "Updating..." : "Update Password"}
-            </motion.button>
-            <button 
-              type="button"
-              onClick={() => {
-                setIsChangingPassword(false);
-                setPasswordError(null);
-                setPasswordSuccess(null);
-              }}
-              className="w-full bg-white text-gray-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] border border-gray-100 hover:bg-gray-50 transition-all"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  };
-
   const startEditing = () => {
     if (user) {
       setEditForm({ name: user.name, phone: user.phone || '', photo: user.photo || '' });
@@ -4543,7 +3526,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const renderProfile = () => {
     if (!user) return renderAuth();
     if (isEditingProfile) return renderEditProfile();
-    if (isChangingPassword) return renderChangePassword();
     
     return (
       <div className="space-y-12 pb-24 px-4 md:px-0">
@@ -4582,10 +3564,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             </div>
 
             {[
-              { label: "Change Password", icon: Lock, color: "text-amber-500", onClick: () => setIsChangingPassword(true) },
-              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone", onClick: startEditing }
+              { label: "Change Password", icon: Lock, color: "text-amber-500" },
+              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone" }
             ].map((item, idx) => (
-              <button key={idx} onClick={item.onClick} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
+              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
                     <item.icon size={20} className={item.color} />
@@ -4772,162 +3754,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     );
   };
 
-  const renderAdminDashboard = () => {
-    return (
-      <div className="space-y-8 pb-24 px-4 md:px-0">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-8">
-          <div>
-            <h2 className="text-3xl font-serif font-black text-[#000080] tracking-tight">System Administration Console</h2>
-            <p className="text-gray-400 font-bold text-xs tracking-wider uppercase mt-1">Simulated Testing Environment & Master Control</p>
-          </div>
-          <button
-            onClick={() => {
-              setIsAdminMode(false);
-              localStorage.setItem('travolor_admin_mode', 'false');
-              setActiveTab('explore');
-            }}
-            className="bg-[#000080] text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md hover:glow-blue transition-all"
-          >
-            Switch to Customer View
-          </button>
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mock Accounts</p>
-              <h3 className="text-3xl font-serif font-black text-[#000080] mt-1">{allUsers.length}</h3>
-            </div>
-            <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500">
-              <Users size={24} />
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sent OTP logs</p>
-              <h3 className="text-3xl font-serif font-black text-[#000080] mt-1">{smsLogs.length}</h3>
-            </div>
-            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500">
-              <Mail size={24} />
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Bookings</p>
-              <h3 className="text-3xl font-serif font-black text-[#000080] mt-1">{allBookings.length}</h3>
-            </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
-              <BookingIcon size={24} />
-            </div>
-          </div>
-        </div>
-
-        {/* Live SMS Dispatch Center */}
-        <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-          <div className="p-6 md:p-8 border-b border-gray-50 flex items-center justify-between bg-amber-50/20">
-            <div>
-              <h3 className="text-lg font-black text-[#000080]">📡 Simulated SMS Keys</h3>
-              <p className="text-gray-400 text-xs mt-1">Latest dispatch verification codes (No phone carrier costs)</p>
-            </div>
-            {smsLogs.length > 0 && (
-              <button 
-                onClick={() => {
-                  setSmsLogs([]);
-                  localStorage.removeItem('travolor_sms_logs');
-                }}
-                className="text-rose-600 hover:text-rose-700 font-bold text-xs"
-              >
-                Clear SMS Logs
-              </button>
-            )}
-          </div>
-          
-          <div className="p-6 md:p-8 space-y-4">
-            {smsLogs.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 space-y-2">
-                <p className="font-bold text-sm">No SMS Dispatched in this session yet.</p>
-                <p className="text-xs">Trigger one by entering a mobile number on the login screen and clicking 'Send OTP'.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-widest font-black text-[10px]">
-                      <th className="pb-4 pl-4">Timestamp</th>
-                      <th className="pb-4">Phone Number</th>
-                      <th className="pb-4 pr-4 text-right">Verification Code (OTP)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {smsLogs.map((log, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50/50">
-                        <td className="py-4 pl-4 font-mono text-gray-500">{log.timestamp}</td>
-                        <td className="py-4 font-bold text-[#000080]">+91 {log.phone}</td>
-                        <td className="py-4 pr-4 text-right">
-                          <span className="bg-emerald-50 text-emerald-700 font-mono font-black border border-emerald-100 px-3 py-1.5 rounded-lg text-sm tracking-widest">
-                            {log.code}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Registered Customer Database Fallback */}
-        <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-          <div className="p-6 md:p-8 border-b border-gray-50 bg-blue-50/10">
-            <h3 className="text-lg font-black text-[#000080]">👥 Fallback User Registration Registry</h3>
-            <p className="text-gray-400 text-xs mt-1">Active users stored locally inside browser's local sandbox</p>
-          </div>
-
-          <div className="p-6 md:p-8 space-y-4">
-            {allUsers.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 space-y-2">
-                <p className="font-bold text-sm">Registry is Empty.</p>
-                <p className="text-xs">Customers registered locally will appear here instantly.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {allUsers.map((u, idx) => (
-                  <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-gray-50 border border-gray-100 rounded-2xl">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#1E90FF]/10 text-[#000080] flex items-center justify-center font-bold">
-                        {u.name?.charAt(0) || 'T'}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-[#000080]">{u.name}</h4>
-                        <p className="text-[10px] text-gray-400 font-medium">{u.email} {u.phone && `• +91 ${u.phone}`}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => {
-                          const updated = allUsers.filter(usr => usr.id !== u.id && usr.email !== u.email);
-                          setAllUsers(updated);
-                          localStorage.setItem('travolor_local_users', JSON.stringify(updated));
-                        }}
-                        className="bg-white border border-rose-100 text-rose-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-rose-50 transition-all cursor-pointer"
-                      >
-                        Delete User
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className={cn(
       "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#000080] dark:text-[#E2E8F0]",
@@ -4952,7 +3778,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <img 
               src="/logo.png" 
               alt="Travolor Logo" 
-              className="h-11 w-11 rounded-full object-cover border border-white/20 shadow-sm"
+              className="h-10 w-auto object-contain"
               referrerPolicy="no-referrer"
             />
             <span className={cn(
@@ -5015,7 +3841,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             {activeTab === 'trips' && renderMyTrips()}
             {activeTab === 'bookings' && renderBookings()}
             {activeTab === 'profile' && renderProfile()}
-            {activeTab === 'admin' && (isAdminMode || user?.role === 'admin') && renderAdminDashboard()}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -5238,8 +4063,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             { id: "explore", icon: Globe, label: "Explore" },
             { id: "trips", icon: MapIcon, label: "Trips" },
             { id: "bookings", icon: BookingIcon, label: "Bookings" },
-            { id: "profile", icon: Settings, label: "Settings" },
-            ...(isAdminMode || user?.role === 'admin' ? [{ id: "admin", icon: ShieldCheck, label: "Admin" }] : [])
+            { id: "profile", icon: Settings, label: "Settings" }
           ].map((tab) => (
             <button
               key={tab.id}
