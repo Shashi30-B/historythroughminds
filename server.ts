@@ -8,17 +8,22 @@ import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 dotenv.config();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = new Database("travel_app.db");
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+let aiClient: GoogleGenAI | null = null;
+function getAi() {
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY || "dummy-key",
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
-});
+  return aiClient;
+}
 
 // Initialize DB
 db.exec(`
@@ -749,7 +754,7 @@ Rules:
     }
 
     try {
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: model,
         contents: prompt,
         config: config
@@ -1081,7 +1086,7 @@ Rules:
       }));
 
       // Initialize stateless multi-turn chat using config
-      const chat = ai.chats.create({
+      const chat = getAi().chats.create({
         model: selectedModel,
         history: history,
         config: config
@@ -1240,7 +1245,7 @@ Format: "Suggested Destinations starting with ${letter}: City1, City2, City3, ..
 Keep it professional and high-end.`;
 
     try {
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: "gemini-3.5-flash",
         contents: prompt,
       });
@@ -1282,9 +1287,9 @@ Keep it professional and high-end.`;
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
+    app.use(express.static(path.join(process.cwd(), "dist")));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      res.sendFile(path.join(process.cwd(), "dist", "index.html"));
     });
   }
 

@@ -2716,7 +2716,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
               <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/25 to-transparent opacity-50" />
               <img 
-                src="/logo.png" 
+                src="/travolor-logo.svg" 
                 alt="Travolor Logo" 
                 className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
                 referrerPolicy="no-referrer"
@@ -3776,7 +3776,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             onClick={() => setActiveTab('explore')}
           >
             <img 
-              src="/logo.png" 
+              src="/travolor-logo.svg" 
               alt="Travolor Logo" 
               className="h-10 w-auto object-contain"
               referrerPolicy="no-referrer"
