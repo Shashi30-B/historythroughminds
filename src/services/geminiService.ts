@@ -83,8 +83,8 @@ Keep it professional and high-end.`;
       contents: prompt,
     });
     return response.text || "";
-  } catch (error) {
-    console.error("Client-side getSuggestions error:", error);
+  } catch (error: any) {
+    console.warn("Client-side getSuggestions fallback warning:", error.message || error);
     return "";
   }
 }
@@ -168,8 +168,8 @@ Rules:
     });
 
     return { text: response.text || "Sorry, I couldn't generate the plan." };
-  } catch (error) {
-    console.error("Client-side generateItinerary error:", error);
+  } catch (error: any) {
+    console.warn("Client-side generateItinerary fallback warning:", error.message || error);
     return { text: "Something went wrong. Please try again." };
   }
 }
@@ -194,7 +194,7 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
     const errData = await response.json();
     throw new Error(errData.error || "Failed to communicate with chat API");
   } catch (error: any) {
-    console.error("sendChatMessage error:", error);
+    console.warn("sendChatMessage fallback warning:", error.message || error);
     return {
       text: "I'm having trouble matching your connection at the moment. Please ensure your Gemini API Key is available in Secrets.",
       grounded: false

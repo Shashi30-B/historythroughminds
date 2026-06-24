@@ -27,10 +27,13 @@ import { twMerge } from 'tailwind-merge';
 import { useLoadScript, Autocomplete, GoogleMap, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { generateItinerary, getSuggestions, sendChatMessage } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
+import AIHub from './components/AIHub';
+import { ItineraryShareModal } from './components/ItineraryShareModal';
+import { AnimatedItinerary } from './components/AnimatedItinerary';
 
 const libraries: ("places")[] = ["places"];
 
-import { auth, db } from './firebase';
+import { auth, db, isFirebaseAvailable } from './firebase';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -213,6 +216,70 @@ const FALLBACK_CITIES = [
   { description: 'Kyoto, Japan', place_id: 'kyoto', structured_formatting: { main_text: 'Kyoto', secondary_text: 'Japan' } },
   { description: 'Kathmandu, Nepal', place_id: 'kathmandu', structured_formatting: { main_text: 'Kathmandu', secondary_text: 'Nepal' } },
 ];
+
+const CITY_COORDS_DB: Record<string, { lat: number, lng: number }> = {
+  mumbai: { lat: 19.0760, lng: 72.8777 },
+  pune: { lat: 18.5204, lng: 73.8567 },
+  kolhapur: { lat: 16.7050, lng: 74.2433 },
+  mahabaleshwar: { lat: 17.9237, lng: 73.6586 },
+  lonavala: { lat: 18.7481, lng: 73.4072 },
+  nashik: { lat: 19.9975, lng: 73.7898 },
+  alibaug: { lat: 18.6584, lng: 72.8777 },
+  shirdi: { lat: 19.7661, lng: 74.4754 },
+  aurangabad: { lat: 19.8762, lng: 75.3433 },
+  nagpur: { lat: 21.1458, lng: 79.0882 },
+  ratnagiri: { lat: 16.9902, lng: 73.3120 },
+  satara: { lat: 17.6805, lng: 73.9918 },
+  solapur: { lat: 17.6599, lng: 75.9064 },
+  sangli: { lat: 16.8524, lng: 74.5815 },
+  thane: { lat: 19.2183, lng: 72.9781 },
+  kolkata: { lat: 22.5726, lng: 88.3639 },
+  kochi: { lat: 9.9312, lng: 76.2673 },
+  kedarnath: { lat: 30.7346, lng: 79.0669 },
+  kashmir: { lat: 34.0837, lng: 74.7973 },
+  kanyakumari: { lat: 8.0883, lng: 77.5385 },
+  kodaikanal: { lat: 11.4102, lng: 76.6950 },
+  karwar: { lat: 14.5479, lng: 74.3188 },
+  kanpur: { lat: 26.4499, lng: 80.3319 },
+  delhi: { lat: 28.7041, lng: 77.1025 },
+  bangalore: { lat: 12.9716, lng: 77.5946 },
+  hyderabad: { lat: 17.3850, lng: 78.4867 },
+  chennai: { lat: 13.0827, lng: 80.2707 },
+  goa: { lat: 15.2993, lng: 74.1240 },
+  jaipur: { lat: 26.9124, lng: 75.7873 },
+  udaipur: { lat: 24.5854, lng: 73.7125 },
+  manali: { lat: 32.2396, lng: 77.1887 },
+  shimla: { lat: 31.1048, lng: 77.1734 },
+  ooty: { lat: 11.4102, lng: 76.6950 },
+  munnar: { lat: 10.0889, lng: 77.0595 },
+  dubai: { lat: 25.2048, lng: 55.2708 },
+  bali: { lat: -8.4095, lng: 115.1889 },
+  london: { lat: 51.5074, lng: -0.1278 },
+  newyork: { lat: 40.7128, lng: -74.0060 },
+  paris: { lat: 48.8566, lng: 2.3522 },
+  singapore: { lat: 1.3521, lng: 103.8198 },
+  kualalumpur: { lat: 3.1390, lng: 101.6869 },
+  kyoto: { lat: 35.0116, lng: 135.7681 },
+  kathmandu: { lat: 27.7172, lng: 85.3240 },
+  chopta: { lat: 30.4853, lng: 79.2255 },
+  alleppey: { lat: 9.4981, lng: 76.3388 },
+  gokarna: { lat: 14.5479, lng: 74.3188 },
+  gandikota: { lat: 15.0277, lng: 78.2861 }
+};
+
+function lookupCityCoords(cityName: string, providedCoords: {lat: number, lng: number} | null): {lat: number, lng: number} | null {
+  if (providedCoords && providedCoords.lat && providedCoords.lng) {
+    return providedCoords;
+  }
+  const clean = (cityName || "").toLowerCase().trim();
+  if (!clean) return null;
+  for (const [key, val] of Object.entries(CITY_COORDS_DB)) {
+    if (clean.includes(key)) {
+      return val;
+    }
+  }
+  return null;
+}
 
 const LocationInput = ({ 
   value, 
@@ -499,7 +566,8 @@ const LocationInput = ({
 
 function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [activeTab, setActiveTab] = useState("explore");
-  const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string} | null>(null);
+  const [hubSubTab, setHubSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport">("chat");
+  const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string, totalBudget?: number} | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
@@ -512,6 +580,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [headlineIndex, setHeadlineIndex] = useState(0);
+  const [paisaBudget, setPaisaBudget] = useState<"budget" | "mid" | "family">("budget");
+  const [paisaSize, setPaisaSize] = useState<"couple" | "small" | "joint">("small");
+  const [selectedHackTab, setSelectedHackTab] = useState<"irctc" | "food" | "stay" | "local">("irctc");
+  const [shareModalData, setShareModalData] = useState<{
+    location: string;
+    startLocation: string;
+    duration: number;
+    style: string;
+    numPeople: number;
+    totalCost: number;
+    itinerary: string;
+    date?: string;
+  } | null>(null);
 
   const headlines = ["Explore the World with Travolor", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
 
@@ -544,6 +625,25 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [mapMarkers, setMapMarkers] = useState<Array<{ name: string; lat: number; lng: number; description?: string }>>([]);
   const [selectedMapMarker, setSelectedMapMarker] = useState<any | null>(null);
   const [mapViewMode, setMapViewMode] = useState<"api" | "vector">("vector");
+  const [isMapsBlocked, setIsMapsBlocked] = useState(false);
+
+  useEffect(() => {
+    // Intercept Google Maps API authentication or target block errors (ApiTargetBlockedMapError)
+    const originalAuthFailure = (window as any).gm_authFailure;
+    (window as any).gm_authFailure = () => {
+      console.warn("Google Maps authentication or key target restriction detected. Gracefully defaulting to visual vector route.");
+      setIsMapsBlocked(true);
+      setMapViewMode("vector");
+      if (originalAuthFailure) {
+        try {
+          originalAuthFailure();
+        } catch (e) {}
+      }
+    };
+    return () => {
+      (window as any).gm_authFailure = originalAuthFailure;
+    };
+  }, []);
 
   useEffect(() => {
     if (!itinerary || !locationInput) {
@@ -827,12 +927,53 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [transportType, setTransportType] = useState("public"); // public, private, flight
   const [accommodationType, setAccommodationType] = useState("standard"); // hostel, standard, luxury
 
-  const liveBudget = useMemo(() => {
-    const transportRates: Record<string, number> = { public: 500, private: 2000, flight: 5000 };
-    const hotelRates: Record<string, number> = { hostel: 800, standard: 2500, luxury: 8000 };
-    const foodRates: Record<string, number> = { budget: 500, standard: 1200, luxury: 3000 };
-    const activityRates: Record<string, number> = { low: 300, medium: 1000, high: 2500 };
+  const travelDistanceKm = useMemo(() => {
+    const fromC = lookupCityCoords(startLocation || "Mumbai", startCoords);
+    const toC = lookupCityCoords(locationInput || "Goa", endCoords);
+    if (!fromC || !toC) return 450; // default realistic distance for Mumbai to Goa
 
+    const R = 6371; // km
+    const dLat = (toC.lat - fromC.lat) * Math.PI / 180;
+    const dLon = (toC.lng - fromC.lng) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(fromC.lat * Math.PI / 180) * Math.cos(toC.lat * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const directDistance = R * c;
+    return Math.max(50, Math.round(directDistance * 1.25)); // winding multiplier, min 50km
+  }, [startLocation, locationInput, startCoords, endCoords]);
+
+  const liveBudget = useMemo(() => {
+    // 1. Calculate realistic transport costs based on real railway & airline rules
+    // public (Sleeper Class train / State Transport Bus) -> ₹0.90 per km per person
+    // private (3AC reservation train / AC intercity bus) -> ₹2.40 per km per person
+    // flight (Flight travel) -> ₹6.50 per km per person (minimum ₹3,200 per ticket)
+    let perPersonTransport = 0;
+    if (transportType === "public") {
+      perPersonTransport = Math.max(180, travelDistanceKm * 0.90);
+    } else if (transportType === "private") {
+      perPersonTransport = Math.max(480, travelDistanceKm * 2.40);
+    } else { // flight
+      perPersonTransport = Math.max(3200, travelDistanceKm * 6.50);
+    }
+    const transportCost = Math.round(perPersonTransport * numPeople);
+
+    // 2. Hotel costs based on realistic room requirements and rates
+    // If couple: 1 room. If small family: 2 rooms. If joint: 3 rooms (for joint family, let's assume 3 rooms)
+    const roomsCount = numPeople <= 2 ? 1 : numPeople <= 4 ? 2 : Math.ceil(numPeople / 2);
+    let roomRatePerNight = 1200;
+    if (accommodationType === "hostel") {
+      roomRatePerNight = 650; // dormitory rates or low-budget dharamshala
+    } else if (accommodationType === "standard") {
+      roomRatePerNight = 2200; // clean family hotel/homestay
+    } else { // luxury
+      roomRatePerNight = 6500; // premium 4-star / heritage resort
+    }
+    const hotelCost = roomRatePerNight * duration * roomsCount;
+
+    // 3. Food costs based on real plate rates
+    const foodRates: Record<string, number> = { budget: 220, standard: 550, luxury: 1400 };
     const styleMap: Record<string, { food: string, activities: string }> = {
       budget: { food: 'budget', activities: 'low' },
       standard: { food: 'standard', activities: 'medium' },
@@ -840,13 +981,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       adventure: { food: 'standard', activities: 'high' },
       family: { food: 'standard', activities: 'medium' }
     };
-
     const currentStyle = styleMap[travelStyle] || styleMap.standard;
-    
-    const transportCost = transportRates[transportType] * numPeople;
-    const hotelCost = hotelRates[accommodationType] * duration * numPeople;
     const foodCost = foodRates[currentStyle.food] * duration * numPeople;
+
+    // 4. Activities / Sightseeing
+    const activityRates: Record<string, number> = { low: 150, medium: 450, high: 1200 };
     const activitiesCost = activityRates[currentStyle.activities] * duration * numPeople;
+
     const totalCost = transportCost + hotelCost + foodCost + activitiesCost;
 
     return {
@@ -854,9 +995,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       hotelCost,
       foodCost,
       activitiesCost,
-      totalCost
+      totalCost,
+      roomsCount,
+      roomRatePerNight,
+      perPersonTransport
     };
-  }, [transportType, accommodationType, travelStyle, duration, numPeople, locationInput]);
+  }, [transportType, accommodationType, travelStyle, duration, numPeople, travelDistanceKm]);
 
   const aiSuggestedBudget = useMemo(() => {
     const getDailyRate = (style: string) => {
@@ -1358,8 +1502,32 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     return `${s}${(inrAmount * rate).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   };
 
-  // Firebase Auth Listener
+  // Firebase Auth Listener & Sandbox mode initializer
   React.useEffect(() => {
+    if (!isFirebaseAvailable) {
+      // In Guest/Local sandbox mode, load or auto-create a persistent profile so all features work immediately!
+      const savedUser = localStorage.getItem("travolor_local_user");
+      const defaultLocalUser = {
+        id: "guest_user",
+        name: "Indian Explorer",
+        email: "historythroughminds@gmail.com",
+        photo: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+        phone: "+91 98765 43210",
+        totalBudget: 80000
+      };
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (e) {
+          setUser(defaultLocalUser);
+        }
+      } else {
+        setUser(defaultLocalUser);
+        localStorage.setItem("travolor_local_user", JSON.stringify(defaultLocalUser));
+      }
+      return;
+    }
+
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -1381,11 +1549,66 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     return () => unsubscribe();
   }, []);
 
-  // Firestore Real-time Listeners
+  // Firestore & Local Real-time Listeners
   React.useEffect(() => {
     if (!user) {
       setSavedTrips([]);
       setBookings([]);
+      setWishlist([]);
+      setUserTotalBudget(50000);
+      return;
+    }
+
+    setEditForm({ name: user.name, phone: user.phone || '', photo: user.photo || '' });
+
+    if (!isFirebaseAvailable) {
+      // Load Local Saved Trips
+      const localTrips = localStorage.getItem("travolor_local_trips");
+      if (localTrips) {
+        try {
+          setSavedTrips(JSON.parse(localTrips).filter((t: any) => t.user_id === user.id));
+        } catch (e) {
+          setSavedTrips([]);
+        }
+      } else {
+        setSavedTrips([]);
+      }
+
+      // Load Local Bookings
+      const localBookings = localStorage.getItem("travolor_local_bookings");
+      if (localBookings) {
+        try {
+          setBookings(JSON.parse(localBookings));
+        } catch (e) {
+          setBookings([]);
+        }
+      } else {
+        if (user.id === "guest_user") {
+          const defaultBookings = [
+            { id: "b1", title: "Heritage Palace Stay, Jaipur", type: "Hotel", date: "28 Jun 2026", status: "Confirmed" },
+            { id: "b2", title: "Mumbai (BOM) ➔ Jaipur (JAI) Flight", type: "Flight", date: "27 Jun 2026", status: "Confirmed" }
+          ];
+          setBookings(defaultBookings);
+          localStorage.setItem("travolor_local_bookings", JSON.stringify(defaultBookings));
+        } else {
+          setBookings([]);
+        }
+      }
+
+      // Load Local Wishlist
+      const localWishlist = localStorage.getItem("travolor_local_wishlist");
+      if (localWishlist) {
+        try {
+          setWishlist(JSON.parse(localWishlist).filter((w: any) => w.user_id === user.id));
+        } catch (e) {
+          setWishlist([]);
+        }
+      } else {
+        setWishlist([]);
+      }
+
+      // Set budget
+      setUserTotalBudget(user.totalBudget || 80000);
       return;
     }
 
@@ -1429,8 +1652,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       }
     });
 
-    setEditForm({ name: user.name, phone: user.phone || '', photo: user.photo || '' });
-
     return () => {
       unsubscribeTrips();
       unsubscribeBookings();
@@ -1466,8 +1687,123 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
+    setLoading(true);
+
+    if (!isFirebaseAvailable) {
+      // Offline / Local Sandbox simulation
+      try {
+        if (authMethod === 'email') {
+          const localUsers = JSON.parse(localStorage.getItem("travolor_registered_users") || "[]");
+          if (authMode === 'login') {
+            const matched = localUsers.find((u: any) => u.email === authForm.email && u.password === authForm.password);
+            if (!matched) {
+              throw new Error("चुकीचा ईमेल किंवा पासवर्ड! (Invalid email or password!)");
+            }
+            const loggedUser = {
+              id: matched.id,
+              name: matched.name,
+              email: matched.email,
+              photo: matched.photo || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+              phone: matched.phone || "",
+              totalBudget: matched.totalBudget || 50000
+            };
+            setUser(loggedUser);
+            localStorage.setItem("travolor_local_user", JSON.stringify(loggedUser));
+          } else {
+            const emailExists = localUsers.some((u: any) => u.email === authForm.email);
+            if (emailExists) {
+              throw new Error("या ईमेलने आधीच नोंदणी केली आहे. (Email is already registered.)");
+            }
+            const newUser = {
+              id: "local_u_" + Date.now(),
+              name: authForm.name,
+              email: authForm.email,
+              password: authForm.password,
+              phone: "",
+              totalBudget: 50000,
+              photo: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
+            };
+            localUsers.push(newUser);
+            localStorage.setItem("travolor_registered_users", JSON.stringify(localUsers));
+            
+            const loggedUser = {
+              id: newUser.id,
+              name: newUser.name,
+              email: newUser.email,
+              photo: newUser.photo,
+              phone: newUser.phone,
+              totalBudget: newUser.totalBudget
+            };
+            setUser(loggedUser);
+            localStorage.setItem("travolor_local_user", JSON.stringify(loggedUser));
+          }
+        } else {
+          // Phone mode simulation
+          if (!phoneForm.phone || phoneForm.phone.length < 10) {
+            throw new Error("कृपया वैध १० अंकी मोबाईल नंबर टाका. (Please enter a valid 10-digit mobile number.)");
+          }
+          const virtualEmail = `${phoneForm.phone}@travolor.mock`;
+          const localUsers = JSON.parse(localStorage.getItem("travolor_registered_users") || "[]");
+          let matched = localUsers.find((u: any) => u.phone === phoneForm.phone || u.email === virtualEmail);
+
+          if (phoneMode === 'otp') {
+            if (!otpSent) {
+              handleSendSimulatedOtp();
+              setLoading(false);
+              return;
+            }
+            if (phoneForm.otp !== otpSentCode && phoneForm.otp !== "123456") {
+              throw new Error("चुकीचा OTP! स्क्रीनवर दिसणारा OTP प्रविष्ट करा. (Incorrect OTP!)");
+            }
+          } else {
+            if (authMode === 'login') {
+              if (!matched || matched.password !== phoneForm.password) {
+                throw new Error("चुकीचा फोन नंबर किंवा पासवर्ड! (Incorrect phone or password!)");
+              }
+            }
+          }
+
+          if (!matched) {
+            matched = {
+              id: "local_u_" + Date.now(),
+              name: phoneForm.name || `Traveler ${phoneForm.phone.slice(-4)}`,
+              email: virtualEmail,
+              password: phoneForm.password || `otp_${phoneForm.phone}_travolor_secure`,
+              phone: phoneForm.phone,
+              totalBudget: 50000,
+              photo: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
+            };
+            localUsers.push(matched);
+            localStorage.setItem("travolor_registered_users", JSON.stringify(localUsers));
+          }
+
+          const loggedUser = {
+            id: matched.id,
+            name: matched.name,
+            email: matched.email,
+            photo: matched.photo,
+            phone: matched.phone,
+            totalBudget: matched.totalBudget
+          };
+          setUser(loggedUser);
+          localStorage.setItem("travolor_local_user", JSON.stringify(loggedUser));
+          setOtpSent(false);
+          setOtpSentCode('');
+        }
+        setActiveTab('explore');
+      } catch (err: any) {
+        console.error(err);
+        setAuthError(err.message || "Authentication failed.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!auth) {
       setAuthError("Firebase is not configured. Please add your API key to the environment variables.");
+      setLoading(false);
       return;
     }
     setAuthError(null);
@@ -1570,6 +1906,22 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   };
 
   const handleGoogleLogin = async () => {
+    if (!isFirebaseAvailable) {
+      // Simulate quick Google Login with a beautiful local account
+      const mockGoogleUser = {
+        id: "mock_google_u",
+        name: "Google Explorer",
+        email: "google.traveler@gmail.com",
+        photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+        phone: "+91 99999 88888",
+        totalBudget: 60000
+      };
+      setUser(mockGoogleUser);
+      localStorage.setItem("travolor_local_user", JSON.stringify(mockGoogleUser));
+      setActiveTab('explore');
+      return;
+    }
+
     if (!auth) {
       setAuthError("Firebase is not configured. Please add your API key to the environment variables.");
       return;
@@ -1601,8 +1953,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   };
 
   const handleLogout = async () => {
-    if (auth) {
+    if (isFirebaseAvailable && auth) {
       await signOut(auth);
+    } else {
+      setUser(null);
+      localStorage.removeItem("travolor_local_user");
     }
     setActiveTab('explore');
   };
@@ -1711,23 +2066,48 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     const existing = wishlist.find(w => w.dest_id === dest.id);
     if (existing) {
-      try {
-        await deleteDoc(doc(db, 'wishlist', existing.id));
-      } catch (err) {
-        console.error(err);
+      if (isFirebaseAvailable) {
+        try {
+          await deleteDoc(doc(db, 'wishlist', existing.id));
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        const localWishlist = localStorage.getItem("travolor_local_wishlist");
+        let list = [];
+        if (localWishlist) {
+          try { list = JSON.parse(localWishlist); } catch (e) {}
+        }
+        const updated = list.filter((w: any) => w.id !== existing.id);
+        localStorage.setItem("travolor_local_wishlist", JSON.stringify(updated));
+        setWishlist(updated.filter((w: any) => w.user_id === user.id));
       }
     } else {
-      try {
-        await addDoc(collection(db, 'wishlist'), {
-          user_id: user.id,
-          dest_id: dest.id,
-          title: dest.title,
-          img: dest.img,
-          desc: dest.desc,
-          created_at: new Date().toISOString()
-        });
-      } catch (err) {
-        console.error(err);
+      const wishItem = {
+        id: "wish_" + Date.now(),
+        user_id: user.id,
+        dest_id: dest.id,
+        title: dest.title,
+        img: dest.img,
+        desc: dest.desc,
+        created_at: new Date().toISOString()
+      };
+
+      if (isFirebaseAvailable) {
+        try {
+          await addDoc(collection(db, 'wishlist'), wishItem);
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        const localWishlist = localStorage.getItem("travolor_local_wishlist");
+        let list = [];
+        if (localWishlist) {
+          try { list = JSON.parse(localWishlist); } catch (e) {}
+        }
+        list.push(wishItem);
+        localStorage.setItem("travolor_local_wishlist", JSON.stringify(list));
+        setWishlist(list.filter((w: any) => w.user_id === user.id));
       }
     }
   };
@@ -1741,6 +2121,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     }
     
     const tripData = {
+      id: "trip_" + Date.now(),
       user_id: user.id,
       start_location: startLocation,
       location: locationInput,
@@ -1751,13 +2132,63 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       created_at: new Date().toISOString()
     };
 
-    try {
-      await addDoc(collection(db, 'trips'), tripData);
+    if (isFirebaseAvailable) {
+      try {
+        await addDoc(collection(db, 'trips'), tripData);
+        alert("Trip saved to My Trips!");
+      } catch (err) {
+        console.error(err);
+        alert("Failed to save trip.");
+      }
+    } else {
+      const allTrips = localStorage.getItem("travolor_local_trips");
+      let list = [];
+      if (allTrips) {
+        try { list = JSON.parse(allTrips); } catch (e) {}
+      }
+      list.unshift(tripData);
+      localStorage.setItem("travolor_local_trips", JSON.stringify(list));
+      setSavedTrips(list.filter((t: any) => t.user_id === user.id));
       alert("Trip saved to My Trips!");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to save trip.");
     }
+  };
+
+  const handleQuickBook = async (serviceType: 'Hotel' | 'Flight' | 'Bus', serviceName: string, serviceUrl: string) => {
+    if (!user) {
+      alert("Please login to book services!");
+      setActiveTab('profile');
+      return;
+    }
+
+    const bookingItem = {
+      id: "book_" + Date.now(),
+      user_id: user.id,
+      title: `${serviceType === 'Hotel' ? 'Hotel Stay' : serviceType === 'Flight' ? 'Flight' : 'Bus Ticket'} to ${serviceName}`,
+      type: serviceType,
+      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      status: 'Confirmed',
+      created_at: new Date().toISOString()
+    };
+
+    if (isFirebaseAvailable) {
+      try {
+        await addDoc(collection(db, 'bookings'), bookingItem);
+      } catch (err) {
+        console.error("Booking write failed:", err);
+      }
+    } else {
+      const localBookings = localStorage.getItem("travolor_local_bookings");
+      let list = [];
+      if (localBookings) {
+        try { list = JSON.parse(localBookings); } catch (e) {}
+      }
+      list.unshift(bookingItem);
+      localStorage.setItem("travolor_local_bookings", JSON.stringify(list));
+      setBookings(list);
+    }
+
+    alert(`🎉 Booking simulation successful! Your ${serviceType} booking has been recorded in your Bookings tab.\nOpening ticket partner in a new tab...`);
+    window.open(serviceUrl, '_blank');
   };
 
   const openInMaps = (loc: string) => {
@@ -1767,6 +2198,106 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const currentColor = StyleColors[travelStyle] || StyleColors.standard;
 
   const renderExplore = () => {
+    const basePeople = paisaSize === "couple" ? 2 : paisaSize === "small" ? 4 : 6;
+    const roomsCount = basePeople <= 2 ? 1 : basePeople <= 4 ? 2 : 3;
+    const simDuration = 3; // 3-day trip simulation
+    let originalCost = 0;
+    let optimizedCost = 0;
+    let transportAdvice = "";
+    let foodAdvice = "";
+    let stayAdvice = "";
+
+    if (paisaBudget === "budget") {
+      const origTravel = travelDistanceKm * 3.5 * basePeople;
+      const optTravel = travelDistanceKm * 0.9 * basePeople;
+      const origHotel = basePeople * 2800 * simDuration;
+      const optHotel = roomsCount * 950 * simDuration;
+      const origFood = basePeople * 800 * simDuration;
+      const optFood = basePeople * 220 * simDuration;
+      originalCost = Math.round(origTravel + origHotel + origFood);
+      optimizedCost = Math.round(optTravel + optHotel + optFood);
+
+      transportAdvice = `Sleeper Class (SL) train @ ₹0.90/km. Book early with Lower Berth Priority!`;
+      foodAdvice = `Local dhabas & street-food paths (avg. ₹220/day per person). Clean & hyper-authentic!`;
+      stayAdvice = `Safe family homestays or dharamshalas @ ₹950/night for ${roomsCount} room${roomsCount > 1 ? 's' : ''}.`;
+    } else if (paisaBudget === "mid") {
+      const origTravel = travelDistanceKm * 6 * basePeople;
+      const optTravel = travelDistanceKm * 2.4 * basePeople;
+      const origHotel = basePeople * 4500 * simDuration;
+      const optHotel = roomsCount * 2200 * simDuration;
+      const origFood = basePeople * 1400 * simDuration;
+      const optFood = basePeople * 550 * simDuration;
+      originalCost = Math.round(origTravel + origHotel + origFood);
+      optimizedCost = Math.round(optTravel + optHotel + optFood);
+
+      transportAdvice = `3AC reservation or premium sleeper bus @ ₹2.40/km (Tatkal pre-filled passenger lists).`;
+      foodAdvice = `IRCTC e-Catering train deliveries & local unlimited traditional thalis (avg. ₹550/day).`;
+      stayAdvice = `High-rated family-hosted homestays @ ₹2,200/night for ${roomsCount} room${roomsCount > 1 ? 's' : ''}.`;
+    } else {
+      const origTravel = travelDistanceKm * 10 * basePeople;
+      const optTravel = travelDistanceKm * 3.5 * basePeople;
+      const origHotel = basePeople * 7000 * simDuration;
+      const optHotel = roomsCount * 4500 * simDuration;
+      const origFood = basePeople * 2200 * simDuration;
+      const optFood = basePeople * 850 * simDuration;
+      originalCost = Math.round(origTravel + origHotel + origFood);
+      optimizedCost = Math.round(optTravel + optHotel + optFood);
+
+      transportAdvice = `Vande Bharat Express comfort or private tourist AC cab @ ₹3.50/km.`;
+      foodAdvice = `Heritage restaurants with curated pure-veg family thali systems (avg. ₹850/day).`;
+      stayAdvice = `Boutique Havelis or cozy villa stays @ ₹4,500/night for ${roomsCount} room${roomsCount > 1 ? 's' : ''}.`;
+    }
+
+    const savingsFactor = Math.round(((originalCost - optimizedCost) / originalCost) * 100) || 65;
+
+    const domesticGems = [
+      {
+        id: "chopta",
+        name: "Chopta, Uttarakhand",
+        insteadOf: "Switzerland Alps",
+        internationalCost: "₹3,50,000",
+        domesticCostStr: "₹18,500",
+        savings: "94% Saved",
+        image: "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=600&q=80",
+        tag: "🏆 Mini-Switzerland of India"
+      },
+      {
+        id: "alleppey",
+        name: "Alleppey, Kerala",
+        insteadOf: "Venice Canals",
+        internationalCost: "₹2,80,000",
+        domesticCostStr: "₹14,200",
+        savings: "95% Saved",
+        image: "https://images.unsplash.com/photo-1593693397690-362cb9666fc2?auto=format&fit=crop&w=600&q=80",
+        tag: "🛶 Venice of the East"
+      },
+      {
+        id: "gokarna",
+        name: "Gokarna, Karnataka",
+        insteadOf: "Bali Beaches",
+        internationalCost: "₹1,20,000",
+        domesticCostStr: "₹11,500",
+        savings: "90% Saved",
+        image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80",
+        tag: "🌊 Unspoiled Coastal Bliss"
+      },
+      {
+        id: "gandikota",
+        name: "Gandikota, Andhra Pradesh",
+        insteadOf: "Grand Canyon USA",
+        internationalCost: "₹4,20,000",
+        domesticCostStr: "₹9,800",
+        savings: "97% Saved",
+        image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=600&q=80",
+        tag: "⛰️ Grand Canyon of India"
+      }
+    ];
+
+    const handleSetDestination = (destName: string) => {
+      setLocationInput(destName);
+      window.scrollTo({ top: 350, behavior: "smooth" });
+    };
+
     return (
       <div className="space-y-16 pb-24">
         {/* Hero Section with Banner Background */}
@@ -2012,8 +2543,362 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           ))}
         </section>
 
+        {/* Premium AI Co-Pilot Features Suite */}
+        <section className="space-y-8 px-4">
+          <div className="text-center space-y-2">
+            <span className="bg-blue-100/80 dark:bg-[#1E90FF]/10 text-[#000080] dark:text-[#93C5FD] px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest border border-blue-200/40 dark:border-[#1E90FF]/20">
+              💎 Travolor Premium Suite
+            </span>
+            <h3 className="text-3xl md:text-4xl font-display font-black text-[#000080] dark:text-white tracking-tight">
+              AI-Powered Travel Co-Pilot Tools
+            </h3>
+            <p className="text-gray-500 text-sm max-w-xl mx-auto font-medium">
+              Access localized expert planners, coordinate expenses, and design routes with advanced Gemini intelligence.
+            </p>
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                id: "chat",
+                title: "🎒 Companion & Quiz",
+                description: "Determine your Travel Personality type and chat with custom AI local guides tuned to your specific travel vibes.",
+                icon: MessageSquare,
+                color: "from-blue-500/10 to-indigo-500/10 text-blue-600 dark:text-blue-400 border-blue-100/50 dark:border-blue-900/30",
+                badge: "Active"
+              },
+              {
+                id: "route",
+                title: "🗺️ Interactive Map Planner",
+                description: "Plot custom destination nodes interactively on the SVG stage and dynamically calculate optimal travel routes & times.",
+                icon: MapIcon,
+                color: "from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100/50 dark:border-emerald-900/30",
+                badge: "Interactive"
+              },
+              {
+                id: "board",
+                title: "✨ Visual Trip Board",
+                description: "Save custom scenic pins, search attraction spots, and receive live recommendations with Google Search integration.",
+                icon: Compass,
+                color: "from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border-purple-100/50 dark:border-purple-900/30",
+                badge: "Premium"
+              },
+              {
+                id: "india",
+                title: "🕌 India Specials",
+                description: "Explore highly curated architectural wonders, spiritual ashram routes, and majestic palace heritage trails.",
+                icon: Castle,
+                color: "from-amber-500/10 to-orange-500/10 text-amber-600 dark:text-amber-400 border-amber-100/50 dark:border-amber-900/30",
+                badge: "Localized"
+              },
+              {
+                id: "group",
+                title: "👥 Group Expense Splitter",
+                description: "Coordinate group travel members, log receipt expenses seamlessly, and view mathematically optimal payment settlements.",
+                icon: Users,
+                color: "from-rose-500/10 to-red-500/10 text-rose-600 dark:text-rose-400 border-rose-100/50 dark:border-rose-900/30",
+                badge: "Splitter"
+              }
+            ].map((feature, i) => {
+              const Icon = feature.icon;
+              return (
+                <motion.div
+                  key={feature.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  onClick={() => {
+                    setHubSubTab(feature.id as any);
+                    setActiveTab("hub");
+                  }}
+                  className={cn(
+                    "relative overflow-hidden rounded-[2.5rem] border bg-white dark:bg-[#0B0F2B]/60 p-6 flex flex-col text-left gap-4 hover:shadow-xl transition-all duration-300 cursor-pointer group",
+                    "border-gray-100/80 dark:border-[#1E295D]/20 shadow-sm"
+                  )}
+                >
+                  <div className={cn("w-12 h-12 rounded-2xl bg-gradient-to-br flex items-center justify-center font-bold", feature.color)}>
+                    <Icon size={22} className="group-hover:scale-110 transition-transform" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-base text-gray-800 dark:text-white group-hover:text-[#1E90FF] transition-colors">{feature.title}</h4>
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-gray-100 dark:bg-[#1E295D]/30 text-gray-400 dark:text-gray-300 tracking-wider">
+                        {feature.badge}
+                      </span>
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium leading-relaxed">{feature.description}</p>
+                  </div>
+                  <div className="mt-auto pt-2 flex items-center gap-1.5 text-xs font-bold text-[#1E90FF] opacity-0 group-hover:opacity-100 transition-opacity">
+                    Open Co-Pilot Tool <ArrowRight size={12} />
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
 
+        {/* Swadesh Paisa Vasool Hub Section */}
+        <section className="space-y-12 px-4 py-8 bg-[#FAF9F5] dark:bg-[#07091B]/40 rounded-[3.5rem] border border-amber-100/50 dark:border-blue-950/20 shadow-sm relative overflow-hidden">
+          {/* Accent decoration */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-amber-500/10 to-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-[#1E90FF]/10 to-amber-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
+
+          <div className="text-center space-y-3 relative z-10">
+            <span className="inline-flex items-center gap-1.5 bg-amber-100/80 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider border border-amber-200/50 dark:border-amber-900/40">
+              🇮🇳 SWADESH PAISA VASOOL HUB
+            </span>
+            <h3 className="text-3xl md:text-5xl font-display font-black text-[#000080] dark:text-white tracking-tight leading-none">
+              Family Savings & Middle-Class Special
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base max-w-2xl mx-auto font-medium">
+              Maximize your happiness, minimize your expenses! Discover pristine Indian budget gems and plan with intelligent local hacks.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
+            {/* Left side: Interactive Paisa Vasool Savings Simulator */}
+            <div className="lg:col-span-7 bg-white dark:bg-[#0A0D28]/80 rounded-[2.5rem] p-6 md:p-8 border border-amber-100/40 dark:border-blue-900/20 shadow-sm flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-slate-800/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">💰</span>
+                    <h4 className="font-extrabold text-lg text-gray-800 dark:text-white">Paisa Vasool Savings Simulator</h4>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 border border-amber-200/50 px-3 py-1 rounded-full text-xs font-black font-mono inline-flex items-center gap-1 shrink-0 self-start sm:self-center">
+                    <span>📍</span> {startLocation || "Mumbai"} ➔ {locationInput || "Goa"} ({travelDistanceKm} km)
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-400 leading-relaxed">
+                  Select your family setup and target budget style to see how Travolor AI optimizes domestic lodging, local eateries, and IRCTC transport for extreme value.
+                </p>
+
+                {/* Step 1: Select Budget style */}
+                <div className="space-y-2 text-left">
+                  <span className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-wider">1. Budget Category</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "budget", label: "🎒 Budget (Low Cost)", desc: "Sleeper Class + Dhabas" },
+                      { id: "mid", label: "🏡 Mid-Range (Smart)", desc: "3AC Train + Homestays" },
+                      { id: "family", label: "🌟 Family Special", desc: "Vande Bharat + Resorts" }
+                    ].map((btn) => (
+                      <button
+                        key={btn.id}
+                        onClick={() => setPaisaBudget(btn.id as any)}
+                        className={cn(
+                          "p-3 rounded-2xl border text-xs text-center transition-all flex flex-col items-center justify-center gap-1",
+                          paisaBudget === btn.id
+                            ? "bg-amber-500/10 border-amber-500 text-amber-800 dark:text-amber-400 font-extrabold"
+                            : "border-gray-100 hover:border-gray-300 dark:border-slate-800 text-gray-500 dark:text-gray-400"
+                        )}
+                      >
+                        <span className="truncate w-full font-bold">{btn.label}</span>
+                        <span className="text-[9px] opacity-70 truncate w-full">{btn.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Step 2: Select Family Size */}
+                <div className="space-y-2 text-left">
+                  <span className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-wider">2. Family / Group Size</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "couple", label: "👥 Couple", desc: "2 People" },
+                      { id: "small", label: "👨‍👩‍👦 Small Family", desc: "4 People" },
+                      { id: "joint", label: "👵 Joint Family", desc: "6+ People" }
+                    ].map((btn) => (
+                      <button
+                        key={btn.id}
+                        onClick={() => setPaisaSize(btn.id as any)}
+                        className={cn(
+                          "p-3 rounded-2xl border text-xs text-center transition-all flex flex-col items-center justify-center gap-1",
+                          paisaSize === btn.id
+                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-800 dark:text-emerald-400 font-extrabold"
+                            : "border-gray-100 hover:border-gray-300 dark:border-slate-800 text-gray-500 dark:text-gray-400"
+                        )}
+                      >
+                        <span className="font-bold">{btn.label}</span>
+                        <span className="text-[9px] opacity-70">{btn.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Cost Comparison Bar */}
+              <div className="bg-amber-50/40 dark:bg-[#0E1335]/50 border border-amber-100/50 dark:border-blue-950/30 p-5 rounded-3xl space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="text-left">
+                    <span className="text-xs text-gray-400 block">Regular Commercial Booking</span>
+                    <span className="text-base font-extrabold text-red-600 line-through">₹{originalCost.toLocaleString()}</span>
+                  </div>
+                  <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
+                    🔥 SAVE {savingsFactor}%
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-gray-400 block">Travolor AI Optimized Swadesh Cost</span>
+                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">₹{optimizedCost.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* visual ratio slider bar */}
+                <div className="relative h-3 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${100 - savingsFactor}%` }}
+                    transition={{ duration: 1 }}
+                    className="absolute left-0 top-0 h-full bg-emerald-500 rounded-full"
+                  />
+                </div>
+
+                <div className="text-left text-xs bg-white/70 dark:bg-[#07091B]/40 p-3 rounded-2xl border border-gray-100/80 dark:border-slate-800/80 space-y-2">
+                  <div className="flex gap-2 items-start">
+                    <span className="text-emerald-500">🚇</span>
+                    <p className="text-gray-600 dark:text-gray-300 font-medium"><strong>Transport Option:</strong> {transportAdvice}</p>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <span className="text-amber-500">🍲</span>
+                    <p className="text-gray-600 dark:text-gray-300 font-medium"><strong>Food Solution:</strong> {foodAdvice}</p>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <span className="text-[#1E90FF]">🏨</span>
+                    <p className="text-gray-600 dark:text-gray-300 font-medium"><strong>Budget Stay Secret:</strong> {stayAdvice}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right side: Accordion of Local Travel Masterclass */}
+            <div className="lg:col-span-5 flex flex-col justify-between space-y-4 text-left">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">🧠 FAMILY MASTERCLASS</span>
+                <h4 className="text-xl font-black text-[#000080] dark:text-white">Pro Budget Saving Hacks</h4>
+                <p className="text-xs text-gray-400">Click the tabs below to read localized secrets used by experienced Indian family travelers.</p>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  {
+                    id: "irctc",
+                    title: "🚇 IRCTC Train booking hacks",
+                    icon: TrainFront,
+                    desc: "To get confirmed tickets, book in General Quota exactly 120 days early. When traveling with senior citizens, check the 'Lower Berth Priority' box. Utilize Tatkal booking at 11 AM (Sleeper) or 10 AM (AC) with pre-filled Master Passenger list to checkout in under 45 seconds!",
+                    color: "border-orange-200/50 dark:border-orange-950/20 bg-orange-50/20 dark:bg-orange-950/5"
+                  },
+                  {
+                    id: "food",
+                    title: "🍲 Pure & Delicious Family Food",
+                    icon: Utensils,
+                    desc: "Use IRCTC e-Catering services with codes to get hygienic food delivered direct to your train coach seat. In pilgrimage cities (Varanasi, Haridwar, Puri, Amritsar), leverage sacred Temple trust Bhandaras & Langars which serve world-class hot meals with utmost purity and devotion.",
+                    color: "border-amber-200/50 dark:border-amber-950/20 bg-amber-50/20 dark:bg-amber-950/5"
+                  },
+                  {
+                    id: "stay",
+                    title: "🏡 Safe & Cozy Homestays",
+                    icon: Home,
+                    desc: "Avoid expensive commercial hotels. Choose verified family-run homestays listed on regional government tourism boards. They offer clean, safe rooms, free authentic home-cooked meals, and never levy hidden extra-person bed charges for children under 10.",
+                    color: "border-emerald-200/50 dark:border-emerald-950/20 bg-emerald-50/20 dark:bg-emerald-950/5"
+                  },
+                  {
+                    id: "local",
+                    title: "🚌 Sarkaari Transport Masterclass",
+                    icon: Bus,
+                    desc: "Ditch costly private cabs. Use official state transport luxury bus models (e.g., Maharashtra Shivneri/Shivshahi, Karnataka Airavat, Gujarat Gurjarnagri) which offer premium AC comfort at 1/3rd the cost. Highly comfortable, secure for families, and run strictly on schedule.",
+                    color: "border-blue-200/50 dark:border-blue-950/20 bg-blue-50/20 dark:bg-blue-950/5"
+                  }
+                ].map((hack) => (
+                  <div
+                    key={hack.id}
+                    onClick={() => setSelectedHackTab(hack.id as any)}
+                    className={cn(
+                      "p-4 rounded-3xl border transition-all cursor-pointer",
+                      selectedHackTab === hack.id
+                        ? "bg-white dark:bg-[#0A0D28] shadow-md border-amber-500 scale-[1.01]"
+                        : "opacity-80 hover:opacity-100 border-gray-100 dark:border-slate-800"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-amber-500 font-extrabold"><hack.icon size={16} /></span>
+                        <span className="font-extrabold text-sm text-gray-800 dark:text-gray-200">{hack.title}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 font-bold">{selectedHackTab === hack.id ? "▼" : "▶"}</span>
+                    </div>
+                    {selectedHackTab === hack.id && (
+                      <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 leading-relaxed pl-6 border-l border-amber-300">
+                        {hack.desc}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Swadesh Domestic Alternatives Showcase */}
+          <div className="space-y-6 pt-6 border-t border-gray-100/50 dark:border-slate-800/40 relative z-10 text-left">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">🏞️ SWADESH DARSHAN SPOTLIGHTS</span>
+              <h4 className="text-2xl font-black text-[#000080] dark:text-white">Ditch Expensive International, Choose Swadesh!</h4>
+              <p className="text-xs text-gray-400">Save lakhs on premium experiences. Visually identical nature, culture, and serenity at a fraction of the budget.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {domesticGems.map((gem) => (
+                <div
+                  key={gem.id}
+                  className="rounded-[2.5rem] border border-gray-100 dark:border-slate-800 bg-white dark:bg-[#0A0D28]/60 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col justify-between"
+                >
+                  <div className="relative h-44 overflow-hidden">
+                    <img
+                      src={gem.image}
+                      alt={gem.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full border border-white/10">
+                      {gem.tag}
+                    </div>
+                    <div className="absolute bottom-3 left-3 bg-[#000080]/90 text-white text-[10px] font-black px-2.5 py-1 rounded-full">
+                      🔥 {gem.savings}
+                    </div>
+                  </div>
+
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div>
+                        <h5 className="font-extrabold text-gray-800 dark:text-white text-base truncate">{gem.name}</h5>
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-400 block mt-0.5">
+                          Alternative to <span className="line-through">{gem.insteadOf}</span>
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-xs pt-1.5 border-t border-gray-50 dark:border-slate-800">
+                        <div>
+                          <span className="text-gray-400 block text-[9px] font-bold uppercase">Foreign Trip</span>
+                          <span className="text-red-500 line-through font-extrabold">{gem.internationalCost}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-emerald-500 block text-[9px] font-bold uppercase">Swadesh Cost</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">{gem.domesticCostStr}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSetDestination(gem.name)}
+                      className="w-full bg-[#1E90FF]/10 text-[#1E90FF] hover:bg-[#1E90FF] hover:text-white font-black text-xs py-3 rounded-2xl transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <span>✨</span> Plan This Swadesh Trip
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
 
       {/* Results Section */}
@@ -2076,7 +2961,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </motion.div>
                   <h2 className="text-4xl md:text-6xl font-bold text-[#000080] tracking-tight">{locationInput}</h2>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-4">
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -2084,6 +2969,24 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     className="bg-white/10 backdrop-blur-xl text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 hover:bg-white hover:text-[#1E90FF] transition-all shadow-2xl border border-white/20"
                   >
                     <Heart size={20} /> {t.saveTrip}
+                  </motion.button>
+                  <motion.button 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setShareModalData({
+                        location: locationInput,
+                        startLocation: startLocation || 'Mumbai',
+                        duration: duration,
+                        style: travelStyle,
+                        numPeople: numPeople,
+                        totalCost: liveBudget.totalCost,
+                        itinerary: itinerary
+                      });
+                    }}
+                    className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-8 py-5 rounded-3xl font-bold flex items-center gap-3 shadow-2xl transition-all border border-amber-400/20"
+                  >
+                    <Share2 size={20} /> Share Poster
                   </motion.button>
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
@@ -2130,15 +3033,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">ENGINE:</span>
                         <div className={cn(
                           "text-xs font-black px-3 py-1.5 rounded-full flex items-center gap-1.5",
-                          modelUsedForItinerary.includes("pro") 
-                            ? "bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-950/20 dark:text-purple-300 dark:border-purple-900" 
-                            : "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900"
+                          modelUsedForItinerary === "Travolor-Local-Engine"
+                            ? "bg-amber-50 text-amber-700 border border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/40"
+                            : modelUsedForItinerary.includes("pro") 
+                              ? "bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-950/20 dark:text-purple-300 dark:border-purple-900" 
+                              : "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900"
                         )}>
                           <Cpu size={12} className="animate-pulse" />
                           {modelUsedForItinerary || "gemini-3.5-flash"}
                           {modelUsedForItinerary.includes("pro") && " (Thinking Mode Active)"}
                         </div>
                       </div>
+
+                      {modelUsedForItinerary === "Travolor-Local-Engine" && (
+                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-50/50 dark:bg-amber-950/20 px-3 py-1.5 rounded-full border border-amber-100 dark:border-amber-900/30 flex items-center gap-1 animate-fade-in">
+                          <span>💡</span> Gemini spending limits reached. Utilizing offline knowledge base.
+                        </div>
+                      )}
 
                       {/* TTS Voice Read Aloud */}
                       <button
@@ -2196,8 +3107,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     </div>
                   )}
 
-                  <div className="markdown-body prose prose-slate max-w-none prose-img:rounded-[2rem] prose-headings:text-[#000080] prose-headings:font-bold prose-p:text-gray-600 prose-li:text-gray-600">
-                    <Markdown>{itinerary}</Markdown>
+                  <div className="mt-4">
+                    <AnimatedItinerary 
+                      itinerary={itinerary} 
+                      locationInput={locationInput} 
+                      startLocation={startLocation || 'Mumbai'} 
+                    />
                   </div>
 
                   {/* Booking CTAs after AI Result */}
@@ -2214,7 +3129,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           key={service.id}
                           whileHover={{ scale: 1.05, y: -5 }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => window.open(service.link(startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
+                          onClick={() => handleQuickBook(
+                            service.id === 'hotels' ? 'Hotel' : service.id === 'flights' ? 'Flight' : 'Bus',
+                            locationInput || "Delhi",
+                            service.link(startLocation || "Mumbai", locationInput || "Delhi")
+                          )}
                           className={cn("flex items-center justify-center gap-3 py-5 px-6 rounded-[2rem] text-white font-bold shadow-xl transition-all", service.color)}
                         >
                           <service.icon size={20} />
@@ -2233,9 +3152,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 opacity-70">Budget Summary</h4>
                   <div className="space-y-8">
-                    <div className="flex justify-between items-end">
-                      <span className="text-sm font-light opacity-80 tracking-wide">Total Estimate</span>
-                      <span className="text-4xl font-bold tracking-tighter">{formatPrice(liveBudget.totalCost)}</span>
+                    <div className="space-y-1 text-left">
+                      <div className="flex justify-between items-end">
+                        <span className="text-sm font-light opacity-80 tracking-wide">Total Estimate</span>
+                        <span className="text-4xl font-bold tracking-tighter">{formatPrice(liveBudget.totalCost)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs opacity-75 font-medium pt-2 border-t border-white/10 mt-2">
+                        <span>Calculated Distance:</span>
+                        <span className="font-mono">{travelDistanceKm.toLocaleString('en-IN')} km</span>
+                      </div>
+                      <div className="flex justify-between text-xs opacity-75 font-medium">
+                        <span>Hotel Rooms Required:</span>
+                        <span className="font-mono">{liveBudget.roomsCount} Room{liveBudget.roomsCount > 1 ? 's' : ''} × {duration} N</span>
+                      </div>
                     </div>
                     <div className="h-px bg-white/20" />
                     <div className="grid grid-cols-2 gap-6">
@@ -2279,22 +3208,25 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         <div className="bg-gray-100 dark:bg-slate-900/60 p-1 rounded-2xl flex items-center gap-1 text-[11px] font-bold self-start sm:self-auto shadow-inner">
                           <button
                             type="button"
+                            disabled={isMapsBlocked}
                             onClick={() => setMapViewMode("api")}
                             className={cn(
-                              "px-3 py-1.5 rounded-xl transition-all",
-                              mapViewMode === "api"
+                              "px-3 py-1.5 rounded-xl transition-all flex items-center gap-1",
+                              isMapsBlocked && "opacity-40 cursor-not-allowed",
+                              mapViewMode === "api" && !isMapsBlocked
                                 ? "bg-white dark:bg-[#1E90FF]/25 text-[#103090] dark:text-[#1E90FF] shadow-sm font-black"
                                 : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                             )}
+                            title={isMapsBlocked ? "API Map disabled due to API key restrictions (ApiTargetBlockedMapError)" : "Switch to Google Maps"}
                           >
-                            🗺️ API Map
+                            🗺️ API Map {isMapsBlocked && "🔒"}
                           </button>
                           <button
                             type="button"
                             onClick={() => setMapViewMode("vector")}
                             className={cn(
                               "px-3 py-1.5 rounded-xl transition-all",
-                              mapViewMode === "vector"
+                              mapViewMode === "vector" || isMapsBlocked
                                 ? "bg-white dark:bg-[#1E90FF]/25 text-[#103090] dark:text-[#1E90FF] shadow-sm font-black"
                                 : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                             )}
@@ -2304,6 +3236,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         </div>
                       )}
                     </div>
+
+                    {isMapsBlocked && (
+                      <div className="text-left bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 p-4 rounded-[2rem] flex items-start gap-3 text-[11px] text-amber-700 dark:text-amber-400 animate-fade-in leading-relaxed">
+                        <span className="text-sm">⚠️</span>
+                        <div>
+                          <span className="font-extrabold block mb-0.5 text-xs text-amber-800 dark:text-amber-300">Google Maps key is restricted (ApiTargetBlockedMapError).</span>
+                          Travolor has automatically switched to **Visual Route** mode to draw your trip attractions instantly with high-contrast custom vector curves.
+                        </div>
+                      </div>
+                    )}
 
                     <div className="h-[300px] w-full rounded-3xl overflow-hidden border border-gray-100 dark:border-slate-800 relative shadow-inner">
                       {mapViewMode === "api" && isLoaded && window.google ? (
@@ -2436,6 +3378,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       )}
                     </div>
 
+                    {mapViewMode === "api" && !isMapsBlocked && (
+                      <div className="text-left bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/30 p-3.5 rounded-2xl flex items-start gap-2.5 text-[11px] text-blue-600/90 dark:text-blue-400">
+                        <span className="text-sm">💡</span>
+                        <p className="leading-relaxed">
+                          Note: If Google Maps fails to display properly due to API key or billing restrictions, please toggle the <span className="font-bold underline cursor-pointer hover:text-blue-800 dark:hover:text-blue-300" onClick={() => setMapViewMode("vector")}>Visual Route</span> mode above for a highly polished vector map of your trip.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="space-y-3">
                       <span className="text-[10px] font-bold text-gray-400 dark:text-gray-550 uppercase tracking-widest block text-left">Mapped Attractions:</span>
                       <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
@@ -2522,10 +3473,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         const val = Number(e.target.value);
                         setUserTotalBudget(val);
                         if (user) {
-                          try {
-                            await updateDoc(doc(db, 'users', user.id), { totalBudget: val });
-                          } catch (err) {
-                            console.error(err);
+                          if (isFirebaseAvailable) {
+                            try {
+                              await updateDoc(doc(db, 'users', user.id), { totalBudget: val });
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          } else {
+                            const updatedUser = { ...user, totalBudget: val };
+                            setUser(updatedUser);
+                            localStorage.setItem("travolor_local_user", JSON.stringify(updatedUser));
                           }
                         }
                       }}
@@ -2542,15 +3499,50 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 const percentage = Math.min(100, (totalEstimate / userTotalBudget) * 100);
                 
                 const breakdown = [
-                  { label: "Hotels", amount: liveBudget.hotelCost, icon: Briefcase, color: "bg-blue-500" },
-                  { label: "Transport", amount: liveBudget.transportCost, icon: Plane, color: "bg-purple-500" },
-                  { label: "Food", amount: liveBudget.foodCost, icon: ShoppingBag, color: "bg-orange-500" },
-                  { label: "Activities", amount: liveBudget.activitiesCost, icon: Zap, color: "bg-amber-500" }
+                  { 
+                    label: "Hotels", 
+                    amount: liveBudget.hotelCost, 
+                    icon: Briefcase, 
+                    color: "bg-blue-500",
+                    formula: `${liveBudget.roomsCount} Room${liveBudget.roomsCount > 1 ? 's' : ''} × ${duration} Night${duration > 1 ? 's' : ''} @ ₹${liveBudget.roomRatePerNight.toLocaleString('en-IN')}/night`
+                  },
+                  { 
+                    label: "Transport", 
+                    amount: liveBudget.transportCost, 
+                    icon: Plane, 
+                    color: "bg-purple-500",
+                    formula: `${travelDistanceKm} km × ${numPeople} Pax (${transportType === 'flight' ? 'Flight' : transportType === 'private' ? '3AC Train' : 'SL Train/Bus'})`
+                  },
+                  { 
+                    label: "Food", 
+                    amount: liveBudget.foodCost, 
+                    icon: ShoppingBag, 
+                    color: "bg-orange-500",
+                    formula: `${numPeople} Traveler${numPeople > 1 ? 's' : ''} × ${duration} Day${duration > 1 ? 's' : ''} @ safe, pure veg & dhaba thalis`
+                  },
+                  { 
+                    label: "Activities", 
+                    amount: liveBudget.activitiesCost, 
+                    icon: Zap, 
+                    color: "bg-amber-500",
+                    formula: `Local rickshaws & landmark entry passes`
+                  }
                 ];
 
                 return (
                   <div className="space-y-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      <div className="space-y-2">
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Calculated Distance</p>
+                        <motion.p 
+                          key={travelDistanceKm}
+                          initial={{ scale: 1.1 }}
+                          animate={{ scale: 1 }}
+                          className="text-4xl font-bold tracking-tighter text-[#000080]"
+                        >
+                          {travelDistanceKm.toLocaleString('en-IN')} <span className="text-lg font-normal text-gray-500">km</span>
+                        </motion.p>
+                      </div>
                       <div className="space-y-2">
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total Estimate</p>
                         <motion.p 
@@ -2574,22 +3566,39 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           <span className="text-sm ml-2 opacity-60">{isOverBudget ? "Over" : "Left"}</span>
                         </motion.p>
                       </div>
-                      <div className="flex items-center">
-                        {isOverBudget ? (
-                          <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center gap-3 text-rose-600">
-                            <AlertTriangle size={20} className="shrink-0" />
-                            <p className="text-xs font-semibold leading-relaxed">
-                              ⚠ You are over budget by {formatPrice(Math.abs(remaining))}. Consider switching to budget hotels or public transport.
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {isOverBudget ? (
+                        <div className="bg-rose-50 border border-rose-100 rounded-3xl p-5 flex items-start gap-4 text-rose-600">
+                          <AlertTriangle size={24} className="shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h5 className="font-extrabold text-sm">Over Budget Alert!</h5>
+                            <p className="text-xs font-medium leading-relaxed">
+                              You are exceeding your budget by {formatPrice(Math.abs(remaining))}. Change to public rail/bus travel or select a cozy family homestay to instantly save.
                             </p>
                           </div>
-                        ) : (
-                          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 text-emerald-600">
-                            <Check size={20} className="shrink-0" />
-                            <p className="text-xs font-semibold">
-                              You are within budget! Great job keeping costs under control.
+                        </div>
+                      ) : (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-5 flex items-start gap-4 text-emerald-600">
+                          <Check size={24} className="shrink-0 mt-0.5 animate-bounce" />
+                          <div className="space-y-1">
+                            <h5 className="font-extrabold text-sm">Perfect Swadesh Pricing!</h5>
+                            <p className="text-xs font-medium leading-relaxed">
+                              This trip is safely within your pocket limits. Every fare has been mathematically cross-referenced with local transport state cards.
                             </p>
                           </div>
-                        )}
+                        </div>
+                      )}
+                      
+                      <div className="bg-amber-50/50 border border-amber-100/50 rounded-3xl p-5 flex items-start gap-4 text-amber-800">
+                        <span className="text-xl">💡</span>
+                        <div className="space-y-1">
+                          <h5 className="font-extrabold text-sm">Real distance based calculations</h5>
+                          <p className="text-xs font-medium leading-relaxed text-amber-700">
+                            Fares calculated for {travelDistanceKm} km journey from {startLocation || "Mumbai"} to {locationInput || "Goa"}.
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -2611,17 +3620,18 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     </div>
 
                     {/* Category Breakdown */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
                       {breakdown.map((item, idx) => {
                         const ItemIcon = item.icon;
                         return (
-                          <div key={idx} className="bg-gray-50/50 rounded-2xl p-4 border border-gray-100 flex items-center gap-4 hover:bg-white hover:shadow-sm transition-all group">
-                            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform shadow-sm", item.color)}>
-                              <ItemIcon size={18} />
+                          <div key={idx} className="bg-gray-50/60 rounded-3xl p-5 border border-gray-100 flex items-start gap-4 hover:bg-white hover:shadow-md transition-all group">
+                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform shadow-sm", item.color)}>
+                              <ItemIcon size={20} />
                             </div>
-                            <div className="overflow-hidden">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">{item.label}</p>
-                              <p className="text-sm font-bold text-[#000080] font-mono truncate">{formatPrice(item.amount)}</p>
+                            <div className="overflow-hidden space-y-1 text-left">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
+                              <p className="text-lg font-black text-[#000080] font-mono">{formatPrice(item.amount)}</p>
+                              <p className="text-xs text-gray-500 font-semibold leading-none">{item.formula}</p>
                             </div>
                           </div>
                         );
@@ -3180,29 +4190,42 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => {
-                        const shareData = {
-                          title: `My Trip to ${trip.location}`,
-                          text: `Check out my ${trip.duration}-day ${trip.style} trip to ${trip.location} planned with Travolor!`,
-                          url: window.location.href
-                        };
-                        if (navigator.share) {
-                          navigator.share(shareData);
-                        } else {
-                          alert("Sharing is not supported on this browser. Copy the URL to share!");
-                        }
+                        const costEst = parseInt(trip.budget ? trip.budget.replace(/[^0-9]/g, '') : '15000') || 15000;
+                        setShareModalData({
+                          location: trip.location,
+                          startLocation: trip.start_location || 'Mumbai',
+                          duration: trip.duration,
+                          style: trip.style,
+                          numPeople: 2, // standard fallback
+                          totalCost: costEst,
+                          itinerary: trip.itinerary,
+                          date: trip.created_at ? new Date(trip.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : undefined
+                        });
                       }}
-                      className="text-slate-300 hover:text-blue-500 transition-colors"
+                      className="text-slate-300 hover:text-[#1E90FF] transition-colors"
+                      title="Share Beautiful Card"
                     >
                       <Share2 size={20} />
                     </button>
                     <button 
                       onClick={async () => {
                         if (confirm("Are you sure you want to delete this trip?")) {
-                          try {
-                            await deleteDoc(doc(db, 'trips', trip.id));
-                          } catch (err) {
-                            console.error(err);
-                            alert("Failed to delete trip.");
+                          if (isFirebaseAvailable) {
+                            try {
+                              await deleteDoc(doc(db, 'trips', trip.id));
+                            } catch (err) {
+                              console.error(err);
+                              alert("Failed to delete trip.");
+                            }
+                          } else {
+                            const allTrips = localStorage.getItem("travolor_local_trips");
+                            let list = [];
+                            if (allTrips) {
+                              try { list = JSON.parse(allTrips); } catch (e) {}
+                            }
+                            const updated = list.filter((t: any) => t.id !== trip.id);
+                            localStorage.setItem("travolor_local_trips", JSON.stringify(updated));
+                            setSavedTrips(updated.filter((t: any) => t.user_id === user.id));
                           }
                         }
                       }}
@@ -3405,12 +4428,22 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     if (!user) return;
     setLoading(true);
     try {
-      const userDocRef = doc(db, 'users', user.id);
-      await updateDoc(userDocRef, {
-        name: editForm.name,
-        phone: editForm.phone,
-        photo: editForm.photo
-      });
+      if (isFirebaseAvailable) {
+        const userDocRef = doc(db, 'users', user.id);
+        await updateDoc(userDocRef, {
+          name: editForm.name,
+          phone: editForm.phone,
+          photo: editForm.photo
+        });
+      } else {
+        const updatedUser = {
+          ...user,
+          name: editForm.name,
+          phone: editForm.phone,
+          photo: editForm.photo
+        };
+        localStorage.setItem("travolor_local_user", JSON.stringify(updatedUser));
+      }
       
       setUser({
         ...user,
@@ -3839,6 +4872,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           >
             {activeTab === 'explore' && renderExplore()}
             {activeTab === 'trips' && renderMyTrips()}
+            {activeTab === 'hub' && <AIHub activeSubTab={hubSubTab} setActiveSubTab={setHubSubTab} user={user} />}
             {activeTab === 'bookings' && renderBookings()}
             {activeTab === 'profile' && renderProfile()}
           </motion.div>
@@ -4062,6 +5096,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           {[
             { id: "explore", icon: Globe, label: "Explore" },
             { id: "trips", icon: MapIcon, label: "Trips" },
+            { id: "hub", icon: Sparkles, label: "AI Hub" },
             { id: "bookings", icon: BookingIcon, label: "Bookings" },
             { id: "profile", icon: Settings, label: "Settings" }
           ].map((tab) => (
@@ -4094,6 +5129,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           ))}
         </div>
       </nav>
+
+      <ItineraryShareModal 
+        isOpen={shareModalData !== null} 
+        onClose={() => setShareModalData(null)} 
+        data={shareModalData} 
+      />
     </div>
   );
 }

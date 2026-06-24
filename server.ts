@@ -2,7 +2,6 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
-import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
@@ -94,6 +93,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use(express.static(path.join(process.cwd(), "public")));
 
   // Health check
   app.get("/api/health", (req, res) => {
@@ -776,7 +776,7 @@ Rules:
         grounded: sources.length > 0
       });
     } catch (error: any) {
-      console.error("Server error generating itinerary. Falling back to high-fidelity local generator.", error);
+      console.warn("Server warning generating itinerary. Falling back to high-fidelity local generator:", error.message || error);
       const fallback = generateLocalItinerary(startLocation, location, duration, travelStyle, numPeople, language);
       res.json(fallback);
     }
@@ -879,13 +879,14 @@ Rules:
     }
 
     // Cost estimates (INR)
-    let baseDailyCost = 6000;
+    const paxCount = parseInt(numPeople) || 2;
+    let baseDailyCost = 2800; // standard per person daily budget
     if (style.includes("budget")) {
-      baseDailyCost = 3500;
+      baseDailyCost = 1200;
     } else if (style.includes("luxury")) {
-      baseDailyCost = 25000;
+      baseDailyCost = 9000;
     }
-    const totalCost = baseDailyCost * duration;
+    const totalCost = baseDailyCost * duration * paxCount;
 
     // Language mappings
     const isHindi = language.toLowerCase().startsWith("hi") || language.toLowerCase().includes("hindi");
@@ -1123,7 +1124,7 @@ Rules:
         grounded: sources.length > 0
       });
     } catch (error: any) {
-      console.error("Chatbot generation error, falling back to local chat agent:", error);
+      console.warn("Chatbot generation warning, falling back to local chat agent:", error.message || error);
       const reply = getLocalChatReply(messages, botRole, language);
       res.json(reply);
     }
@@ -1251,7 +1252,7 @@ Keep it professional and high-end.`;
       });
       res.json({ text: response.text || "" });
     } catch (error: any) {
-      console.error("Server error getting suggestions, falling back to offline indexing:", error);
+      console.warn("Server warning getting suggestions, falling back to offline indexing:", error.message || error);
       const upperLetter = (letter || "A").toUpperCase().substring(0, 1);
       const cities = fallbackSuggestions[upperLetter] || fallbackSuggestions["A"];
       res.json({ text: `Suggested Destinations starting with ${upperLetter}: ${cities}`, fallback: true });
