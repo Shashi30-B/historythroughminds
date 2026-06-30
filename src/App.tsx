@@ -603,8 +603,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [headlineIndex, setHeadlineIndex] = useState(0);
   const [paisaBudget, setPaisaBudget] = useState<"budget" | "mid" | "family">("budget");
   const [paisaSize, setPaisaSize] = useState<"couple" | "small" | "joint">("small");
-  const [selectedHackTab, setSelectedHackTab] = useState<"irctc" | "food" | "stay" | "local">("irctc");
-  const [exploreSecondaryTab, setExploreSecondaryTab] = useState<'gems' | 'copilot' | 'simulator'>('gems');
+  const [selectedHackTab, setSelectedHackTab] = useState<"irctc" | "food" | "stay" | "local" | "local-tips">("irctc");
+  const [exploreSecondaryTab, setExploreSecondaryTab] = useState<'gems' | 'copilot' | 'simulator' | 'budget-planner'>('gems');
   const [shareModalData, setShareModalData] = useState<{
     location: string;
     startLocation: string;
@@ -3130,7 +3130,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
         {/* Segmented Tab Bar for Exploration & Inspiration */}
         {!itinerary && !loading && (
-          <div className="max-w-4xl mx-auto w-full px-4 text-center space-y-4 animate-fade-in">
+          <div className="max-w-5xl mx-auto w-full px-4 text-center space-y-4 animate-fade-in">
             <span className="text-xs font-black tracking-widest text-[#1E90FF] uppercase">🎯 Swadesh Travel Explorer</span>
             <div className="bg-gray-100/90 dark:bg-[#0E1335]/80 p-2 rounded-3xl inline-flex flex-wrap gap-2 justify-center border border-gray-200/50 dark:border-blue-950/40 shadow-inner">
               <button
@@ -3140,7 +3140,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   document.getElementById('swadesh-gems-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
                 className={cn(
-                  "px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
+                  "px-5 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
                   exploreSecondaryTab === 'gems'
                     ? "bg-white dark:bg-[#1E90FF]/20 text-[#000080] dark:text-[#93C5FD] shadow-md"
                     : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -3155,7 +3155,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   document.getElementById('copilot-tools-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
                 className={cn(
-                  "px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
+                  "px-5 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
                   exploreSecondaryTab === 'copilot'
                     ? "bg-white dark:bg-[#1E90FF]/20 text-[#000080] dark:text-[#93C5FD] shadow-md"
                     : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -3170,13 +3170,28 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   document.getElementById('savings-simulator-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
                 className={cn(
-                  "px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
+                  "px-5 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
                   exploreSecondaryTab === 'simulator'
                     ? "bg-white dark:bg-[#1E90FF]/20 text-[#000080] dark:text-[#93C5FD] shadow-md"
                     : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                 )}
               >
                 💰 Savings Simulator & Hacks
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setExploreSecondaryTab('budget-planner');
+                  document.getElementById('trip-budget-tracker-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className={cn(
+                  "px-5 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
+                  exploreSecondaryTab === 'budget-planner'
+                    ? "bg-white dark:bg-[#1E90FF]/20 text-[#000080] dark:text-[#93C5FD] shadow-md"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                )}
+              >
+                💳 Budget Sandbox
               </button>
             </div>
           </div>
@@ -3520,6 +3535,269 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           </div>
         </section>
       )}
+
+        {/* Sandbox: AI Budget Planner & Calculator (Middle-Class Travel Dashboard) */}
+        {!itinerary && !loading && (
+          <section id="trip-budget-tracker-section" className="space-y-12 px-4 py-8 bg-[#FAF9F5] dark:bg-[#07091B]/40 rounded-[3.5rem] border border-blue-100/50 dark:border-blue-950/20 shadow-sm relative overflow-hidden scroll-mt-24">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#1E90FF]/10 to-amber-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-emerald-500/10 to-[#1E90FF]/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
+
+            <div className="text-center space-y-3 relative z-10">
+              <span className="inline-flex items-center gap-1.5 bg-blue-100/80 dark:bg-blue-950/20 text-blue-800 dark:text-blue-400 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider border border-blue-200/50 dark:border-blue-900/40">
+                💳 INTERACTIVE BUDGET SANDBOX
+              </span>
+              <h3 className="text-3xl md:text-5xl font-display font-black text-[#000080] dark:text-white tracking-tight leading-none">
+                AI Budget Planner & Calculator
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base max-w-2xl mx-auto font-medium">
+                Adjust sliders and toggle transport/stay options to see real-time cost estimations based on realistic Indian local rates and IRCTC rules.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
+              {/* Left side: Interactive Settings Form */}
+              <div className="lg:col-span-5 bg-white dark:bg-[#0A0D28]/80 rounded-[2.5rem] p-6 md:p-8 border border-blue-100/40 dark:border-blue-900/20 shadow-sm flex flex-col justify-between space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-slate-800 pb-3 text-left">
+                    <span className="text-xl">🎛️</span>
+                    <h4 className="font-extrabold text-lg text-gray-800 dark:text-white">Calculator Settings</h4>
+                  </div>
+
+                  {/* Input Budget */}
+                  <div className="space-y-2 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider flex justify-between">
+                      <span>1. Your Target Budget</span>
+                      <span className="text-blue-500 font-bold">₹{userTotalBudget.toLocaleString('en-IN')}</span>
+                    </label>
+                    <input 
+                      type="range" 
+                      min="2000" 
+                      max="150000" 
+                      step="1000"
+                      value={userTotalBudget}
+                      onChange={(e) => setUserTotalBudget(Number(e.target.value))}
+                      className="w-full accent-[#1E90FF]"
+                    />
+                  </div>
+
+                  {/* Travelers Slider */}
+                  <div className="space-y-2 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider flex justify-between">
+                      <span>2. Number of Travelers (Pax)</span>
+                      <span className="text-blue-500 font-bold">{numPeople} Person{numPeople > 1 ? 's' : ''}</span>
+                    </label>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="12" 
+                      value={numPeople}
+                      onChange={(e) => setNumPeople(Number(e.target.value))}
+                      className="w-full accent-[#1E90FF]"
+                    />
+                  </div>
+
+                  {/* Trip Duration */}
+                  <div className="space-y-2 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider flex justify-between">
+                      <span>3. Trip Duration (Nights)</span>
+                      <span className="text-blue-500 font-bold">{duration} Night{duration > 1 ? 's' : ''}</span>
+                    </label>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="15" 
+                      value={duration}
+                      onChange={(e) => setDuration(Number(e.target.value))}
+                      className="w-full accent-[#1E90FF]"
+                    />
+                  </div>
+
+                  {/* Transport Type Select */}
+                  <div className="space-y-2 text-left">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">4. Budget Transport Type</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "public", label: "🚇 SL Train/Bus", desc: "Sarkari/Sleeper" },
+                        { id: "private", label: "🚗 3AC Train/Cab", desc: "Premium AC" },
+                        { id: "flight", label: "✈️ Flight Ticket", desc: "Fast Travel" }
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setTransportType(t.id)}
+                          className={cn(
+                            "p-2.5 rounded-2xl border text-[11px] text-center transition-all flex flex-col items-center justify-center gap-0.5",
+                            transportType === t.id
+                              ? "bg-blue-500/10 border-blue-500 text-blue-800 dark:text-blue-400 font-extrabold"
+                              : "border-gray-100 hover:border-gray-300 dark:border-slate-800 text-gray-500 dark:text-gray-400"
+                          )}
+                        >
+                          <span className="font-bold truncate w-full">{t.label}</span>
+                          <span className="text-[8px] opacity-70 truncate w-full">{t.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Accommodation Stay Type Select */}
+                  <div className="space-y-2 text-left">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">5. Budget Stay Type</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "hostel", label: "🎒 Dorm/Dharamsala", desc: "Low-Cost Stay" },
+                        { id: "standard", label: "🏡 Family Homestay", desc: "Cozy & Safe" },
+                        { id: "luxury", label: "🌟 Luxury Resort", desc: "Premium Style" }
+                      ].map((a) => (
+                        <button
+                          key={a.id}
+                          onClick={() => setAccommodationType(a.id)}
+                          className={cn(
+                            "p-2.5 rounded-2xl border text-[11px] text-center transition-all flex flex-col items-center justify-center gap-0.5",
+                            accommodationType === a.id
+                              ? "bg-emerald-500/10 border-emerald-500 text-emerald-800 dark:text-emerald-400 font-extrabold"
+                              : "border-gray-100 hover:border-gray-300 dark:border-slate-800 text-gray-500 dark:text-gray-400"
+                          )}
+                        >
+                          <span className="font-bold truncate w-full">{a.label}</span>
+                          <span className="text-[8px] opacity-70 truncate w-full">{a.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side: Middle-Class Travel Dashboard (Results Display) */}
+              <div className="lg:col-span-7 bg-white dark:bg-[#0A0D28]/80 rounded-[2.5rem] p-6 md:p-8 border border-blue-100/40 dark:border-blue-900/20 shadow-sm flex flex-col justify-between space-y-6">
+                {(() => {
+                  const totalEstimate = liveBudget.totalCost;
+                  const remaining = userTotalBudget - totalEstimate;
+                  const isOverBudget = remaining < 0;
+                  const percentage = Math.min(100, (totalEstimate / userTotalBudget) * 100);
+                  
+                  const breakdown = [
+                    { 
+                      label: "🏢 Budget Hotels & Homestays", 
+                      amount: liveBudget.hotelCost, 
+                      icon: Home, 
+                      color: "bg-blue-500",
+                      formula: `${liveBudget.roomsCount} Room${liveBudget.roomsCount > 1 ? 's' : ''} × ${duration} Night${duration > 1 ? 's' : ''} @ ₹${liveBudget.roomRatePerNight.toLocaleString('en-IN')}/night`
+                    },
+                    { 
+                      label: "🚌 Budget Transport & Railways", 
+                      amount: liveBudget.transportCost, 
+                      icon: TrainFront, 
+                      color: "bg-purple-500",
+                      formula: `${travelDistanceKm} km × ${numPeople} Pax (${transportType === 'flight' ? 'Flight' : transportType === 'private' ? '3AC Train' : 'SL Train/Bus'})`
+                    },
+                    { 
+                      label: "🍲 Local Food & Pure Veg Thalis", 
+                      amount: liveBudget.foodCost, 
+                      icon: Utensils, 
+                      color: "bg-orange-500",
+                      formula: `${numPeople} Traveler${numPeople > 1 ? 's' : ''} × ${duration} Day${duration > 1 ? 's' : ''} @ safe, pure veg & dhaba thalis`
+                    },
+                    { 
+                      label: "🎟️ Activities & Local Rickshaws", 
+                      amount: liveBudget.activitiesCost, 
+                      icon: Zap, 
+                      color: "bg-amber-500",
+                      formula: `Local auto-rickshaws & landmark entry passes`
+                    }
+                  ];
+
+                  return (
+                    <div className="space-y-6 text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-slate-800/60 pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">📊</span>
+                          <h4 className="font-extrabold text-base text-gray-800 dark:text-white">Middle-Class Travel Dashboard</h4>
+                        </div>
+                        <div className="bg-blue-50 dark:bg-blue-950/20 text-[#1E90FF] border border-blue-200/50 px-3 py-1 rounded-full text-xs font-black font-mono inline-flex items-center gap-1 shrink-0 self-start sm:self-center">
+                          <span>📍</span> {startLocation || "Mumbai"} ➔ {locationInput || "Goa"} ({travelDistanceKm} km)
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-gray-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                          <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Distance</p>
+                          <p className="text-2xl font-black text-[#000080] dark:text-white mt-1">
+                            {travelDistanceKm.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-500">km</span>
+                          </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                          <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Total Estimate</p>
+                          <p className="text-2xl font-black text-[#000080] dark:text-white mt-1">{formatPrice(totalEstimate)}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                          <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Remaining</p>
+                          <p className={cn("text-2xl font-black mt-1", isOverBudget ? "text-rose-500" : "text-emerald-600")}>
+                            {formatPrice(Math.abs(remaining))}
+                            <span className="text-[10px] ml-1 opacity-60 font-bold">{isOverBudget ? "Over" : "Left"}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-[11px] font-black text-gray-400 uppercase">
+                          <span>Budget Utilization</span>
+                          <span className={cn(isOverBudget ? "text-rose-500" : "text-[#1E90FF]")}>
+                            {percentage.toFixed(0)}% Used
+                          </span>
+                        </div>
+                        <div className="h-3 bg-gray-100 dark:bg-slate-900 rounded-full overflow-hidden p-0.5 border border-gray-100 dark:border-slate-800/80">
+                          <motion.div 
+                            className={cn("h-full rounded-full transition-all duration-500", isOverBudget ? "bg-rose-500" : "bg-gradient-to-r from-[#1E90FF] to-[#000080]")}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Category Breakdown */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                        {breakdown.map((item, idx) => {
+                          const ItemIcon = item.icon;
+                          return (
+                            <div key={idx} className="bg-gray-50/60 dark:bg-slate-900/20 rounded-2xl p-4 border border-gray-100 dark:border-slate-800/60 flex items-start gap-3 hover:bg-white dark:hover:bg-slate-900/60 hover:shadow-md transition-all group">
+                              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform shadow-sm", item.color)}>
+                                <ItemIcon size={16} />
+                              </div>
+                              <div className="overflow-hidden space-y-0.5 text-left">
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">{item.label}</p>
+                                <p className="text-base font-black text-[#000080] dark:text-white font-mono leading-none pt-1">{formatPrice(item.amount)}</p>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold truncate leading-none pt-0.5">{item.formula}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Match Banner */}
+                      <div className="pt-2">
+                        {isOverBudget ? (
+                          <div className="bg-rose-50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-950/20 rounded-2xl p-4 flex items-start gap-3 text-rose-600 dark:text-rose-400 text-xs">
+                            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                            <p className="font-semibold leading-relaxed">
+                              You are exceeding your budget by <strong>{formatPrice(Math.abs(remaining))}</strong>. Try switching to Public SL Train or Cozy Family Homestays to stay within limit.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-950/20 rounded-2xl p-4 flex items-start gap-3 text-emerald-600 dark:text-emerald-400 text-xs">
+                            <Check size={18} className="shrink-0 mt-0.5" />
+                            <p className="font-semibold leading-relaxed">
+                              This configuration is perfectly within your budget. Every fare has been mathematically cross-referenced with local transport state cards.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Swadesh Domestic Alternatives Showcase (under Swadesh Gems Tab) */}
         {!itinerary && !loading && (
