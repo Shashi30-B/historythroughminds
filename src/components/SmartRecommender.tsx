@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Compass, Sparkles, MapPin, ShieldAlert, CloudRain, ShieldCheck, PhoneCall, ChevronRight, Activity, Info, RefreshCw } from "lucide-react";
 
@@ -116,6 +116,65 @@ export default function SmartRecommender() {
   const [showSOS, setShowSOS] = useState(false);
   const [aiScanning, setAiScanning] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [liveWeather, setLiveWeather] = useState<{ temp: string; condition: string; packingAdvice: string } | null>(null);
+
+  useEffect(() => {
+    const fetchCityWeather = async () => {
+      try {
+        let lat = 15.2993, lng = 74.1240; // Goa default
+        if (selectedCity === "mumbai") { lat = 19.0760; lng = 72.8777; }
+        else if (selectedCity === "delhi") { lat = 28.7041; lng = 77.1025; }
+        else if (selectedCity === "srinagar") { lat = 34.0837; lng = 74.7973; }
+
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&timezone=auto`);
+        const data = await res.json();
+        if (data.current_weather) {
+          const tempVal = `${Math.round(data.current_weather.temperature)}°C`;
+          const code = data.current_weather.weathercode;
+          let condVal = "Clear Sky";
+          let packingVal = "Light breathable clothes, comfortable active walking sneakers, and sunglasses.";
+          
+          if (code === 0) {
+            condVal = "Clear Sky";
+            packingVal = "Light linen/cotton wear, sunglasses, sun hat, and SPF 50+ sunscreen.";
+          } else if (code <= 3) {
+            condVal = "Partly Cloudy";
+            packingVal = "Breathable clothing, active walking sneakers, and sunglasses.";
+          } else if (code <= 48) {
+            condVal = "Foggy";
+            packingVal = "Light jacket or windcheater, comfortable sneakers, and lip balm.";
+          } else if (code <= 55) {
+            condVal = "Light Drizzle";
+            packingVal = "Compact pocket umbrella, quick-dry clothes, and waterproof shoes.";
+          } else if (code <= 65) {
+            condVal = "Rainy";
+            packingVal = "Full-size umbrella, rain coat, waterproof bag cover, and quick-dry shoes.";
+          } else if (code <= 77) {
+            condVal = "Snowy";
+            packingVal = "Heavy wool thermals, fleece winter coats, gloves, and thick snow boots.";
+          } else if (code <= 82) {
+            condVal = "Rain Showers";
+            packingVal = "Pocket umbrella, windbreaker jacket, waterproof shoes, and quick-dry nylon wear.";
+          } else if (code <= 86) {
+            condVal = "Snow Showers";
+            packingVal = "Fleece winter jacket, thermals, woolen gloves, and anti-slip snow boots.";
+          } else {
+            condVal = "Thunderstorms";
+            packingVal = "Full rain gear, waterproof backpack, power bank, and sturdy non-slip footwear.";
+          }
+
+          setLiveWeather({
+            temp: tempVal,
+            condition: condVal,
+            packingAdvice: packingVal
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching city weather in SmartRecommender:", err);
+      }
+    };
+    fetchCityWeather();
+  }, [selectedCity]);
 
   const cityData = CITY_RECOMMENDATIONS[selectedCity];
 
@@ -295,7 +354,7 @@ export default function SmartRecommender() {
                 {cityData.weather.alertLevel} Alert
               </span>
             </div>
-            <p className="text-[10px] text-gray-400 font-bold font-mono mt-0.5">Current Temp: {cityData.weather.temp} | Condition: {cityData.weather.condition}</p>
+            <p className="text-[10px] text-gray-400 font-bold font-mono mt-0.5">Current Temp: {liveWeather ? liveWeather.temp : cityData.weather.temp} | Condition: {liveWeather ? liveWeather.condition : cityData.weather.condition}</p>
             <p className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold mt-2 max-w-xl">
               ⚠️ {cityData.weather.alertDesc}
             </p>
@@ -306,7 +365,7 @@ export default function SmartRecommender() {
         <div className="p-3.5 rounded-2xl bg-white dark:bg-[#0A0E2B] border border-gray-100 dark:border-slate-850 shrink-0 max-w-xs font-semibold">
           <span className="text-[8px] font-extrabold uppercase tracking-widest text-[#1E90FF] block mb-1">Tailored Packing Advice</span>
           <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-normal">
-            🎒 {cityData.weather.packingAdvice}
+            🎒 {liveWeather ? liveWeather.packingAdvice : cityData.weather.packingAdvice}
           </p>
         </div>
       </div>

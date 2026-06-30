@@ -1,0 +1,52 @@
+{
+  "collections": {
+    "users": {
+      "fields": {
+        "name": "string",
+        "email": "string",
+        "phone": "string",
+        "photo": "string",
+        "totalBudget": "number",
+        "created_at": "timestamp"
+      }
+    },
+    "trips": {
+      "fields": {
+        "user_id": "string",
+        "startLocation": "string",
+        "location": "string",
+        "duration": "number",
+        "travelStyle": "string",
+        "numPeople": "number",
+        "language": "string",
+        "travelMode": "string",
+        "travelDate": "string",
+        "budget": "number",
+        "itinerary": "string",
+        "created_at": "timestamp"
+      }
+    },
+    "bookings": {
+      "fields": {
+        "user_id": "string",
+        "destination": "string",
+        "transportType": "string",
+        "passengers": "number",
+        "totalCost": "number",
+        "travelDate": "string",
+        "status": "string",
+        "created_at": "timestamp"
+      }
+    },
+    "wishlist": {
+      "fields": {
+        "user_id": "string",
+        "destination": "string",
+        "image": "string",
+        "description": "string",
+        "estimatedCost": "number",
+        "created_at": "timestamp"
+      }
+    }
+  }
+}

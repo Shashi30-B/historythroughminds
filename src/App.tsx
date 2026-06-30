@@ -14,7 +14,7 @@ import {
   Home, Globe, Briefcase as BookingIcon, User as ProfileIcon,
   ArrowRight, ArrowLeft, Camera, ShoppingBag, Lightbulb,
   Bell, Moon, Sun, Languages, LogOut, Settings, HelpCircle, ShieldCheck, Phone,
-  AlertTriangle, Check,
+  AlertTriangle, Check, Trash2,
   Mail, Lock, Eye, EyeOff, Github, Share2,
   Plane, TrainFront, Bus, Car, Package,
   GripVertical, MapPin as MapPinIcon, Navigation2, Zap,
@@ -22,14 +22,18 @@ import {
   Mic, MicOff, Volume2, VolumeX
 } from 'lucide-react';
 import Markdown from 'react-markdown';
+import { Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useLoadScript, Autocomplete, GoogleMap, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { useLoadScript, Autocomplete, GoogleMap, MarkerF, InfoWindowF, PolylineF } from '@react-google-maps/api';
 import { generateItinerary, getSuggestions, sendChatMessage } from './services/geminiService';
 import { TRAVEL_STYLES } from './constants';
 import AIHub from './components/AIHub';
 import { ItineraryShareModal } from './components/ItineraryShareModal';
 import { AnimatedItinerary } from './components/AnimatedItinerary';
+import { InteractiveItineraryView } from './components/InteractiveItineraryView';
+import { BudgetDashboardView } from './components/BudgetDashboardView';
+import { LocalGuideView } from './components/LocalGuideView';
 
 const libraries: ("places")[] = ["places"];
 
@@ -264,7 +268,18 @@ const CITY_COORDS_DB: Record<string, { lat: number, lng: number }> = {
   chopta: { lat: 30.4853, lng: 79.2255 },
   alleppey: { lat: 9.4981, lng: 76.3388 },
   gokarna: { lat: 14.5479, lng: 74.3188 },
-  gandikota: { lat: 15.0277, lng: 78.2861 }
+  gandikota: { lat: 15.0277, lng: 78.2861 },
+  agra: { lat: 27.1767, lng: 78.0081 },
+  amritsar: { lat: 31.6340, lng: 74.8723 },
+  srinagar: { lat: 34.0837, lng: 74.7973 },
+  ladakh: { lat: 34.1526, lng: 77.5771 },
+  varanasi: { lat: 25.3176, lng: 82.9739 },
+  rishikesh: { lat: 30.0869, lng: 78.2676 },
+  coorg: { lat: 12.3375, lng: 75.8069 },
+  hampi: { lat: 15.3350, lng: 76.4600 },
+  mysore: { lat: 12.2958, lng: 76.6394 },
+  pondicherry: { lat: 11.9416, lng: 79.8083 },
+  tirupati: { lat: 13.6288, lng: 79.4192 }
 };
 
 function lookupCityCoords(cityName: string, providedCoords: {lat: number, lng: number} | null): {lat: number, lng: number} | null {
@@ -566,8 +581,14 @@ const LocationInput = ({
 
 function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [activeTab, setActiveTab] = useState("explore");
-  const [hubSubTab, setHubSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport">("chat");
+  const [hubSubTab, setHubSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor">("chat");
   const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string, totalBudget?: number} | null>(null);
+  const [authInitializing, setAuthInitializing] = useState(true);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [adminTrips, setAdminTrips] = useState<any[]>([]);
+  const [adminBookings, setAdminBookings] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminSubTab, setAdminSubTab] = useState<'users' | 'trips' | 'bookings'>('users');
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
@@ -583,6 +604,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [paisaBudget, setPaisaBudget] = useState<"budget" | "mid" | "family">("budget");
   const [paisaSize, setPaisaSize] = useState<"couple" | "small" | "joint">("small");
   const [selectedHackTab, setSelectedHackTab] = useState<"irctc" | "food" | "stay" | "local">("irctc");
+  const [exploreSecondaryTab, setExploreSecondaryTab] = useState<'gems' | 'copilot' | 'simulator'>('gems');
   const [shareModalData, setShareModalData] = useState<{
     location: string;
     startLocation: string;
@@ -619,15 +641,48 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [duration, setDuration] = useState(3);
   const [numPeople, setNumPeople] = useState(2);
   const [travelStyle, setTravelStyle] = useState("standard");
+  const [travelMode, setTravelMode] = useState<'self-drive' | 'cab' | 'bus' | 'train' | 'flight'>('self-drive');
+  const [travelDate, setTravelDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7); // Default to 7 days from now
+    return d.toISOString().split('T')[0];
+  });
+  const [targetBudget, setTargetBudget] = useState(50000);
   const [loading, setLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
+  const [structuredItinerary, setStructuredItinerary] = useState<any>(null);
+  const [itinerarySubTab, setItinerarySubTab] = useState<'interactive' | 'text' | 'budget' | 'guide'>('interactive');
   const [itinerarySources, setItinerarySources] = useState<any[]>([]);
   const [mapMarkers, setMapMarkers] = useState<Array<{ name: string; lat: number; lng: number; description?: string }>>([]);
   const [selectedMapMarker, setSelectedMapMarker] = useState<any | null>(null);
   const [mapViewMode, setMapViewMode] = useState<"api" | "vector">("vector");
-  const [isMapsBlocked, setIsMapsBlocked] = useState(false);
+  const [isMapsBlocked, setIsMapsBlocked] = useState((window as any).isMapsBlocked || false);
+
+  interface WeatherForecastDay {
+    date: string;
+    dayName: string;
+    tempMax: number;
+    tempMin: number;
+    conditionCode: number;
+    conditionText: string;
+    precipitation: number;
+  }
+
+  const [weatherForecast, setWeatherForecast] = useState<WeatherForecastDay[] | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState<boolean>(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [weatherPackingAdvice, setWeatherPackingAdvice] = useState<string>("");
 
   useEffect(() => {
+    if ((window as any).isMapsBlocked) {
+      setIsMapsBlocked(true);
+      setMapViewMode("vector");
+    }
+    (window as any).onMapsBlocked = () => {
+      setIsMapsBlocked(true);
+      setMapViewMode("vector");
+    };
+
     // Intercept Google Maps API authentication or target block errors (ApiTargetBlockedMapError)
     const originalAuthFailure = (window as any).gm_authFailure;
     (window as any).gm_authFailure = () => {
@@ -640,10 +695,207 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         } catch (e) {}
       }
     };
+
+    // Also intercept console.error to catch Google Maps specific runtime errors like ApiTargetBlockedMapError
+    const originalConsoleError = console.error;
+    console.error = (...args: any[]) => {
+      const errorMessage = args.map(arg => {
+        if (arg instanceof Error) return arg.message + "\n" + arg.stack;
+        if (typeof arg === 'object') {
+          try {
+            return JSON.stringify(arg);
+          } catch (e) {
+            return String(arg);
+          }
+        }
+        return String(arg);
+      }).join(" ");
+
+      if (
+        errorMessage.includes("ApiTargetBlockedMapError") || 
+        errorMessage.includes("Google Maps JavaScript API error") || 
+        errorMessage.includes("API target blocked")
+      ) {
+        console.warn("Google Maps API restriction detected in console error. Defaulting to vector maps:", errorMessage);
+        setIsMapsBlocked(true);
+        setMapViewMode("vector");
+      }
+      originalConsoleError.apply(console, args);
+    };
+
+    // Intercept window errors just in case
+    const handleWindowError = (event: ErrorEvent) => {
+      if (
+        event.message && 
+        (event.message.includes("ApiTargetBlockedMapError") || 
+         event.message.includes("Google Maps") || 
+         event.message.includes("ApiTargetBlocked"))
+      ) {
+        console.warn("Google Maps API error detected on window. Defaulting to vector maps:", event.message);
+        setIsMapsBlocked(true);
+        setMapViewMode("vector");
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("error", handleWindowError);
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason?.message || String(event.reason);
+      if (
+        reason &&
+        (reason.includes("ApiTargetBlockedMapError") ||
+         reason.includes("Google Maps") ||
+         reason.includes("ApiTargetBlocked"))
+      ) {
+        console.warn("Google Maps API unhandled promise rejection handled. Defaulting to vector maps:", reason);
+        setIsMapsBlocked(true);
+        setMapViewMode("vector");
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+
     return () => {
       (window as any).gm_authFailure = originalAuthFailure;
+      console.error = originalConsoleError;
+      window.removeEventListener("error", handleWindowError);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' as any }).then((permissionStatus) => {
+        if (permissionStatus.state === 'granted') {
+          detectLocation();
+        }
+        permissionStatus.onchange = () => {
+          if (permissionStatus.state === 'granted') {
+            detectLocation();
+          }
+        };
+      }).catch((err) => {
+        console.warn("Permission query not supported:", err);
+      });
+    } else if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => { detectLocation(); },
+        () => {},
+        { timeout: 1500 }
+      );
+    }
+  }, [isLoaded]);
+
+  const getWeatherIcon = (code: number) => {
+    if (code === 0) return <Sun className="text-amber-500 animate-pulse" size={20} />;
+    if (code <= 3) return <Cloud className="text-slate-300" size={20} />;
+    if (code <= 48) return <Cloud className="text-slate-400" size={20} />;
+    if (code <= 55) return <CloudDrizzle className="text-sky-300" size={20} />;
+    if (code <= 65) return <CloudRain className="text-sky-400 animate-bounce" style={{ animationDuration: "2s" }} size={20} />;
+    if (code <= 77) return <CloudSnow className="text-blue-200" size={20} />;
+    if (code <= 82) return <CloudRain className="text-sky-500 animate-bounce" style={{ animationDuration: "1.5s" }} size={20} />;
+    if (code <= 86) return <CloudSnow className="text-blue-300 animate-pulse" size={20} />;
+    return <CloudLightning className="text-yellow-400" size={20} />;
+  };
+
+  useEffect(() => {
+    if (!itinerary || !locationInput) {
+      setWeatherForecast(null);
+      setWeatherPackingAdvice("");
+      return;
+    }
+
+    const fetchWeather = async () => {
+      setWeatherLoading(true);
+      setWeatherError(null);
+      try {
+        // Step 1: Geocode the destination using Google Geocoding API if key is available
+        const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY;
+        let lat = 19.0760; // fallback to Mumbai
+        let lng = 72.8777;
+
+        if (mapsKey) {
+          try {
+            const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationInput)}&key=${mapsKey}`;
+            const geoRes = await fetch(geocodeUrl);
+            const geoData = await geoRes.json();
+            if (geoData.results && geoData.results[0]) {
+              lat = geoData.results[0].geometry.location.lat;
+              lng = geoData.results[0].geometry.location.lng;
+            }
+          } catch (e) {
+            console.warn("Google Geocoding failed, falling back to Open-Meteo search:", e);
+            const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationInput)}&count=1&language=en&format=json`;
+            const geoRes = await fetch(geocodeUrl);
+            const geoData = await geoRes.json();
+            if (geoData.results && geoData.results[0]) {
+              lat = geoData.results[0].latitude;
+              lng = geoData.results[0].longitude;
+            }
+          }
+        } else {
+          // fallback to Open-Meteo Geocoding
+          const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationInput)}&count=1&language=en&format=json`;
+          const geoRes = await fetch(geocodeUrl);
+          const geoData = await geoRes.json();
+          if (geoData.results && geoData.results[0]) {
+            lat = geoData.results[0].latitude;
+            lng = geoData.results[0].longitude;
+          }
+        }
+
+        // Step 2: Fetch daily forecast from our backend /api/weather proxy (which queries OpenWeather / falls back)
+        const weatherUrl = `/api/weather?lat=${lat}&lng=${lng}`;
+        const weatherRes = await fetch(weatherUrl);
+        const weatherData = await weatherRes.json();
+
+        if (weatherData.daily) {
+          const forecastList: WeatherForecastDay[] = weatherData.daily;
+          setWeatherForecast(forecastList);
+
+          // Step 3: Analyze and generate packing suggestions based on weather forecast
+          const tempsMax = forecastList.map(d => d.tempMax);
+          const tempsMin = forecastList.map(d => d.tempMin);
+          const avgMax = tempsMax.reduce((sum, val) => sum + val, 0) / tempsMax.length;
+          const avgMin = tempsMin.reduce((sum, val) => sum + val, 0) / tempsMin.length;
+          const totalPrecipitation = forecastList.reduce((sum, d) => sum + d.precipitation, 0);
+          const rainyDays = forecastList.filter(d => d.precipitation > 0.5 || (d.conditionText && d.conditionText.toLowerCase().includes("rain")) || [51,53,55,61,63,65,80,81,82,95,96,99].includes(d.conditionCode || 0)).length;
+
+          let advice = "";
+          if (rainyDays > 0 || totalPrecipitation > 5) {
+            advice = "🌧️ Rainy forecast: Pack quick-dry clothing, waterproof jackets/shoes, pocket umbrellas, and waterproof zip bags for electronics.";
+          } else if (avgMin < 12) {
+            advice = "❄️ Chilly weather: Bring warm thermal layers, heavy woolen coats, sweaters, gloves, thick socks, and hydrating skin lip balm.";
+          } else if (avgMin < 18) {
+            advice = "🧥 Cool breeze: Bring light cardigans, comfortable jackets, or hoodies for breezy evenings, plus versatile layered clothing.";
+          } else if (avgMax > 33) {
+            advice = "☀️ Hot weather: Pack lightweight breathable cotton or linen fabrics, high SPF 50+ sunscreen, polarized sunglasses, and wide-brim sun hats.";
+          } else {
+            advice = "🎒 Mild & Pleasant: Bring light breathable clothes, comfortable active walking sneakers, casual wear, and a light jacket for temperature drops.";
+          }
+          setWeatherPackingAdvice(advice);
+        } else {
+          throw new Error("Invalid weather data response");
+        }
+      } catch (err: any) {
+        console.error("Error fetching weather forecast:", err);
+        setWeatherError("Weather forecast currently unavailable");
+        
+        // Fallback packing advice based on travel style
+        let fallbackAdvice = "🎒 Light casual wear, comfortable walking shoes, sunglasses, and a power bank.";
+        if (travelStyle?.toLowerCase().includes("budget") || travelStyle?.toLowerCase().includes("backpacking")) {
+          fallbackAdvice = "🎒 Multi-purpose light attire, sturdy walking shoes, rain jacket, mini first-aid kit, and compact quick-dry towel.";
+        } else if (travelStyle?.toLowerCase().includes("adventure")) {
+          fallbackAdvice = "🎒 Sturdy trekking shoes, moisture-wicking activewear, windbreaker jacket, sunscreen, and hydration backpack.";
+        }
+        setWeatherPackingAdvice(fallbackAdvice);
+      } finally {
+        setWeatherLoading(false);
+      }
+    };
+
+    fetchWeather();
+  }, [locationInput, itinerary, travelStyle]);
 
   useEffect(() => {
     if (!itinerary || !locationInput) {
@@ -699,32 +951,60 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     if (isLoaded && window.google && window.google.maps) {
       const geocoder = new window.google.maps.Geocoder();
       const loadedMarkers: Array<{ name: string; lat: number; lng: number; description?: string }> = [];
-      let completed = 0;
       
-      attractionsList.forEach((attraction) => {
-        const searchQuery = `${attraction}, ${locationInput}`;
-        geocoder.geocode({ address: searchQuery }, (results, status) => {
-          completed++;
-          if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
-            const loc = results[0].geometry.location;
-            loadedMarkers.push({
-              name: attraction,
-              lat: loc.lat(),
-              lng: loc.lng(),
-              description: results[0].formatted_address
-            });
-          }
-
-          if (completed === attractionsList.length) {
-            if (loadedMarkers.length > 0) {
-              setMapMarkers(loadedMarkers);
-            } else {
-              // Geocode failed or returned zero, generate mock coordinates
-              generateMockCoords(attractionsList);
+      const triggerGeocoding = () => {
+        let completed = 0;
+        attractionsList.forEach((attraction) => {
+          const searchQuery = `${attraction}, ${locationInput}`;
+          geocoder.geocode({ address: searchQuery }, (results, status) => {
+            completed++;
+            if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
+              const loc = results[0].geometry.location;
+              loadedMarkers.push({
+                name: attraction,
+                lat: loc.lat(),
+                lng: loc.lng(),
+                description: results[0].formatted_address
+              });
             }
-          }
+
+            if (completed === attractionsList.length) {
+              if (loadedMarkers.length > 0) {
+                setMapMarkers(loadedMarkers);
+              } else {
+                generateMockCoords(attractionsList);
+              }
+            }
+          });
         });
-      });
+      };
+
+      if (startLocation) {
+        if (startCoords) {
+          loadedMarkers.push({
+            name: `Start: ${startLocation}`,
+            lat: startCoords.lat,
+            lng: startCoords.lng,
+            description: `Your trip starting point (${startLocation})`
+          });
+          triggerGeocoding();
+        } else {
+          geocoder.geocode({ address: startLocation }, (startResults, startStatus) => {
+            if (startStatus === window.google.maps.GeocoderStatus.OK && startResults && startResults[0]) {
+              const loc = startResults[0].geometry.location;
+              loadedMarkers.push({
+                name: `Start: ${startLocation}`,
+                lat: loc.lat(),
+                lng: loc.lng(),
+                description: startResults[0].formatted_address
+              });
+            }
+            triggerGeocoding();
+          });
+        }
+      } else {
+        triggerGeocoding();
+      }
     } else {
       // Maps API not loaded/blocked/offline, generate beautiful mock coordinates for Visual canvas
       generateMockCoords(attractionsList);
@@ -759,19 +1039,33 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         center = { lat: 19.0760, lng: 72.8777 };
       }
 
+      const deltaMarkers: Array<{ name: string; lat: number; lng: number; description?: string }> = [];
+
+      // If we have startLocation, add a starting marker offset from the destination center
+      if (startLocation) {
+        const sLat = startCoords?.lat || (center.lat + 0.35); // offset starter significantly to show connection path
+        const sLng = startCoords?.lng || (center.lng - 0.35);
+        deltaMarkers.push({
+          name: `Start: ${startLocation}`,
+          lat: sLat,
+          lng: sLng,
+          description: `Your trip starting point (${startLocation})`
+        });
+      }
+
       // Distribute coordinates in a beautiful spiral arc shape
-      const deltaMarkers = list.map((attr, idx) => {
+      list.forEach((attr, idx) => {
         const angle = (idx / list.length) * Math.PI * 1.5; // curved arc spread
         const radius = 0.012 + idx * 0.003; // spiral outward slightly
         const latOffset = Math.sin(angle) * radius;
         const lngOffset = Math.cos(angle) * radius;
 
-        return {
+        deltaMarkers.push({
           name: attr,
           lat: center.lat + latOffset,
           lng: center.lng + lngOffset,
           description: `Virtual coordinate plot of ${attr} in ${locationInput}`
-        };
+        });
       });
 
       setMapMarkers(deltaMarkers);
@@ -781,6 +1075,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [modelUsedForItinerary, setModelUsedForItinerary] = useState<string>("");
   const [enableThinking, setEnableThinking] = useState(false);
   const [useSearch, setUseSearch] = useState(true);
+  const [includeHiddenGems, setIncludeHiddenGems] = useState(true);
+  const [includeLocalExperiences, setIncludeLocalExperiences] = useState(true);
 
   // Chatbot states
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -1106,38 +1402,97 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         try {
           let lat1, lon1, lat2, lon2;
 
-          if (isLoaded && window.google) {
-            const geocoder = new google.maps.Geocoder();
-            const [res1, res2] = await Promise.all([
-              new Promise<any>((resolve) => geocoder.geocode({ address: startLocation }, (r) => resolve(r))),
-              new Promise<any>((resolve) => geocoder.geocode({ address: locationInput }, (r) => resolve(r)))
-            ]);
-            
-            if (res1 && res1[0] && res2 && res2[0]) {
-              lat1 = res1[0].geometry.location.lat();
-              lon1 = res1[0].geometry.location.lng();
-              lat2 = res2[0].geometry.location.lat();
-              lon2 = res2[0].geometry.location.lng();
+          // 1. Try local CITY_COORDS_DB first for instant resolution
+          const fromC = lookupCityCoords(startLocation, null);
+          const toC = lookupCityCoords(locationInput, null);
+          if (fromC) {
+            lat1 = fromC.lat;
+            lon1 = fromC.lng;
+          }
+          if (toC) {
+            lat2 = toC.lat;
+            lon2 = toC.lng;
+          }
+
+          // 2. If missing, try safe Google Geocoding
+          if ((!lat1 || !lat2) && isLoaded && window.google && !isMapsBlocked) {
+            try {
+              const geocoder = new google.maps.Geocoder();
+              const [res1, res2] = await Promise.all([
+                new Promise<any>((resolve) => {
+                  const timer = setTimeout(() => resolve(null), 1000);
+                  try {
+                    geocoder.geocode({ address: startLocation }, (r) => {
+                      clearTimeout(timer);
+                      resolve(r);
+                    });
+                  } catch {
+                    clearTimeout(timer);
+                    resolve(null);
+                  }
+                }),
+                new Promise<any>((resolve) => {
+                  const timer = setTimeout(() => resolve(null), 1000);
+                  try {
+                    geocoder.geocode({ address: locationInput }, (r) => {
+                      clearTimeout(timer);
+                      resolve(r);
+                    });
+                  } catch {
+                    clearTimeout(timer);
+                    resolve(null);
+                  }
+                })
+              ]);
+              
+              if (res1 && res1[0] && !lat1) {
+                lat1 = res1[0].geometry.location.lat();
+                lon1 = res1[0].geometry.location.lng();
+              }
+              if (res2 && res2[0] && !lat2) {
+                lat2 = res2[0].geometry.location.lat();
+                lon2 = res2[0].geometry.location.lng();
+              }
+            } catch (err) {
+              console.warn("Google geocoder failed in calculateRoute:", err);
             }
           }
 
-          if (!lat1) {
-            // Fetch coordinates for both cities using Nominatim
-            const [res1, res2] = await Promise.all([
-              fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(startLocation)}&limit=1`),
-              fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput)}&limit=1`)
-            ]);
-            const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+          // 3. If still missing, try Nominatim
+          if (!lat1 || !lat2) {
+            try {
+              const [res1, res2] = await Promise.all([
+                !lat1 ? fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(startLocation)}&limit=1`).then(r => r.json()).catch(() => null) : Promise.resolve(null),
+                !lat2 ? fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput)}&limit=1`).then(r => r.json()).catch(() => null) : Promise.resolve(null)
+              ]);
 
-            if (data1[0] && data2[0]) {
-              lat1 = parseFloat(data1[0].lat);
-              lon1 = parseFloat(data1[0].lon);
-              lat2 = parseFloat(data2[0].lat);
-              lon2 = parseFloat(data2[0].lon);
+              if (res1 && res1[0] && !lat1) {
+                lat1 = parseFloat(res1[0].lat);
+                lon1 = parseFloat(res1[0].lon);
+              }
+              if (res2 && res2[0] && !lat2) {
+                lat2 = parseFloat(res2[0].lat);
+                lon2 = parseFloat(res2[0].lon);
+              }
+            } catch (nominatimErr) {
+              console.warn("Nominatim geocoder failed in calculateRoute:", nominatimErr);
             }
           }
 
           if (lat1 && lat2) {
+            setStartCoords(prev => {
+              if (!prev || prev.lat !== lat1 || prev.lng !== lon1) {
+                return { lat: lat1, lng: lon1 };
+              }
+              return prev;
+            });
+            setEndCoords(prev => {
+              if (!prev || prev.lat !== lat2 || prev.lng !== lon2) {
+                return { lat: lat2, lng: lon2 };
+              }
+              return prev;
+            });
+
             // Haversine distance
             const R = 6371; // km
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -1146,7 +1501,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                       Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const distance = Math.round(R * c);
+            const distance = Math.max(50, Math.round(R * c * 1.25));
 
             // Estimate time and mode
             let mode = "Car/Bus";
@@ -1505,49 +1860,93 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   // Firebase Auth Listener & Sandbox mode initializer
   React.useEffect(() => {
     if (!isFirebaseAvailable) {
-      // In Guest/Local sandbox mode, load or auto-create a persistent profile so all features work immediately!
+      // In Guest/Local sandbox mode, load any previously logged-in user profile if exists.
       const savedUser = localStorage.getItem("travolor_local_user");
-      const defaultLocalUser = {
-        id: "guest_user",
-        name: "Indian Explorer",
-        email: "historythroughminds@gmail.com",
-        photo: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
-        phone: "+91 98765 43210",
-        totalBudget: 80000
-      };
       if (savedUser) {
         try {
-          setUser(JSON.parse(savedUser));
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.id !== "guest_user") {
+            setUser(parsed);
+          } else {
+            setUser(null);
+          }
         } catch (e) {
-          setUser(defaultLocalUser);
+          setUser(null);
         }
       } else {
-        setUser(defaultLocalUser);
-        localStorage.setItem("travolor_local_user", JSON.stringify(defaultLocalUser));
+        setUser(null);
       }
+      setAuthInitializing(false);
       return;
     }
 
-    if (!auth) return;
+    if (!auth) {
+      setAuthInitializing(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Fetch additional profile data from Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        const userData = userDoc.exists() ? userDoc.data() : {};
-        
-        setUser({
-          id: firebaseUser.uid,
-          name: userData.name || firebaseUser.displayName || 'Traveler',
-          email: firebaseUser.email || '',
-          photo: userData.photo || firebaseUser.photoURL || '',
-          phone: userData.phone || ''
-        });
-      } else {
+      try {
+        if (firebaseUser) {
+          // Fetch additional profile data from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userData = userDoc.exists() ? userDoc.data() : {};
+          
+          setUser({
+            id: firebaseUser.uid,
+            name: userData.name || firebaseUser.displayName || 'Traveler',
+            email: firebaseUser.email || '',
+            photo: userData.photo || firebaseUser.photoURL || '',
+            phone: userData.phone || ''
+          });
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("Auth sync error:", err);
         setUser(null);
+      } finally {
+        setAuthInitializing(false);
       }
     });
     return () => unsubscribe();
   }, []);
+
+  // Admin Real-time Synchronization
+  React.useEffect(() => {
+    if (!user || user.email !== 'historythroughminds@gmail.com' || !isFirebaseAvailable || !db) {
+      setAdminUsers([]);
+      setAdminTrips([]);
+      setAdminBookings([]);
+      return;
+    }
+
+    setAdminLoading(true);
+
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminUsers(list);
+    }, (err) => console.error("Admin user listener error:", err));
+
+    const unsubTrips = onSnapshot(collection(db, 'trips'), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminTrips(list);
+    }, (err) => console.error("Admin trip listener error:", err));
+
+    const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminBookings(list);
+      setAdminLoading(false);
+    }, (err) => {
+      console.error("Admin booking listener error:", err);
+      setAdminLoading(false);
+    });
+
+    return () => {
+      unsubUsers();
+      unsubTrips();
+      unsubBookings();
+    };
+  }, [user, isFirebaseAvailable]);
 
   // Firestore & Local Real-time Listeners
   React.useEffect(() => {
@@ -1899,7 +2298,58 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       }
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || "Authentication failed.");
+      let friendlyMessage = err.message || "Authentication failed.";
+      if (err.code) {
+        const errorTranslations: Record<string, Record<string, string>> = {
+          'auth/invalid-credential': {
+            English: "Incorrect email/phone or password!",
+            Marathi: "चुकीचा ईमेल/मोबाईल नंबर किंवा पासवर्ड!",
+            Hindi: "गलत ईमेल/मोबाइल नंबर या पासवर्ड!"
+          },
+          'auth/wrong-password': {
+            English: "Incorrect password!",
+            Marathi: "चुकीचा पासवर्ड!",
+            Hindi: "गलत पासवर्ड!"
+          },
+          'auth/user-not-found': {
+            English: "No account found for this email/phone.",
+            Marathi: "या ईमेल/मोबाईलवर कोणतेही खाते आढळले नाही.",
+            Hindi: "इस ईमेल/मोबाइल पर कोई खाता नहीं मिला।"
+          },
+          'auth/email-already-in-use': {
+            English: "This email/phone is already registered.",
+            Marathi: "या ईमेल/मोबाईलवर आधीच खाते नोंदणीकृत आहे.",
+            Hindi: "यह ईमेल/मोबाइल पहले से ही पंजीकृत है।"
+          },
+          'auth/weak-password': {
+            English: "Password should be at least 6 characters.",
+            Marathi: "पासवर्ड किमान ६ अक्षरांचा असावा.",
+            Hindi: "पासवर्ड कम से कम ६ अक्षरों का होना चाहिए।"
+          },
+          'auth/invalid-email': {
+            English: "Please enter a valid email or phone number.",
+            Marathi: "कृपया वैध ईमेल किंवा मोबाईल नंबर प्रविष्ट करा.",
+            Hindi: "कृपया एक वैध ईमेल या मोबाइल नंबर दर्ज करें।"
+          },
+          'auth/popup-closed-by-user': {
+            English: "Login popup was closed by user.",
+            Marathi: "लॉगिन विंडो बंद केली गेली.",
+            Hindi: "लॉगिन पॉपअप उपयोगकर्ता द्वारा बंद कर दिया गया था।"
+          },
+          'auth/network-request-failed': {
+            English: "Network error! Please check your internet.",
+            Marathi: "नेटवर्क त्रुटी! कृपया इंटरनेट कनेक्शन तपासा.",
+            Hindi: "नेटवर्क त्रुटि! कृपया अपना इंटरनेट कनेक्शन जांचें।"
+          }
+        };
+
+        const code = err.code;
+        if (errorTranslations[code]) {
+          const trans = errorTranslations[code];
+          friendlyMessage = trans[language] || trans.English;
+        }
+      }
+      setAuthError(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -1976,8 +2426,12 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     setLoading(true);
     setItinerary(null);
+    setStructuredItinerary(null);
     setItinerarySources([]);
     setModelUsedForItinerary("");
+    setTimeout(() => {
+      document.getElementById("itinerary-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
     try {
       const result = await generateItinerary({
         location: locationInput,
@@ -1987,9 +2441,18 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         travelStyle: styleToUse,
         language: language,
         enableThinking: enableThinking,
-        useSearch: useSearch
+        useSearch: useSearch,
+        travelMode: travelMode,
+        travelDate: travelDate,
+        budget: targetBudget,
+        includeHiddenGems: includeHiddenGems,
+        includeLocalExperiences: includeLocalExperiences
       });
       setItinerary(result.text);
+      setStructuredItinerary(result.structured || null);
+      setTimeout(() => {
+        document.getElementById("itinerary-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 300);
       if (result.sources) {
         setItinerarySources(result.sources);
       }
@@ -2295,6 +2758,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     const handleSetDestination = (destName: string) => {
       setLocationInput(destName);
+      setEndCoords(null);
       window.scrollTo({ top: 350, behavior: "smooth" });
     };
 
@@ -2366,7 +2830,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 <LocationInput
                   value={startLocation}
-                  onChange={setStartLocation}
+                  onChange={(val: string) => {
+                    setStartLocation(val);
+                    setStartCoords(null);
+                  }}
                   onPlaceSelect={(place: any) => {
                     if (place.formatted_address) setStartLocation(place.formatted_address);
                     else if (place.name) setStartLocation(place.name);
@@ -2389,7 +2856,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
                 <LocationInput
                   value={locationInput}
-                  onChange={setLocationInput}
+                  onChange={(val: string) => {
+                    setLocationInput(val);
+                    setEndCoords(null);
+                  }}
                   onPlaceSelect={(place: any) => {
                     if (place.formatted_address) setLocationInput(place.formatted_address);
                     else if (place.name) setLocationInput(place.name);
@@ -2406,6 +2876,85 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   isLoaded={isLoaded}
                   language={language}
                 />
+              </div>
+
+              {/* Travel Mode Selector */}
+              <div className="text-left space-y-3">
+                <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                  {language === 'mr' ? '🚗 प्रवासाचे साधन निवडा (Travel Mode)' : language === 'hi' ? '🚗 यात्रा का साधन चुनें (Travel Mode)' : '🚗 Select Travel Mode'}
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {[
+                    { id: 'self-drive', label: 'Self Drive', mr: 'स्वतः कारने', hi: 'स्वयं ड्राइव', icon: Car },
+                    { id: 'cab', label: 'Outstation Cab', mr: 'कॅब भाड्याने', hi: 'आउटस्टेशन कैब', icon: Car },
+                    { id: 'bus', label: 'Sleeper Bus', mr: 'लक्झरी बसने', hi: 'स्लीपर बस', icon: Bus },
+                    { id: 'train', label: 'Scenic Train', mr: 'रेल्वेने (ट्रेन)', hi: 'ट्रेन सफर', icon: TrainFront },
+                    { id: 'flight', label: 'Fast Flight', mr: 'विमानाने (फ्लाइट)', hi: 'हवाई यात्रा', icon: Plane }
+                  ].map((mode) => {
+                    const Icon = mode.icon;
+                    const isSelected = travelMode === mode.id;
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setTravelMode(mode.id as any)}
+                        className={`flex flex-col items-center justify-center py-4 px-3 rounded-2xl border text-center transition-all cursor-pointer ${
+                          isSelected 
+                            ? "bg-[#000080] border-[#000080] text-white shadow-lg ring-2 ring-blue-400/50" 
+                            : "bg-gray-50/70 border-gray-100 hover:bg-gray-100/80 hover:border-gray-300 dark:bg-slate-800/40 dark:border-slate-800 dark:hover:bg-slate-800/80 text-gray-700 dark:text-gray-300"
+                        }`}
+                        title={mode.label}
+                      >
+                        <Icon size={22} className={`mb-2 ${isSelected ? 'text-amber-400' : 'text-gray-400 dark:text-gray-500'}`} />
+                        <span className="text-[11px] font-black tracking-tight block truncate w-full">
+                          {language === 'mr' ? mode.mr : language === 'hi' ? mode.hi : mode.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Travel Date and Target Budget Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-gray-50 dark:bg-slate-800/20 border border-gray-100 dark:border-slate-800 rounded-2xl p-4 flex items-center justify-between group hover:bg-white dark:hover:bg-slate-900 hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3 w-full">
+                    <Calendar className="text-gray-400 shrink-0" size={20} />
+                    <div className="flex flex-col text-left w-full">
+                      <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">
+                        {language === 'mr' ? 'प्रवासाची तारीख (Travel Date)' : language === 'hi' ? 'यात्रा की तारीख (Travel Date)' : 'Travel Date'}
+                      </span>
+                      <input 
+                        type="date" 
+                        value={travelDate} 
+                        onChange={(e) => setTravelDate(e.target.value)} 
+                        className="text-[#000080] dark:text-blue-400 font-bold bg-transparent outline-none border-none p-0 mt-0.5 w-full cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-slate-800/20 border border-gray-100 dark:border-slate-800 rounded-2xl p-4 flex items-center justify-between group hover:bg-white dark:hover:bg-slate-900 hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3 w-full">
+                    <Wallet className="text-gray-400 shrink-0" size={20} />
+                    <div className="flex flex-col text-left w-full">
+                      <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">
+                        {language === 'mr' ? 'लक्षित बजेट (Target Budget - ₹)' : language === 'hi' ? 'लक्षित बजट (Target Budget - ₹)' : 'Target Budget (₹)'}
+                      </span>
+                      <input 
+                        type="number" 
+                        min="1000"
+                        step="5000"
+                        value={targetBudget} 
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setTargetBudget(val);
+                        }} 
+                        className="text-[#000080] dark:text-blue-400 font-bold bg-transparent outline-none border-none p-0 mt-0.5 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2489,6 +3038,58 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                     </label>
                   </div>
+
+                  {/* Include Hidden Gems */}
+                  <div className="flex items-center justify-between border-t border-gray-100 dark:border-slate-800/80 pt-3">
+                    <div className="flex items-center gap-3 text-left">
+                      <div className="w-9 h-9 rounded-xl bg-amber-100/70 dark:bg-amber-950/20 text-amber-500 flex items-center justify-center">
+                        <Sparkles size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-[#000080] dark:text-indigo-400">
+                          {language === "Marathi" ? "गुपित प्रेक्षणीय स्थळे समाविष्ट करा" : language === "Hindi" ? "छिपे हुए अनूठे स्थान जोड़ें" : "Include Hidden Gems & Offbeat Spots"}
+                        </span>
+                        <span className="text-gray-400 text-[11px]">
+                          {language === "Marathi" ? "गर्दी नसलेली सुंदर पर्यटन ठिकाणे" : language === "Hindi" ? "कम भीड़भाड़ वाले खूबसूरत पर्यटक स्थल" : "Discover lesser-known, scenic secret places"}
+                        </span>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={includeHiddenGems} 
+                        onChange={(e) => setIncludeHiddenGems(e.target.checked)} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                  </div>
+
+                  {/* Include Local Experiences */}
+                  <div className="flex items-center justify-between border-t border-gray-100 dark:border-slate-800/80 pt-3">
+                    <div className="flex items-center gap-3 text-left">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-100/70 dark:bg-emerald-950/20 text-emerald-500 flex items-center justify-center">
+                        <Utensils size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-[#000080] dark:text-indigo-400">
+                          {language === "Marathi" ? "स्थानिक अनुभव आणि खाद्यसंस्कृती" : language === "Hindi" ? "स्थानीय अनुभव और पारंपरिक व्यंजन" : "Include Local Experiences & Culinary Guides"}
+                        </span>
+                        <span className="text-gray-400 text-[11px]">
+                          {language === "Marathi" ? "पारंपरिक खाद्यपदार्थ आणि स्थानिक संस्कृती" : language === "Hindi" ? "पारंपरिक व्यंजन और स्थानीय कला-संस्कृति" : "Savor authentic regional food & native culture"}
+                        </span>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={includeLocalExperiences} 
+                        onChange={(e) => setIncludeLocalExperiences(e.target.checked)} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-emerald-300 dark:peer-focus:ring-emerald-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                  </div>
                 </div>
 
                 <motion.button
@@ -2527,130 +3128,205 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           </div>
         </section>
 
-        {/* Travel Stats Section */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
-          {TRAVEL_STATS.map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="bg-white/50 backdrop-blur-sm border border-white/20 p-8 rounded-[2.5rem] text-center space-y-2 shadow-sm"
-            >
-              <h4 className="text-4xl font-black text-[#000080] tracking-tighter">{stat.value}</h4>
-              <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">{stat.label}</p>
-            </motion.div>
-          ))}
-        </section>
-
-        {/* Premium AI Co-Pilot Features Suite */}
-        <section className="space-y-8 px-4">
-          <div className="text-center space-y-2">
-            <span className="bg-blue-100/80 dark:bg-[#1E90FF]/10 text-[#000080] dark:text-[#93C5FD] px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest border border-blue-200/40 dark:border-[#1E90FF]/20">
-              💎 Travolor Premium Suite
-            </span>
-            <h3 className="text-3xl md:text-4xl font-display font-black text-[#000080] dark:text-white tracking-tight">
-              AI-Powered Travel Co-Pilot Tools
-            </h3>
-            <p className="text-gray-500 text-sm max-w-xl mx-auto font-medium">
-              Access localized expert planners, coordinate expenses, and design routes with advanced Gemini intelligence.
-            </p>
+        {/* Segmented Tab Bar for Exploration & Inspiration */}
+        {!itinerary && !loading && (
+          <div className="max-w-4xl mx-auto w-full px-4 text-center space-y-4 animate-fade-in">
+            <span className="text-xs font-black tracking-widest text-[#1E90FF] uppercase">🎯 Swadesh Travel Explorer</span>
+            <div className="bg-gray-100/90 dark:bg-[#0E1335]/80 p-2 rounded-3xl inline-flex flex-wrap gap-2 justify-center border border-gray-200/50 dark:border-blue-950/40 shadow-inner">
+              <button
+                type="button"
+                onClick={() => {
+                  setExploreSecondaryTab('gems');
+                  document.getElementById('swadesh-gems-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className={cn(
+                  "px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
+                  exploreSecondaryTab === 'gems'
+                    ? "bg-white dark:bg-[#1E90FF]/20 text-[#000080] dark:text-[#93C5FD] shadow-md"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                )}
+              >
+                🏞️ Swadesh Gems
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setExploreSecondaryTab('copilot');
+                  document.getElementById('copilot-tools-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className={cn(
+                  "px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
+                  exploreSecondaryTab === 'copilot'
+                    ? "bg-white dark:bg-[#1E90FF]/20 text-[#000080] dark:text-[#93C5FD] shadow-md"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                )}
+              >
+                🎒 Co-Pilot Tools
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setExploreSecondaryTab('simulator');
+                  document.getElementById('savings-simulator-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className={cn(
+                  "px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2",
+                  exploreSecondaryTab === 'simulator'
+                    ? "bg-white dark:bg-[#1E90FF]/20 text-[#000080] dark:text-[#93C5FD] shadow-md"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                )}
+              >
+                💰 Savings Simulator & Hacks
+              </button>
+            </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                id: "chat",
-                title: "🎒 Companion & Quiz",
-                description: "Determine your Travel Personality type and chat with custom AI local guides tuned to your specific travel vibes.",
-                icon: MessageSquare,
-                color: "from-blue-500/10 to-indigo-500/10 text-blue-600 dark:text-blue-400 border-blue-100/50 dark:border-blue-900/30",
-                badge: "Active"
-              },
-              {
-                id: "route",
-                title: "🗺️ Interactive Map Planner",
-                description: "Plot custom destination nodes interactively on the SVG stage and dynamically calculate optimal travel routes & times.",
-                icon: MapIcon,
-                color: "from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100/50 dark:border-emerald-900/30",
-                badge: "Interactive"
-              },
-              {
-                id: "board",
-                title: "✨ Visual Trip Board",
-                description: "Save custom scenic pins, search attraction spots, and receive live recommendations with Google Search integration.",
-                icon: Compass,
-                color: "from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border-purple-100/50 dark:border-purple-900/30",
-                badge: "Premium"
-              },
-              {
-                id: "india",
-                title: "🕌 India Specials",
-                description: "Explore highly curated architectural wonders, spiritual ashram routes, and majestic palace heritage trails.",
-                icon: Castle,
-                color: "from-amber-500/10 to-orange-500/10 text-amber-600 dark:text-amber-400 border-amber-100/50 dark:border-amber-900/30",
-                badge: "Localized"
-              },
-              {
-                id: "group",
-                title: "👥 Group Expense Splitter",
-                description: "Coordinate group travel members, log receipt expenses seamlessly, and view mathematically optimal payment settlements.",
-                icon: Users,
-                color: "from-rose-500/10 to-red-500/10 text-rose-600 dark:text-rose-400 border-rose-100/50 dark:border-rose-900/30",
-                badge: "Splitter"
-              }
-            ].map((feature, i) => {
-              const Icon = feature.icon;
-              return (
+        {/* Travel Stats & AI Co-Pilot Features Suite */}
+        {!itinerary && !loading && (
+          <div id="copilot-tools-section" className="scroll-mt-24 space-y-12">
+            {/* Travel Stats Section */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
+              {TRAVEL_STATS.map((stat, i) => (
                 <motion.div
-                  key={feature.id}
+                  key={i}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  onClick={() => {
-                    setHubSubTab(feature.id as any);
-                    setActiveTab("hub");
-                  }}
-                  className={cn(
-                    "relative overflow-hidden rounded-[2.5rem] border bg-white dark:bg-[#0B0F2B]/60 p-6 flex flex-col text-left gap-4 hover:shadow-xl transition-all duration-300 cursor-pointer group",
-                    "border-gray-100/80 dark:border-[#1E295D]/20 shadow-sm"
-                  )}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-white/50 backdrop-blur-sm border border-white/20 p-8 rounded-[2.5rem] text-center space-y-2 shadow-sm"
                 >
-                  <div className={cn("w-12 h-12 rounded-2xl bg-gradient-to-br flex items-center justify-center font-bold", feature.color)}>
-                    <Icon size={22} className="group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-base text-gray-800 dark:text-white group-hover:text-[#1E90FF] transition-colors">{feature.title}</h4>
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-gray-100 dark:bg-[#1E295D]/30 text-gray-400 dark:text-gray-300 tracking-wider">
-                        {feature.badge}
-                      </span>
-                    </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium leading-relaxed">{feature.description}</p>
-                  </div>
-                  <div className="mt-auto pt-2 flex items-center gap-1.5 text-xs font-bold text-[#1E90FF] opacity-0 group-hover:opacity-100 transition-opacity">
-                    Open Co-Pilot Tool <ArrowRight size={12} />
-                  </div>
+                  <h4 className="text-4xl font-black text-[#000080] tracking-tighter">{stat.value}</h4>
+                  <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">{stat.label}</p>
                 </motion.div>
-              );
-            })}
+              ))}
+            </section>
+
+            {/* Premium AI Co-Pilot Features Suite */}
+            <section className="space-y-8 px-4">
+              <div className="text-center space-y-2">
+                <span className="bg-blue-100/80 dark:bg-[#1E90FF]/10 text-[#000080] dark:text-[#93C5FD] px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest border border-blue-200/40 dark:border-[#1E90FF]/20">
+                  💎 Travolor Premium Suite
+                </span>
+                <h3 className="text-3xl md:text-4xl font-display font-black text-[#000080] dark:text-white tracking-tight">
+                  AI-Powered Travel Co-Pilot Tools
+                </h3>
+                <p className="text-gray-500 text-sm max-w-xl mx-auto font-medium">
+                  Access localized expert planners, coordinate expenses, and design routes with advanced Gemini intelligence.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  {
+                    id: "chat",
+                    title: "🎒 Companion & Quiz",
+                    description: "Determine your Travel Personality type and chat with custom AI local guides tuned to your specific travel vibes.",
+                    icon: MessageSquare,
+                    color: "from-blue-500/10 to-indigo-500/10 text-blue-600 dark:text-blue-400 border-blue-100/50 dark:border-blue-900/30",
+                    badge: "Active"
+                  },
+                  {
+                    id: "route",
+                    title: "🗺️ Interactive Map Planner",
+                    description: "Plot custom destination nodes interactively on the SVG stage and dynamically calculate optimal travel routes & times.",
+                    icon: MapIcon,
+                    color: "from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100/50 dark:border-emerald-900/30",
+                    badge: "Interactive"
+                  },
+                  {
+                    id: "board",
+                    title: "✨ Visual Trip Board",
+                    description: "Save custom scenic pins, search attraction spots, and receive live recommendations with Google Search integration.",
+                    icon: Compass,
+                    color: "from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border-purple-100/50 dark:border-purple-900/30",
+                    badge: "Premium"
+                  },
+                  {
+                    id: "india",
+                    title: "🕌 India Specials",
+                    description: "Explore highly curated architectural wonders, spiritual ashram routes, and majestic palace heritage trails.",
+                    icon: Castle,
+                    color: "from-amber-500/10 to-orange-500/10 text-amber-600 dark:text-amber-400 border-amber-100/50 dark:border-amber-900/30",
+                    badge: "Localized"
+                  },
+                  {
+                    id: "group",
+                    title: "👥 Group Expense Splitter",
+                    description: "Coordinate group travel members, log receipt expenses seamlessly, and view mathematically optimal payment settlements.",
+                    icon: Users,
+                    color: "from-rose-500/10 to-red-500/10 text-rose-600 dark:text-rose-400 border-rose-100/50 dark:border-rose-900/30",
+                    badge: "Splitter"
+                  },
+                  {
+                    id: "budget-tracker",
+                    title: "💳 AI Budget Planner & Calculator",
+                    description: "Enter your target budget and calculate real-time domestic lodging, train fares, meals, and local auto expenses instantly.",
+                    icon: Wallet,
+                    color: "from-amber-500/10 to-emerald-500/10 text-amber-600 dark:text-amber-400 border-amber-100/50 dark:border-amber-900/30",
+                    badge: "Calculator"
+                  }
+                ].map((feature, i) => {
+                  const Icon = feature.icon;
+                  return (
+                    <motion.div
+                      key={feature.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ y: -6, scale: 1.02 }}
+                      onClick={() => {
+                        if (feature.id === "budget-tracker") {
+                          setActiveTab("explore");
+                          setTimeout(() => {
+                            document.getElementById("trip-budget-tracker-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }, 100);
+                        } else {
+                          setHubSubTab(feature.id as any);
+                          setActiveTab("hub");
+                        }
+                      }}
+                      className={cn(
+                        "relative overflow-hidden rounded-[2.5rem] border bg-white dark:bg-[#0B0F2B]/60 p-6 flex flex-col text-left gap-4 hover:shadow-xl transition-all duration-300 cursor-pointer group",
+                        "border-gray-100/80 dark:border-[#1E295D]/20 shadow-sm"
+                      )}
+                    >
+                      <div className={cn("w-12 h-12 rounded-2xl bg-gradient-to-br flex items-center justify-center font-bold", feature.color)}>
+                        <Icon size={22} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-base text-gray-800 dark:text-white group-hover:text-[#1E90FF] transition-colors">{feature.title}</h4>
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-gray-100 dark:bg-[#1E295D]/30 text-gray-400 dark:text-gray-300 tracking-wider">
+                            {feature.badge}
+                          </span>
+                        </div>
+                        <p className="text-gray-500 dark:text-gray-400 text-xs font-medium leading-relaxed">{feature.description}</p>
+                      </div>
+                      <div className="mt-auto pt-2 flex items-center gap-1.5 text-xs font-bold text-[#1E90FF] opacity-0 group-hover:opacity-100 transition-opacity">
+                        Open {feature.id === "budget-tracker" ? "Calculator" : "Co-Pilot Tool"} <ArrowRight size={12} />
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
-        </section>
+        )}
 
-        {/* Swadesh Paisa Vasool Hub Section */}
-        <section className="space-y-12 px-4 py-8 bg-[#FAF9F5] dark:bg-[#07091B]/40 rounded-[3.5rem] border border-amber-100/50 dark:border-blue-950/20 shadow-sm relative overflow-hidden">
-          {/* Accent decoration */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-amber-500/10 to-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-[#1E90FF]/10 to-amber-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
+        {/* Swadesh Paisa Vasool Hub Section (under Savings Simulator Tab) */}
+        {!itinerary && !loading && (
+          <section id="savings-simulator-section" className="space-y-12 px-4 py-8 bg-[#FAF9F5] dark:bg-[#07091B]/40 rounded-[3.5rem] border border-amber-100/50 dark:border-blue-950/20 shadow-sm relative overflow-hidden scroll-mt-24">
+            {/* Accent decoration */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-amber-500/10 to-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-[#1E90FF]/10 to-amber-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
 
-          <div className="text-center space-y-3 relative z-10">
-            <span className="inline-flex items-center gap-1.5 bg-amber-100/80 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider border border-amber-200/50 dark:border-amber-900/40">
-              🇮🇳 SWADESH PAISA VASOOL HUB
-            </span>
-            <h3 className="text-3xl md:text-5xl font-display font-black text-[#000080] dark:text-white tracking-tight leading-none">
-              Family Savings & Middle-Class Special
-            </h3>
+            <div className="text-center space-y-3 relative z-10">
+              <span className="inline-flex items-center gap-1.5 bg-amber-100/80 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider border border-amber-200/50 dark:border-amber-900/40">
+                🇮🇳 SWADESH PAISA VASOOL HUB
+              </span>
+              <h3 className="text-3xl md:text-5xl font-display font-black text-[#000080] dark:text-white tracking-tight leading-none">
+                Family Savings & Middle-Class Special
+              </h3>
             <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base max-w-2xl mx-auto font-medium">
               Maximize your happiness, minimize your expenses! Discover pristine Indian budget gems and plan with intelligent local hacks.
             </p>
@@ -2806,6 +3482,13 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     icon: Bus,
                     desc: "Ditch costly private cabs. Use official state transport luxury bus models (e.g., Maharashtra Shivneri/Shivshahi, Karnataka Airavat, Gujarat Gurjarnagri) which offer premium AC comfort at 1/3rd the cost. Highly comfortable, secure for families, and run strictly on schedule.",
                     color: "border-blue-200/50 dark:border-blue-950/20 bg-blue-50/20 dark:bg-blue-950/5"
+                  },
+                  {
+                    id: "local-tips",
+                    title: "💡 Local Savings Tips",
+                    icon: Lightbulb,
+                    desc: "Never accept airport or railway station taxi rates. Always walk outside the gate or use local ride-sharing apps (Ola/Uber) or official pre-paid counters. Hire local registered e-rickshaws for sightseeing instead of full-day taxis, and always ask street food vendors for the local thali rates.",
+                    color: "border-purple-200/50 dark:border-purple-950/20 bg-purple-50/20 dark:bg-purple-950/5"
                   }
                 ].map((hack) => (
                   <div
@@ -2835,16 +3518,24 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               </div>
             </div>
           </div>
+        </section>
+      )}
 
-          {/* Swadesh Domestic Alternatives Showcase */}
-          <div className="space-y-6 pt-6 border-t border-gray-100/50 dark:border-slate-800/40 relative z-10 text-left">
-            <div className="space-y-1">
-              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">🏞️ SWADESH DARSHAN SPOTLIGHTS</span>
-              <h4 className="text-2xl font-black text-[#000080] dark:text-white">Ditch Expensive International, Choose Swadesh!</h4>
+        {/* Swadesh Domestic Alternatives Showcase (under Swadesh Gems Tab) */}
+        {!itinerary && !loading && (
+          <section id="swadesh-gems-section" className="space-y-6 px-4 py-8 text-left bg-[#FAF9F5] dark:bg-[#07091B]/40 rounded-[3.5rem] border border-emerald-100/50 dark:border-blue-950/20 shadow-sm relative overflow-hidden animate-fade-in scroll-mt-24">
+            {/* Accent decoration */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-emerald-500/10 to-[#1E90FF]/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+
+            <div className="space-y-1 relative z-10">
+              <span className="inline-flex items-center gap-1.5 bg-emerald-100/80 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border border-emerald-200/50 dark:border-emerald-900/40">
+                🏞️ SWADESH DARSHAN SUGGESTIONS & HIDDEN BUDGET DESTINATIONS
+              </span>
+              <h4 className="text-2xl md:text-3xl font-black text-[#000080] dark:text-white">Ditch Expensive International, Choose Swadesh!</h4>
               <p className="text-xs text-gray-400">Save lakhs on premium experiences. Visually identical nature, culture, and serenity at a fraction of the budget.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
               {domesticGems.map((gem) => (
                 <div
                   key={gem.id}
@@ -2897,8 +3588,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                 </div>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
 
       {/* Results Section */}
@@ -2934,15 +3625,79 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             className="space-y-12"
           >
             {/* Destination Card */}
-            <div className="relative h-[500px] rounded-[3.5rem] overflow-hidden shadow-2xl group">
+            <div className="relative h-auto md:h-[500px] min-h-[500px] rounded-[3.5rem] overflow-hidden shadow-2xl group flex flex-col justify-between">
               <img 
                 src={`https://picsum.photos/seed/${locationInput}/1600/900`} 
                 alt={locationInput}
-                className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-              <div className="absolute bottom-12 left-12 right-12 flex flex-col md:flex-row justify-between items-end gap-8">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+              
+              {/* Premium Weather & Packing Widget */}
+              <div className="absolute top-4 left-4 right-4 md:top-8 md:right-8 md:left-auto md:max-w-md bg-black/55 backdrop-blur-md border border-white/10 rounded-3xl p-5 text-white z-10 space-y-4 shadow-2xl animate-fade-in text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-amber-400">
+                      <Sun size={18} className="animate-spin" style={{ animationDuration: "10s" }} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black tracking-tight text-white">7-Day Climate & Packing</h4>
+                      <p className="text-[9px] text-gray-300 font-bold uppercase tracking-wider font-mono">Open-Meteo Integration</p>
+                    </div>
+                  </div>
+                  {weatherForecast && !weatherLoading && (
+                    <span className="text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">
+                      Live
+                    </span>
+                  )}
+                </div>
+
+                {weatherLoading ? (
+                  <div className="py-6 flex flex-col items-center justify-center space-y-2">
+                    <Loader2 className="animate-spin text-[#1E90FF]" size={20} />
+                    <span className="text-[10px] font-bold text-gray-300">Retrieving local climate trends...</span>
+                  </div>
+                ) : weatherError ? (
+                  <div className="text-[11px] text-rose-300 bg-rose-500/10 p-3 rounded-2xl border border-rose-500/20 text-center font-medium">
+                    ⚠️ {weatherError}
+                  </div>
+                ) : weatherForecast ? (
+                  <div className="space-y-3.5 animate-fade-in">
+                    {/* Horizontal 7-Day Scroll */}
+                    <div className="flex gap-2.5 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-white/20">
+                      {weatherForecast.map((day, dIdx) => (
+                        <div key={dIdx} className="flex flex-col items-center bg-white/5 border border-white/5 rounded-2xl p-2.5 min-w-[55px] text-center space-y-1.5 hover:bg-white/10 transition-all shrink-0">
+                          <span className="text-[9px] font-extrabold text-gray-300 uppercase">{day.dayName}</span>
+                          <div className="my-0.5">{getWeatherIcon(day.conditionCode)}</div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black">{day.tempMax}°</span>
+                            <span className="text-[9px] text-gray-400 font-bold">{day.tempMin}°</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Dynamic Packing Suggestions */}
+                    {weatherPackingAdvice && (
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1 hover:bg-white/10 transition-all">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-sky-300 block">
+                          🎒 Weather-Tuned Packing List
+                        </span>
+                        <p className="text-[11px] text-gray-200 font-semibold leading-relaxed">
+                          {weatherPackingAdvice}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-gray-300 text-center py-4 font-medium">
+                    Enter destination to load live weather.
+                  </div>
+                )}
+              </div>
+
+              <div className="relative z-10 w-full mt-auto p-6 md:p-12 flex flex-col md:flex-row justify-between items-end gap-8">
                 <div className="space-y-4">
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
@@ -3107,12 +3862,71 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     </div>
                   )}
 
+                  {structuredItinerary && (
+                    <div className="flex border-b border-gray-100 dark:border-slate-800/60 pb-3 mb-6 overflow-x-auto gap-1">
+                      {[
+                        { id: 'interactive', label: 'Interactive Plan', icon: Compass },
+                        { id: 'text', label: 'Classic Text', icon: Info },
+                        { id: 'budget', label: 'Budget Analyst', icon: Wallet },
+                        { id: 'guide', label: 'Local Guide', icon: Sparkles }
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setItinerarySubTab(tab.id as any)}
+                          className={cn(
+                            "px-5 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 transition-all shrink-0 cursor-pointer border",
+                            itinerarySubTab === tab.id
+                              ? "bg-[#000080] text-white border-[#000080] shadow-md dark:bg-[#1E90FF] dark:border-[#1E90FF]"
+                              : "text-gray-500 hover:text-gray-800 hover:bg-slate-50 border-transparent dark:hover:bg-slate-800"
+                          )}
+                        >
+                          <tab.icon size={14} />
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="mt-4">
-                    <AnimatedItinerary 
-                      itinerary={itinerary} 
-                      locationInput={locationInput} 
-                      startLocation={startLocation || 'Mumbai'} 
-                    />
+                    {structuredItinerary && itinerarySubTab === 'interactive' && (
+                      <InteractiveItineraryView
+                        structured={structuredItinerary}
+                        language={language}
+                        startLocation={startLocation || 'Mumbai'}
+                        locationInput={locationInput}
+                        travelMode={travelMode}
+                        travelDate={travelDate}
+                        duration={duration}
+                      />
+                    )}
+                    
+                    {(!structuredItinerary || itinerarySubTab === 'text') && (
+                      <AnimatedItinerary 
+                        itinerary={itinerary} 
+                        locationInput={locationInput} 
+                        startLocation={startLocation || 'Mumbai'} 
+                      />
+                    )}
+
+                    {structuredItinerary && itinerarySubTab === 'budget' && (
+                      <BudgetDashboardView
+                        budget={structuredItinerary.budgetDashboard}
+                        language={language}
+                        numPeople={numPeople}
+                        duration={duration}
+                        travelStyle={travelStyle}
+                        budgetOptimizer={structuredItinerary.aiFeatures?.budgetOptimizer}
+                      />
+                    )}
+
+                    {structuredItinerary && itinerarySubTab === 'guide' && (
+                      <LocalGuideView
+                        features={structuredItinerary.aiFeatures}
+                        checklist={structuredItinerary.checklist}
+                        emergencyContacts={structuredItinerary.emergencyContacts}
+                        language={language}
+                      />
+                    )}
                   </div>
 
                   {/* Booking CTAs after AI Result */}
@@ -3282,6 +4096,18 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                             />
                           ))}
 
+                          {mapMarkers.length > 1 && (
+                            <PolylineF
+                              path={mapMarkers.map(m => ({ lat: m.lat, lng: m.lng }))}
+                              options={{
+                                strokeColor: "#000080",
+                                strokeOpacity: 0.8,
+                                strokeWeight: 4.5,
+                                geodesic: true
+                              }}
+                            />
+                          )}
+
                           {selectedMapMarker && (
                             <InfoWindowF
                               position={{ lat: selectedMapMarker.lat, lng: selectedMapMarker.lng }}
@@ -3425,7 +4251,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     {[
                       { label: "Best Time", icon: Clock, value: "Oct - Mar", color: "text-orange-500" },
                       { label: "Crowd Level", icon: Users, value: "Moderate", color: "text-[#1E90FF]" },
-                      { label: "Weather", icon: Thermometer, value: "Pleasant", color: "text-emerald-500" },
+                      { label: "Weather", icon: Thermometer, value: weatherForecast ? `${weatherForecast[0].tempMax}°C - ${weatherForecast[0].conditionText}` : "Pleasant", color: "text-emerald-500" },
                       { label: "Photo Spots", icon: Camera, value: "12+ Points", color: "text-pink-500" },
                       { label: "Shopping", icon: ShoppingBag, value: "Local Crafts", color: "text-purple-500" },
                       { label: "Pro Tip", icon: Lightbulb, value: "Book early!", color: "text-amber-500" }
@@ -3447,18 +4273,19 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
             {/* Trip Budget Tracker Section */}
             <motion.div 
+              id="trip-budget-tracker-section"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white border border-gray-100 rounded-[3rem] p-8 md:p-12 shadow-2xl space-y-10"
+              className="bg-white border border-gray-100 dark:border-[#1E295D]/20 rounded-[3rem] p-8 md:p-12 shadow-2xl space-y-10 dark:bg-[#0B0F2B]/60 scroll-mt-24"
             >
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-[#000080] flex items-center justify-center shadow-xl">
-                    <Wallet className="text-white" size={28} />
+                  <div className="w-14 h-14 rounded-2xl bg-[#000080] dark:bg-[#1E90FF]/20 flex items-center justify-center shadow-xl">
+                    <Wallet className="text-white dark:text-[#93C5FD]" size={28} />
                   </div>
                   <div>
-                    <h3 className="text-3xl font-bold text-[#000080] tracking-tight">Trip Budget Tracker</h3>
-                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Real-time cost analysis</p>
+                    <h3 className="text-3xl font-bold text-[#000080] dark:text-white tracking-tight">AI Budget Planner & Calculator</h3>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Middle-Class Travel Dashboard</p>
                   </div>
                 </div>
                 
@@ -3918,7 +4745,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         placeholder="98765 43210"
                         value={phoneForm.phone}
                         onChange={(e) => {
-                          const sanitized = e.target.value.replace(/D/g, '').slice(0, 10);
+                          const sanitized = e.target.value.replace(/\D/g, '').slice(0, 10);
                           setPhoneForm({...phoneForm, phone: sanitized});
                         }}
                         className={cn(
@@ -4240,6 +5067,8 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     onClick={() => {
                       setStartLocation(trip.start_location || '');
                       setLocationInput(trip.location);
+                      setStartCoords(null);
+                      setEndCoords(null);
                       setDuration(trip.duration);
                       setTravelStyle(trip.style);
                       setItinerary(trip.itinerary);
@@ -4556,6 +5385,314 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     );
   };
 
+  const updateBookingStatus = async (bookingId: string, status: string) => {
+    try {
+      await updateDoc(doc(db, 'bookings', bookingId), { status });
+    } catch (err) {
+      console.error("Failed to update booking status:", err);
+    }
+  };
+
+  const deleteTripByAdmin = async (tripId: string) => {
+    if (window.confirm("Are you sure you want to delete this itinerary?")) {
+      try {
+        await deleteDoc(doc(db, 'trips', tripId));
+      } catch (err) {
+        console.error("Failed to delete trip:", err);
+      }
+    }
+  };
+
+  const deleteBookingByAdmin = async (bookingId: string) => {
+    if (window.confirm("Are you sure you want to delete this booking?")) {
+      try {
+        await deleteDoc(doc(db, 'bookings', bookingId));
+      } catch (err) {
+        console.error("Failed to delete booking:", err);
+      }
+    }
+  };
+
+  const renderAdmin = () => {
+    const totalRevenue = adminBookings.reduce((sum, b) => sum + (b.totalCost || 0), 0);
+
+    return (
+      <div className="space-y-10 pb-24 px-4 md:px-0">
+        {/* Admin Header */}
+        <div className="text-center space-y-3 pt-8">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black uppercase tracking-wider shadow-sm animate-pulse">
+            <Crown size={14} className="text-amber-600" />
+            System Administrator Mode
+          </div>
+          <h2 className="text-4xl font-serif font-black text-[#000080] dark:text-white tracking-tight">Admin Dashboard</h2>
+          <p className="text-gray-400 text-sm font-medium">Global platform analytics, user directory, and bookings oversight</p>
+        </div>
+
+        {/* Analytics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-sans">
+          {[
+            { label: "Total Registered Users", value: adminUsers.length, detail: "Platform users", icon: Users2, color: "bg-blue-500/10 text-blue-600" },
+            { label: "Active Planned Trips", value: adminTrips.length, detail: "AI Itineraries", icon: MapIcon, color: "bg-emerald-500/10 text-emerald-600" },
+            { label: "Customer Bookings", value: adminBookings.length, detail: "Confirmed trips", icon: BookingIcon, color: "bg-purple-500/10 text-purple-600" },
+            { label: "Estimated Revenue", value: `₹${totalRevenue.toLocaleString('en-IN')}`, detail: "Booking value", icon: Wallet, color: "bg-amber-500/10 text-amber-600" }
+          ].map((stat, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              className="bg-white dark:bg-[#0B0F2B] border border-gray-100 dark:border-[#1E295D]/30 p-6 rounded-[2rem] shadow-sm flex items-center gap-4 relative overflow-hidden group hover:shadow-md transition-all"
+            >
+              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center font-bold", stat.color)}>
+                <stat.icon size={26} />
+              </div>
+              <div>
+                <span className="text-xs font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider block">{stat.label}</span>
+                <span className="text-2xl font-black text-[#000080] dark:text-white block mt-0.5">{stat.value}</span>
+                <span className="text-[10px] text-gray-400 font-medium block mt-0.5">{stat.detail}</span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Sub-tabs Selection */}
+        <div className="bg-white dark:bg-[#0B0F2B] border border-gray-100 dark:border-[#1E295D]/30 p-2 rounded-2xl flex gap-1 max-w-md mx-auto shadow-sm">
+          {[
+            { id: 'users', label: 'User Directory', icon: Users },
+            { id: 'trips', label: 'All Trips', icon: MapIcon },
+            { id: 'bookings', label: 'All Bookings', icon: BookingIcon }
+          ].map((subTab) => (
+            <button
+              key={subTab.id}
+              onClick={() => setAdminSubTab(subTab.id as any)}
+              className={cn(
+                "flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2",
+                adminSubTab === subTab.id
+                  ? "bg-[#000080] text-white shadow-md"
+                  : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              )}
+            >
+              <subTab.icon size={14} />
+              {subTab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Main Admin Section */}
+        <div className="bg-white dark:bg-[#0B0F2B] border border-gray-100 dark:border-[#1E295D]/30 rounded-[2.5rem] p-6 md:p-8 shadow-sm">
+          {adminLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="animate-spin text-[#000080]" size={36} />
+              <p className="text-sm font-bold text-gray-400">Loading master analytics...</p>
+            </div>
+          ) : (
+            <>
+              {adminSubTab === 'users' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[#000080] dark:text-white font-sans">Registered Customer Directory</h3>
+                    <span className="text-xs font-extrabold bg-blue-50 text-blue-700 px-3 py-1 rounded-full">{adminUsers.length} Customers</span>
+                  </div>
+                  <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-[#1E295D]/30">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-[#1E295D]/30 text-[10px] uppercase tracking-widest text-gray-400 font-extrabold">
+                          <th className="p-4">Customer</th>
+                          <th className="p-4">Email</th>
+                          <th className="p-4">Phone</th>
+                          <th className="p-4 text-center">Custom Budget</th>
+                          <th className="p-4 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 dark:divide-[#1E295D]/20">
+                        {adminUsers.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-gray-400 font-bold">No registered users found.</td>
+                          </tr>
+                        ) : (
+                          adminUsers.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/20 transition-colors">
+                              <td className="p-4 flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center border border-white shadow-sm">
+                                  {item.photo ? (
+                                    <img src={item.photo} alt={item.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <User size={16} className="text-blue-600" />
+                                  )}
+                                </div>
+                                <span className="font-bold text-[#000080] dark:text-white">{item.name || 'Traveler'}</span>
+                              </td>
+                              <td className="p-4 font-semibold text-gray-500 dark:text-gray-400">{item.email}</td>
+                              <td className="p-4 font-mono text-gray-500 dark:text-gray-400">{item.phone || '-'}</td>
+                              <td className="p-4 text-center font-bold text-emerald-600">₹{(item.totalBudget || 50000).toLocaleString('en-IN')}</td>
+                              <td className="p-4 text-center">
+                                {item.email === 'historythroughminds@gmail.com' ? (
+                                  <span className="text-[10px] font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Owner / Admin</span>
+                                ) : (
+                                  <button
+                                    onClick={async () => {
+                                      if (window.confirm(`Are you sure you want to delete user ${item.name}?`)) {
+                                        try {
+                                          await deleteDoc(doc(db, 'users', item.id));
+                                        } catch (err) {
+                                          console.error(err);
+                                        }
+                                      }
+                                    }}
+                                    className="text-rose-600 hover:text-rose-800 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-lg hover:bg-rose-50 transition-all"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {adminSubTab === 'trips' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[#000080] dark:text-white font-sans">All Custom Itineraries</h3>
+                    <span className="text-xs font-extrabold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full">{adminTrips.length} Saved Trips</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {adminTrips.length === 0 ? (
+                      <div className="col-span-2 text-center py-12 text-gray-400 font-bold">No saved itineraries found.</div>
+                    ) : (
+                      adminTrips.map((trip) => (
+                        <div key={trip.id} className="bg-slate-50 dark:bg-gray-900/30 border border-slate-100 dark:border-[#1E295D]/20 p-6 rounded-3xl space-y-4 relative group hover:shadow-sm transition-all">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-black text-lg text-[#000080] dark:text-white">{trip.location}</h4>
+                              <p className="text-xs text-gray-400 font-medium">From: {trip.startLocation || 'Mumbai'} ({trip.travelMode || 'Car'})</p>
+                            </div>
+                            <button
+                              onClick={() => deleteTripByAdmin(trip.id)}
+                              className="text-gray-400 hover:text-rose-600 p-2 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-full transition-all"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-bold text-gray-500 dark:text-gray-400 font-sans font-sans">
+                            <div className="bg-white dark:bg-gray-800/40 p-2 rounded-xl border border-gray-100 dark:border-transparent">
+                              <span className="block uppercase text-[8px] text-gray-400">Duration</span>
+                              <span className="text-[#000080] dark:text-white font-black text-sm">{trip.duration} Days</span>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800/40 p-2 rounded-xl border border-gray-100 dark:border-transparent">
+                              <span className="block uppercase text-[8px] text-gray-400">Style</span>
+                              <span className="text-[#000080] dark:text-white font-black text-sm uppercase">{trip.travelStyle}</span>
+                            </div>
+                            <div className="bg-white dark:bg-gray-800/40 p-2 rounded-xl border border-gray-100 dark:border-transparent">
+                              <span className="block uppercase text-[8px] text-gray-400">People</span>
+                              <span className="text-[#000080] dark:text-white font-black text-sm">{trip.numPeople} Pax</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-[#1E295D]/10">
+                            <span className="text-[10px] font-bold text-gray-400 font-mono">Owner UID: <code className="bg-gray-100 dark:bg-gray-800/60 px-1.5 py-0.5 rounded text-[9px] font-mono">{trip.user_id?.slice(0, 8)}...</code></span>
+                            <button
+                              onClick={() => {
+                                setLocationInput(trip.location);
+                                setStartLocation(trip.startLocation || 'Mumbai');
+                                setStartCoords(null);
+                                setEndCoords(null);
+                                setDuration(trip.duration);
+                                setNumPeople(trip.numPeople);
+                                setTravelStyle(trip.travelStyle);
+                                setItinerary(trip.itinerary);
+                                setActiveTab('explore');
+                              }}
+                              className="text-[#1E90FF] font-black text-[10px] uppercase tracking-widest hover:underline"
+                            >
+                              View Layout
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {adminSubTab === 'bookings' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[#000080] dark:text-white font-sans">Master Bookings Registry</h3>
+                    <span className="text-xs font-extrabold bg-purple-50 text-purple-700 px-3 py-1 rounded-full">{adminBookings.length} Bookings</span>
+                  </div>
+                  <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-[#1E295D]/30">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-[#1E295D]/30 text-[10px] uppercase tracking-widest text-gray-400 font-extrabold">
+                          <th className="p-4">Destination</th>
+                          <th className="p-4 text-center">Passengers</th>
+                          <th className="p-4 text-center">Transport</th>
+                          <th className="p-4 text-center">Total Fare</th>
+                          <th className="p-4 text-center">Booking Status</th>
+                          <th className="p-4 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 dark:divide-[#1E295D]/20">
+                        {adminBookings.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-gray-400 font-bold">No customer bookings found.</td>
+                          </tr>
+                        ) : (
+                          adminBookings.map((b) => (
+                            <tr key={b.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/20 transition-colors">
+                              <td className="p-4">
+                                <span className="font-bold text-[#000080] dark:text-white block">{b.destination}</span>
+                                <span className="text-xs text-gray-400">Date: {b.travelDate || 'Upcoming'}</span>
+                              </td>
+                              <td className="p-4 text-center font-bold text-gray-600 dark:text-gray-300">{b.passengers || 1} Pax</td>
+                              <td className="p-4 text-center">
+                                <span className="text-xs uppercase font-extrabold bg-blue-50 text-blue-700 dark:bg-[#1E90FF]/15 dark:text-blue-300 px-2.5 py-1 rounded-full">
+                                  {b.transportType || 'Train'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-center font-black text-[#000080] dark:text-white">
+                                ₹{(b.totalCost || 0).toLocaleString('en-IN')}
+                              </td>
+                              <td className="p-4 text-center">
+                                <select
+                                  value={b.status || 'In Process'}
+                                  onChange={(e) => updateBookingStatus(b.id, e.target.value)}
+                                  className="text-xs font-extrabold bg-slate-100 dark:bg-gray-800 border-none outline-none focus:ring-1 focus:ring-blue-400 py-1.5 px-3 rounded-xl cursor-pointer text-[#000080] dark:text-white"
+                                >
+                                  <option value="In Process">In Process</option>
+                                  <option value="Approved">Approved ✅</option>
+                                  <option value="Completed">Completed 🌟</option>
+                                  <option value="Cancelled">Cancelled ❌</option>
+                                </select>
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => deleteBookingByAdmin(b.id)}
+                                  className="text-rose-600 hover:text-rose-800 text-xs font-black uppercase tracking-wider p-2 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-full transition-all"
+                                  title="Delete booking record"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderProfile = () => {
     if (!user) return renderAuth();
     if (isEditingProfile) return renderEditProfile();
@@ -4787,6 +5924,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     );
   };
 
+  if (authInitializing) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#060814] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="animate-spin text-[#000080] dark:text-[#1E90FF]" size={42} />
+        <p className="text-sm font-sans font-black text-[#000080] dark:text-[#E2E8F0] uppercase tracking-[0.2em] animate-pulse">Initializing Secure Session...</p>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       "min-h-screen font-sans selection:bg-blue-100 transition-colors duration-500 pb-32 text-[#000080] dark:text-[#E2E8F0]",
@@ -4872,7 +6018,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           >
             {activeTab === 'explore' && renderExplore()}
             {activeTab === 'trips' && renderMyTrips()}
-            {activeTab === 'hub' && <AIHub activeSubTab={hubSubTab} setActiveSubTab={setHubSubTab} user={user} />}
+            {activeTab === 'hub' && <AIHub activeSubTab={hubSubTab} setActiveSubTab={setHubSubTab} user={user} isLoaded={isLoaded} />}
             {activeTab === 'bookings' && renderBookings()}
             {activeTab === 'profile' && renderProfile()}
           </motion.div>
@@ -5092,14 +6238,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
       {/* Sticky Bottom Navigation */}
       <nav className="fixed bottom-6 left-0 right-0 z-50 px-6">
-        <div className="max-w-md mx-auto bg-white/90 dark:bg-[#0B0F2B]/90 backdrop-blur-xl border border-gray-100 dark:border-[#1E295D]/40 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
-          {[
-            { id: "explore", icon: Globe, label: "Explore" },
-            { id: "trips", icon: MapIcon, label: "Trips" },
-            { id: "hub", icon: Sparkles, label: "AI Hub" },
-            { id: "bookings", icon: BookingIcon, label: "Bookings" },
-            { id: "profile", icon: Settings, label: "Settings" }
-          ].map((tab) => (
+        <div className="max-w-lg mx-auto bg-white/90 dark:bg-[#0B0F2B]/90 backdrop-blur-xl border border-gray-100 dark:border-[#1E295D]/40 rounded-full shadow-xl p-1.5 flex justify-between items-center relative overflow-hidden">
+          {(() => {
+            const tabs = [
+              { id: "explore", icon: Globe, label: "Explore" },
+              { id: "trips", icon: MapIcon, label: "Trips" },
+              { id: "hub", icon: Sparkles, label: "AI Hub" },
+              { id: "bookings", icon: BookingIcon, label: "Bookings" },
+              { id: "profile", icon: Settings, label: "Settings" }
+            ];
+            return tabs;
+          })().map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -5137,6 +6286,44 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       />
     </div>
   );
+}
+
+if (typeof window !== "undefined") {
+  (window as any).isMapsBlocked = false;
+  
+  if (!(window as any).gm_authFailure) {
+    (window as any).gm_authFailure = () => {
+      console.warn("Google Maps authentication or key target restriction detected early.");
+      (window as any).isMapsBlocked = true;
+      if ((window as any).onMapsBlocked) {
+        try { (window as any).onMapsBlocked(); } catch (e) {}
+      }
+    };
+  }
+
+  const earlyConsoleError = console.error;
+  console.error = (...args: any[]) => {
+    const errorMessage = args.map(arg => {
+      if (arg instanceof Error) return arg.message + "\n" + arg.stack;
+      if (typeof arg === 'object') {
+        try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+      }
+      return String(arg);
+    }).join(" ");
+
+    if (
+      errorMessage.includes("ApiTargetBlockedMapError") || 
+      errorMessage.includes("Google Maps JavaScript API error") || 
+      errorMessage.includes("API target blocked")
+    ) {
+      console.warn("Google Maps API restriction detected early in console error.");
+      (window as any).isMapsBlocked = true;
+      if ((window as any).onMapsBlocked) {
+        try { (window as any).onMapsBlocked(); } catch (e) {}
+      }
+    }
+    earlyConsoleError.apply(console, args);
+  };
 }
 
 export default function App() {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, MessageSquare, Map, Landmark, Users, Compass, HelpCircle, Award } from "lucide-react";
+import { Sparkles, MessageSquare, Map, Landmark, Users, Compass, HelpCircle, Award, Sparkles as AdvisorIcon } from "lucide-react";
 
 import TravelPersonalityTest, { TravelPersonality, PERSONALITY_META } from "./TravelPersonalityTest";
 import AICompanionChat from "./AICompanionChat";
@@ -11,15 +11,18 @@ import IndiaSpecialPlanner from "./IndiaSpecialPlanner";
 import GroupCoordinator from "./GroupCoordinator";
 import SmartRecommender from "./SmartRecommender";
 import SwadeshPassport from "./SwadeshPassport";
+import TravelAdvisorHub from "./TravelAdvisorHub";
+import { RoadTripPlanner } from "./RoadTripPlanner";
 
 interface AIHubProps {
-  activeSubTab?: "chat" | "route" | "board" | "india" | "group" | "passport";
-  setActiveSubTab?: (tab: "chat" | "route" | "board" | "india" | "group" | "passport") => void;
-  user?: { id: string; name: string; email: string; photo?: string } | null;
+  activeSubTab?: "chat" | "route" | "board" | "india" | "group" | "passport" | "advisor";
+  setActiveSubTab?: (tab: "chat" | "route" | "board" | "india" | "group" | "passport" | "advisor") => void;
+  user?: any | null;
+  isLoaded?: boolean;
 }
 
-export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propSetSubTab, user }: AIHubProps = {}) {
-  const [localSubTab, setLocalSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport">("chat");
+export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propSetSubTab, user, isLoaded }: AIHubProps = {}) {
+  const [localSubTab, setLocalSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor">("chat");
   const activeSubTab = propSubTab !== undefined ? propSubTab : localSubTab;
   const setActiveSubTab = propSetSubTab !== undefined ? propSetSubTab : setLocalSubTab;
   const [personality, setPersonality] = useState<TravelPersonality | null>(() => {
@@ -92,6 +95,7 @@ export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propS
             { id: "chat", label: "🎒 Companion & Quiz", icon: MessageSquare },
             { id: "route", label: "🗺️ Map & Itinerary", icon: Map },
             { id: "board", label: "✨ Board & Gems", icon: Compass },
+            { id: "advisor", label: "🌟 Advisor & Flights", icon: AdvisorIcon },
             { id: "india", label: "🕌 India Specials", icon: Landmark },
             { id: "group", label: "👥 Group Splitter", icon: Users },
             { id: "passport", label: "🏆 Swadesh Passport", icon: Award }
@@ -148,6 +152,7 @@ export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propS
               exit={{ opacity: 0, y: -15 }}
               className="space-y-8"
             >
+              <RoadTripPlanner />
               <InteractiveMapPlanner />
               <DragDropItinerary />
             </motion.div>
@@ -196,6 +201,17 @@ export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propS
               exit={{ opacity: 0, y: -15 }}
             >
               <SwadeshPassport user={user} />
+            </motion.div>
+          )}
+
+          {activeSubTab === "advisor" && (
+            <motion.div
+              key="advisor"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <TravelAdvisorHub user={user} isLoaded={isLoaded} />
             </motion.div>
           )}
         </AnimatePresence>

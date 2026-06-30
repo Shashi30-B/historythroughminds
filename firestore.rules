@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper to check if user is the designated admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'historythroughminds@gmail.com';
+    }
+
+    // Helper to check if user is authenticated and matches userId
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Helper to check if resource belongs to user (using user_id or userId)
+    function belongsToUser() {
+      return request.auth != null && (
+        (resource == null) || 
+        (resource.data.user_id == request.auth.uid) ||
+        (resource.data.userId == request.auth.uid)
+      );
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+    }
+
+    // Trips collection
+    match /trips/{tripId} {
+      allow read, write: if isAdmin() || 
+        (request.auth != null && (
+          (resource == null && request.resource.data.user_id == request.auth.uid) || 
+          belongsToUser()
+        ));
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      allow read, write: if isAdmin() || 
+        (request.auth != null && (
+          (resource == null && request.resource.data.user_id == request.auth.uid) || 
+          belongsToUser()
+        ));
+    }
+
+    // Wishlist collection
+    match /wishlist/{wishId} {
+      allow read, write: if isAdmin() || 
+        (request.auth != null && (
+          (resource == null && request.resource.data.user_id == request.auth.uid) || 
+          belongsToUser()
+        ));
+    }
+  }
+}
