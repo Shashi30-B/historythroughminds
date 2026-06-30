@@ -810,7 +810,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       setWeatherError(null);
       try {
         // Step 1: Geocode the destination using Google Geocoding API if key is available
-        const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY;
+        const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY || (typeof process !== "undefined" && process.env ? process.env.GOOGLE_MAPS_PLATFORM_KEY : "");
         let lat = 19.0760; // fallback to Mumbai
         let lng = 72.8777;
 
@@ -4166,45 +4166,99 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   )}
 
                   <div className="mt-4">
-                    {structuredItinerary && itinerarySubTab === 'interactive' && (
-                      <InteractiveItineraryView
-                        structured={structuredItinerary}
-                        language={language}
-                        startLocation={startLocation || 'Mumbai'}
-                        locationInput={locationInput}
-                        travelMode={travelMode}
-                        travelDate={travelDate}
-                        duration={duration}
-                      />
-                    )}
-                    
-                    {(!structuredItinerary || itinerarySubTab === 'text') && (
-                      <AnimatedItinerary 
-                        itinerary={itinerary} 
-                        locationInput={locationInput} 
-                        startLocation={startLocation || 'Mumbai'} 
-                      />
-                    )}
+                    <AnimatePresence mode="wait">
+                      {structuredItinerary && itinerarySubTab === 'interactive' && (
+                        <motion.div
+                          key="interactive"
+                          initial={{ opacity: 0, y: 30 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            type: "spring" as const,
+                            stiffness: 100,
+                            damping: 15,
+                            mass: 0.8
+                          }}
+                        >
+                          <InteractiveItineraryView
+                            structured={structuredItinerary}
+                            language={language}
+                            startLocation={startLocation || 'Mumbai'}
+                            locationInput={locationInput}
+                            travelMode={travelMode}
+                            travelDate={travelDate}
+                            duration={duration}
+                          />
+                        </motion.div>
+                      )}
+                      
+                      {(!structuredItinerary || itinerarySubTab === 'text') && (
+                        <motion.div
+                          key="text"
+                          initial={{ opacity: 0, y: 30 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            type: "spring" as const,
+                            stiffness: 100,
+                            damping: 15,
+                            mass: 0.8
+                          }}
+                        >
+                          <AnimatedItinerary 
+                            itinerary={itinerary} 
+                            locationInput={locationInput} 
+                            startLocation={startLocation || 'Mumbai'} 
+                          />
+                        </motion.div>
+                      )}
 
-                    {structuredItinerary && itinerarySubTab === 'budget' && (
-                      <BudgetDashboardView
-                        budget={structuredItinerary.budgetDashboard}
-                        language={language}
-                        numPeople={numPeople}
-                        duration={duration}
-                        travelStyle={travelStyle}
-                        budgetOptimizer={structuredItinerary.aiFeatures?.budgetOptimizer}
-                      />
-                    )}
+                      {structuredItinerary && itinerarySubTab === 'budget' && (
+                        <motion.div
+                          key="budget"
+                          initial={{ opacity: 0, y: 30 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            type: "spring" as const,
+                            stiffness: 100,
+                            damping: 15,
+                            mass: 0.8
+                          }}
+                        >
+                          <BudgetDashboardView
+                            budget={structuredItinerary.budgetDashboard}
+                            language={language}
+                            numPeople={numPeople}
+                            duration={duration}
+                            travelStyle={travelStyle}
+                            budgetOptimizer={structuredItinerary.aiFeatures?.budgetOptimizer}
+                          />
+                        </motion.div>
+                      )}
 
-                    {structuredItinerary && itinerarySubTab === 'guide' && (
-                      <LocalGuideView
-                        features={structuredItinerary.aiFeatures}
-                        checklist={structuredItinerary.checklist}
-                        emergencyContacts={structuredItinerary.emergencyContacts}
-                        language={language}
-                      />
-                    )}
+                      {structuredItinerary && itinerarySubTab === 'guide' && (
+                        <motion.div
+                          key="guide"
+                          initial={{ opacity: 0, y: 30 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            type: "spring" as const,
+                            stiffness: 100,
+                            damping: 15,
+                            mass: 0.8
+                          }}
+                        >
+                          <LocalGuideView
+                            features={structuredItinerary.aiFeatures}
+                            checklist={structuredItinerary.checklist}
+                            emergencyContacts={structuredItinerary.emergencyContacts}
+                            language={language}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Booking CTAs after AI Result */}
@@ -6605,7 +6659,7 @@ if (typeof window !== "undefined") {
 }
 
 export default function App() {
-  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY;
+  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY || (typeof process !== "undefined" && process.env ? process.env.GOOGLE_MAPS_PLATFORM_KEY : "");
   if (mapsKey) {
     return <AppWithMaps mapsKey={mapsKey} />;
   }

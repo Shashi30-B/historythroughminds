@@ -69,13 +69,43 @@ export function BudgetDashboardView({
     { name: t.items.emergency, value: emergency, percentage: Math.round((emergency / totalCost) * 100), color: "bg-slate-500", icon: ShieldCheck }
   ].filter(c => c.value > 0);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    show: { 
+      opacity: 1, 
+      y: 0,
+      transition: { 
+        type: "spring" as const,
+        stiffness: 100,
+        damping: 15,
+        mass: 0.8
+      }
+    }
+  };
+
   return (
-    <div className="space-y-10 text-left">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-10 text-left"
+    >
       {/* Grand Total Header Display */}
       <motion.div 
+        variants={itemVariants}
+        className="bg-[#000080] rounded-[3rem] p-8 md:p-12 text-white relative overflow-hidden shadow-2xl animate-none"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-[#000080] rounded-[3rem] p-8 md:p-12 text-white relative overflow-hidden shadow-2xl"
       >
         <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-sky-500/10 rounded-full -ml-16 -mb-16 pointer-events-none" />
@@ -110,7 +140,10 @@ export function BudgetDashboardView({
       {/* Grid: Breakdown Gauges + AI Optimizer */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Category breakdown gauges */}
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-6">
+        <motion.div 
+          variants={itemVariants}
+          className="lg:col-span-7 bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-6"
+        >
           <h4 className="text-lg font-black text-gray-800 dark:text-white border-b border-gray-100 dark:border-slate-800/60 pb-4">
             📊 Cost Distribution Breakdown
           </h4>
@@ -140,10 +173,13 @@ export function BudgetDashboardView({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* AI budget optimizer */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <motion.div 
+          variants={itemVariants}
+          className="lg:col-span-5 flex flex-col gap-6"
+        >
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-slate-900 dark:to-slate-950 p-6 md:p-8 rounded-[3rem] border border-emerald-500/20 dark:border-emerald-900/30 shadow-xl flex-1 text-left relative overflow-hidden flex flex-col justify-between">
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
             <div className="space-y-4">
@@ -171,8 +207,8 @@ export function BudgetDashboardView({
               </p>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

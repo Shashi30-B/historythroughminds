@@ -25,7 +25,7 @@ function getAi() {
 }
 
 function getGoogleMapsApiKey(): string | undefined {
-  return process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.MAPS_API_KEY;
+  return process.env.GOOGLE_MAPS_PLATFORM_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.MAPS_API_KEY;
 }
 
 // Initialize DB
@@ -850,7 +850,8 @@ async function startServer() {
   async function getCityCoordinates(city: string): Promise<{ lat: number; lng: number; formattedAddress: string } | null> {
     const apiKey = getGoogleMapsApiKey();
     if (!apiKey) {
-      throw new Error("Google Maps Platform API Key (GOOGLE_MAPS_PLATFORM_KEY) is missing. Please add it to your Secrets in Settings.");
+      console.warn("Google Maps Platform API Key (GOOGLE_MAPS_PLATFORM_KEY) is missing. Using Open-Meteo geocoding as fallback.");
+      return getOpenMeteoCoordinates(city);
     }
     
     // First try Google Places API (Find Place from Text) to resolve coords as requested
@@ -882,12 +883,41 @@ async function startServer() {
           formattedAddress: data.results[0].formatted_address
         };
       } else {
-        throw new Error(`Google Geocoding error: ${data.status} for ${city}`);
+        console.warn(`Google Geocoding error: ${data.status} for ${city}. Falling back to Open-Meteo.`);
+        return getOpenMeteoCoordinates(city);
       }
     } catch (error: any) {
-      console.warn("Geocoding failed for:", city, error);
-      throw new Error(`Failed to geocode location "${city}": ${error.message}`);
+      console.warn("Geocoding failed for:", city, error, ". Falling back to Open-Meteo.");
+      return getOpenMeteoCoordinates(city);
     }
+  }
+
+  async function getOpenMeteoCoordinates(city: string): Promise<{ lat: number; lng: number; formattedAddress: string } | null> {
+    try {
+      const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+      const geoRes = await fetch(geocodeUrl);
+      const geoData = await geoRes.json();
+      if (geoData.results && geoData.results[0]) {
+        const result = geoData.results[0];
+        return {
+          lat: result.latitude,
+          lng: result.longitude,
+          formattedAddress: `${result.name}, ${result.admin1 || ""}, ${result.country || ""}`
+        };
+      }
+    } catch (e) {
+      console.error("Open-Meteo geocoding failed:", e);
+    }
+    // Final fallback
+    const fallback = CITY_COORDS_FALLBACK[city.toLowerCase().trim()];
+    if (fallback) {
+      return {
+        lat: fallback.lat,
+        lng: fallback.lng,
+        formattedAddress: city
+      };
+    }
+    return null;
   }
 
   // Attractions search helper using Google Places API
@@ -978,7 +1008,8 @@ async function startServer() {
     const apiKey = getGoogleMapsApiKey();
 
     if (!apiKey) {
-      throw new Error("Google Maps Platform API Key (GOOGLE_MAPS_PLATFORM_KEY) is missing. Please add it to your Secrets in Settings.");
+      console.warn("Google Maps Platform API Key (GOOGLE_MAPS_PLATFORM_KEY) is missing. Using Haversine route estimation fallback.");
+      return computeRouteFallback(from, to);
     }
 
     // Try Routes API
@@ -1016,7 +1047,7 @@ async function startServer() {
         throw new Error(`Google Routes API Error: ${msg} (Status ${response.status})`);
       }
     } catch (error: any) {
-      console.warn("Routes API compute failed:", error);
+      console.warn("Routes API compute failed, attempting Distance Matrix fallback:", error);
       // Try Distance Matrix as fallback
       try {
         const origins = typeof from === "string" ? encodeURIComponent(from) : `${from.lat},${from.lng}`;
@@ -1033,9 +1064,52 @@ async function startServer() {
           throw new Error(element?.status || "Invalid element status in Distance Matrix");
         }
       } catch (dmErr: any) {
-        throw new Error(`Route computation failed: Routes API: ${error.message}. Distance Matrix: ${dmErr.message}`);
+        console.warn(`Distance Matrix fallback also failed: ${dmErr.message}. Returning Haversine route estimation.`);
+        return computeRouteFallback(from, to);
       }
     }
+  }
+
+  async function computeRouteFallback(
+    from: string | { lat: number; lng: number },
+    to: string | { lat: number; lng: number }
+  ): Promise<{ distanceKm: number; durationText: string; durationSeconds: number }> {
+    console.warn("Computing route using fallback Haversine distance estimation...");
+    try {
+      let fromLatLng = typeof from === "string" ? null : from;
+      let toLatLng = typeof to === "string" ? null : to;
+
+      if (!fromLatLng && typeof from === "string") {
+        const coords = CITY_COORDS_FALLBACK[from.toLowerCase().trim()] || await getOpenMeteoCoordinates(from);
+        if (coords) {
+          fromLatLng = { lat: coords.lat, lng: coords.lng };
+        }
+      }
+
+      if (!toLatLng && typeof to === "string") {
+        const coords = CITY_COORDS_FALLBACK[to.toLowerCase().trim()] || await getOpenMeteoCoordinates(to);
+        if (coords) {
+          toLatLng = { lat: coords.lat, lng: coords.lng };
+        }
+      }
+
+      if (fromLatLng && toLatLng) {
+        const baseDistance = getHaversineDistance(fromLatLng, toLatLng);
+        // Multiply by 1.35 to account for road winding factor, as straight-line is shorter than actual driving route.
+        const distanceKm = Math.max(5, Math.round(baseDistance * 1.35));
+        // Average driving speed is approx 60 km/h in India
+        const durationSeconds = Math.max(300, Math.round((distanceKm / 60) * 3600));
+        const hours = Math.floor(durationSeconds / 3600);
+        const minutes = Math.floor((durationSeconds % 3600) / 60);
+        const durationText = hours > 0 ? `${hours} hours ${minutes} mins` : `${minutes} mins`;
+        return { distanceKm, durationText, durationSeconds };
+      }
+    } catch (e) {
+      console.error("Route fallback computation failed:", e);
+    }
+
+    // Default ultimate fallback if coordinates cannot be resolved
+    return { distanceKm: 150, durationText: "2 hours 30 mins", durationSeconds: 9000 };
   }  // Gemini API Routes
   app.post("/api/gemini/generate-itinerary", async (req, res) => {
     try {

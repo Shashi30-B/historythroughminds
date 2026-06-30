@@ -46,12 +46,44 @@ export function LocalGuideView({
     setLocalChecked(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    show: { 
+      opacity: 1, 
+      y: 0,
+      transition: { 
+        type: "spring" as const,
+        stiffness: 100,
+        damping: 15,
+        mass: 0.8
+      }
+    }
+  };
+
   return (
-    <div className="space-y-10 text-left">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-10 text-left"
+    >
       {/* 1. Hidden Gems & Native Food */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Hidden Gems card */}
-        <div className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-6">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-6"
+        >
           <div className="flex items-center gap-3 border-b border-gray-100 dark:border-slate-800/60 pb-4">
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
               <Camera size={20} />
@@ -73,10 +105,13 @@ export function LocalGuideView({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Local Food card */}
-        <div className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-6">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-6"
+        >
           <div className="flex items-center gap-3 border-b border-gray-100 dark:border-slate-800/60 pb-4">
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center">
               <Utensils size={20} />
@@ -100,11 +135,14 @@ export function LocalGuideView({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* 2. Crowd density & best visit time + photography spots */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <motion.div 
+        variants={itemVariants}
+        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+      >
         <div className="bg-blue-50/30 dark:bg-slate-900/40 p-6 rounded-3xl border border-blue-500/10 text-left space-y-2">
           <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
             <Calendar size={18} />
@@ -130,12 +168,15 @@ export function LocalGuideView({
           </div>
           <p className="text-xs text-gray-600 dark:text-gray-400 leading-normal font-medium">{features.crowdPrediction}</p>
         </div>
-      </div>
+      </motion.div>
 
       {/* 3. Packing & Pre-Trip Checklists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Packing checklist */}
-        <div className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-5">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-5"
+        >
           <h4 className="text-lg font-black text-gray-800 dark:text-white border-b border-gray-100 dark:border-slate-800/60 pb-4 flex items-center gap-2">
             🎒 {t.pack}
           </h4>
@@ -153,10 +194,13 @@ export function LocalGuideView({
               </button>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Pre-Trip Verification checklist */}
-        <div className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-5">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-5"
+        >
           <h4 className="text-lg font-black text-gray-800 dark:text-white border-b border-gray-100 dark:border-slate-800/60 pb-4 flex items-center gap-2">
             ✅ {t.checklist}
           </h4>
@@ -177,13 +221,16 @@ export function LocalGuideView({
               );
             })}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* 4. Safety Tips & Emergency Contacts helpline */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Safety tips */}
-        <div className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-5">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white dark:bg-slate-900/60 rounded-[3rem] p-6 md:p-8 border border-gray-100 dark:border-slate-800 shadow-xl space-y-5"
+        >
           <h4 className="text-lg font-black text-rose-600 border-b border-gray-100 dark:border-slate-800/60 pb-4 flex items-center gap-2">
             ⚠️ Safety & Health Advisories
           </h4>
@@ -195,10 +242,13 @@ export function LocalGuideView({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Emergency Contacts card */}
-        <div className="bg-[#000080]/5 rounded-[3rem] p-6 md:p-8 border border-[#000080]/10 shadow-xl space-y-5">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-[#000080]/5 rounded-[3rem] p-6 md:p-8 border border-[#000080]/10 shadow-xl space-y-5"
+        >
           <h4 className="text-lg font-black text-[#000080] dark:text-white border-b border-gray-100 dark:border-slate-800/60 pb-4 flex items-center gap-2">
             📞 {t.emerg}
           </h4>
@@ -213,8 +263,8 @@ export function LocalGuideView({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
