@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   MapPin, Navigation, Compass, Calendar, Sparkles, AlertCircle, CheckCircle, 
@@ -49,7 +49,11 @@ interface RoadTripData {
   highwayDhabas: Array<{ name: string; specialty: string; distance: string }>;
 }
 
-export function RoadTripPlanner() {
+interface RoadTripPlannerProps {
+  language?: string;
+}
+
+export function RoadTripPlanner({ language: propLanguage }: RoadTripPlannerProps = {}) {
   const [startPoint, setStartPoint] = useState('Pune');
   const [destination, setDestination] = useState('Goa');
   const [duration, setDuration] = useState(2);
@@ -63,6 +67,13 @@ export function RoadTripPlanner() {
   const [selectedMarker, setSelectedMarker] = useState<any>(null);
   const [activeDayTab, setActiveDayTab] = useState<number>(1);
   const [savedStatus, setSavedStatus] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (propLanguage) {
+      const mapped = propLanguage === "Marathi" ? "mr" : propLanguage === "Hindi" ? "hi" : "en";
+      setLanguage(mapped);
+    }
+  }, [propLanguage]);
 
   // Suggested prebaked routes
   const popularTrips = [

@@ -32,15 +32,38 @@ const CHIPS: Record<string, string[]> = {
   ]
 };
 
-export default function AICompanionChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      sender: "bot",
-      text: "Namaste! I am your premium AI Travel Co-Pilot. Ask me anything about routes, destinations, local foods, cultural experiences, packing, visa guides, or budget hacks. How can I assist you today?",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  ]);
+const GREETINGS: Record<string, string> = {
+  English: "Namaste! I am your premium AI Travel Co-Pilot. Ask me anything about routes, destinations, local foods, cultural experiences, packing, or budget hacks in India. How can I assist you today?",
+  Hindi: "नमस्ते! मैं आपका प्रीमियम एआई ट्रैवल को-पायलट हूँ। मुझसे भारत के यात्रा मार्गों, गंतव्यों, स्थानीय व्यंजनों, सांस्कृतिक अनुभवों, पैकिंग या बजट के बारे में कुछ भी पूछें। मैं आज आपकी क्या सहायता कर सकता हूँ?",
+  Marathi: "नमस्ते! मी तुमचा प्रीमियम एआई ट्रॅव्हल को-पायलट आहे. मला भारतातील मार्ग, ठिकाणे, स्थानिक खाद्यपदार्थ, सांस्कृतिक अनुभव, पॅकिंग किंवा बजेट हॅक्सबद्दल काहीही विचारा. मी आज तुम्हाला कशी मदत करू शकतो?",
+  Gujarati: "નમસ્તે! હું તમારો પ્રીમિયમ AI ટ્રાવેલ કો-પાયલોટ છું. મને ભારતના પ્રવાસ માર્ગો, સ્થળો, સ્થાનિક વાનગીઓ, સાંસ્કૃતિક અનુભવો અથવા બજેટ વિશે કંઈપણ પૂછો. હું આજે તમને કેવી રીતે મદદ કરી શકું?",
+  Bengali: "নমস্কার! আমি আপনার প্রিমিয়াম এআই ট্রাভেল কো-পাইলট। আমাকে ভারতের ভ্রমণ রুট, গন্তব্য, স্থানীয় খাবার, সাংস্কৃতিক অভিজ্ঞতা বা বাজেট হ্যাক সম্পর্কে যেকোনো কিছু জিজ্ঞাসা করুন। আজ আপনাকে কীভাবে সাহায্য করতে পারি?",
+  Punjabi: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਤੁਹਾਡਾ ਪ੍ਰੀਮੀਅਮ AI ਟ੍ਰੈਵਲ ਕੋ-ਪਾਇਲਟ ਹਾਂ। ਮੈਨੂੰ ਭਾਰਤ ਦੇ ਯਾਤਰਾ ਮਾਰਗਾਂ, ਮੰਜ਼ਿਲਾਂ, ਸਥਾਨਕ ਭੋਜਨਾਂ, ਸੱਭਿਆਚਾਰਕ ਅਨੁਭਵਾਂ, ਜਾਂ ਬਜਟ ਬਾਰੇ ਕੁਝ ਵੀ ਪੁੱਛੋ। ਮੈਂ ਅੱਜ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?",
+  Tamil: "வணக்கம்! நான் உங்கள் பிரீமியம் ஏஐ பயண இணை விமானி. இந்தியாவின் பயண வழிகள், இடங்கள், உள்ளூர் உணவுகள், கலாச்சார அனுபவங்கள் அல்லது பட்ஜெட் பற்றி எதையும் என்னிடம் கேளுங்கள். இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?",
+  Telugu: "నమస్తే! నేను మీ ప్రీమియం AI ట్రావెல் కో-పైలట్. భారతదేశంలోని ప్రయాణ మార్గాలు, గమ్యస్థానాలు, స్థానిక ఆహారాలు, సాంస్కృతిక అనుభవాలు లేదా బడ్జెట్ హ్యాక్స్ గురించి నన్ను ఏదైనా అడగండి. ఈరోజు నేను మీకు ఎలా సహాయం చేయగలను?",
+  Kannada: "ನಮಸ್ತೆ! ನಾನು ನಿಮ್ಮ ಪ್ರೀಮಿಯಂ AI ಟ್ರಾವೆಲ್ ಕೋ-ಪೈಲಟ್. ಭಾರತದ ಪ್ರಯಾಣ मार्गಗಳು, ತಾಣಗಳು, ಸ್ಥಳೀಯ ಆಹಾರಗಳು, ಸಾಂಸ್ಕೃತಿಕ ಅನುಭವಗಳು ಅಥವಾ ಬಜೆಟ್ ಹ್ಯಾಕ್ಸ್ ಬಗ್ಗೆ ನನ್ನನ್ನು ಏನಾದರೂ ಕೇಳಿ. ಇಂದು ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?",
+  Malayalam: "നമസ്തേ! ഞാൻ നിങ്ങളുടെ പ്രീമിയം AI ട്രാവൽ കോ-പൈലറ്റ് ആണ്. ഇന്ത്യയിലെ യാത്രാ റൂട്ടുകൾ, സ്ഥലങ്ങൾ, പ്രാദേശിക ഭക്ഷണങ്ങൾ, സാംസ്കാരിക അനുഭവങ്ങൾ അല്ലെങ്കിൽ ബജറ്റ് ഹാക്കുകൾ എന്നിവയെക്കുറിച്ച് എന്നോട് ചോദിക്കുക. ഇന്ന് ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കും?",
+  Odia: "ନମସ୍କାର! ମୁଁ ଆପଣଙ୍କର ପ୍ରିମିୟମ AI ଯାତ୍ରା କୋ-ପାଇଲଟ୍ | ମୋତେ ଭାରତର ଯାତ୍ରା ମାର୍ଗ, ଗନ୍ତବ୍ୟ ସ୍ଥଳ, ସ୍ଥାନୀୟ ଖାଦ୍ୟ, ସାସ୍କୃତିକ ଅନୁଭୂତି କିମ୍ବା ବଜେଟ୍ ହ୍ୟାକ୍ ବିଷୟରେ କିଛି ବି ପଚାରନ୍ତୁ | ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?"
+};
+
+interface AICompanionChatProps {
+  language?: string;
+}
+
+export default function AICompanionChat({ language = "English" }: AICompanionChatProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  useEffect(() => {
+    const greetingText = GREETINGS[language] || GREETINGS.English;
+    setMessages([
+      {
+        id: "1",
+        sender: "bot",
+        text: greetingText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+  }, [language]);
   const [inputText, setInputText] = useState("");
   const [botRole, setBotRole] = useState<"copilot" | "foodie" | "historian" | "budget">("copilot");
   const [chatMode, setChatMode] = useState<"fast" | "general" | "complex">("general");
@@ -84,7 +107,7 @@ export default function AICompanionChat() {
           messages: apiMessages,
           mode: chatMode,
           botRole: botRole,
-          language: "English"
+          language: language
         })
       });
 

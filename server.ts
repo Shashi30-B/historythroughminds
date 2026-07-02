@@ -893,30 +893,56 @@ async function startServer() {
   }
 
   async function getOpenMeteoCoordinates(city: string): Promise<{ lat: number; lng: number; formattedAddress: string } | null> {
-    try {
-      const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
-      const geoRes = await fetch(geocodeUrl);
-      const geoData = await geoRes.json();
-      if (geoData.results && geoData.results[0]) {
-        const result = geoData.results[0];
+    const searchTerms = [city];
+    if (city.includes(",")) {
+      const parts = city.split(",").map(p => p.trim()).filter(Boolean);
+      if (parts.length > 0) {
+        searchTerms.push(parts[0]); // e.g. "Kolhapur"
+        if (parts.length > 1) {
+          searchTerms.push(`${parts[0]} ${parts[1]}`); // e.g. "Kolhapur Maharashtra"
+        }
+      }
+    }
+
+    for (const term of searchTerms) {
+      try {
+        const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=1&language=en&format=json`;
+        const geoRes = await fetch(geocodeUrl);
+        const geoData = await geoRes.json();
+        if (geoData.results && geoData.results[0]) {
+          const result = geoData.results[0];
+          return {
+            lat: result.latitude,
+            lng: result.longitude,
+            formattedAddress: `${result.name}, ${result.admin1 || ""}, ${result.country || ""}`
+          };
+        }
+      } catch (e) {
+        console.error(`Open-Meteo geocoding failed for "${term}":`, e);
+      }
+    }
+
+    // Check fallback database
+    for (const term of searchTerms) {
+      const fallback = CITY_COORDS_FALLBACK[term.toLowerCase().trim()];
+      if (fallback) {
         return {
-          lat: result.latitude,
-          lng: result.longitude,
-          formattedAddress: `${result.name}, ${result.admin1 || ""}, ${result.country || ""}`
+          lat: fallback.lat,
+          lng: fallback.lng,
+          formattedAddress: city
         };
       }
-    } catch (e) {
-      console.error("Open-Meteo geocoding failed:", e);
     }
-    // Final fallback
-    const fallback = CITY_COORDS_FALLBACK[city.toLowerCase().trim()];
-    if (fallback) {
+
+    // Explicit check for Kolhapur, Maharashtra
+    if (city.toLowerCase().includes("kolhapur")) {
       return {
-        lat: fallback.lat,
-        lng: fallback.lng,
-        formattedAddress: city
+        lat: 16.7050,
+        lng: 74.2433,
+        formattedAddress: "Kolhapur, Maharashtra, India"
       };
     }
+
     return null;
   }
 
@@ -944,18 +970,154 @@ async function startServer() {
     return [];
   }
 
-  // Greedy Proximity Clustering Algorithm
-  function clusterAttractions(
+  // Helper functions to generate verified Google Maps Links
+  function getGoogleMapsSearchUrl(query: string): string {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  }
+
+  function getGoogleMapsDirectionsUrl(origin: string, destination: string): string {
+    return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+  }
+
+  // Programmatic, hallucination-free enrichment for maps links and exact Google Maps calculations
+  function enrichItineraryWithMaps(
+    structuredData: any,
+    dayWiseRoutes: any[],
+    startLocation: string,
+    location: string,
+    duration: number,
+    outboundDist: number,
+    outboundDurationText: string,
+    totalTransitCost: number,
+    totalHotelCost: number,
+    totalFoodCost: number,
+    shoppingAllowance: number,
+    totalTicketCost: number,
+    totalLocalTransportCost: number,
+    emergencyBuffer: number,
+    totalCostWithBuffer: number,
+    costPerPerson: number
+  ) {
+    if (!structuredData) return;
+
+    if (!structuredData.hero) structuredData.hero = {};
+    structuredData.hero.navigationLink = getGoogleMapsDirectionsUrl(startLocation, location);
+    structuredData.hero.pdfLink = `#print`;
+    structuredData.hero.shareLink = `#share`;
+    structuredData.hero.totalCost = totalCostWithBuffer;
+    structuredData.hero.distance = `${outboundDist} km`;
+    structuredData.hero.travelTime = outboundDurationText;
+
+    if (!structuredData.budgetDashboard) {
+      structuredData.budgetDashboard = {};
+    }
+    structuredData.budgetDashboard.fuel = totalTransitCost;
+    structuredData.budgetDashboard.hotel = totalHotelCost;
+    structuredData.budgetDashboard.food = totalFoodCost;
+    structuredData.budgetDashboard.shopping = shoppingAllowance;
+    structuredData.budgetDashboard.activities = totalTicketCost;
+    structuredData.budgetDashboard.transport = totalLocalTransportCost;
+    structuredData.budgetDashboard.emergency = emergencyBuffer;
+    structuredData.budgetDashboard.grandTotal = totalCostWithBuffer;
+    structuredData.budgetDashboard.costPerPerson = costPerPerson;
+
+    if (structuredData.day0) {
+      structuredData.day0.distance = `${outboundDist} km`;
+      structuredData.day0.drivingTime = outboundDurationText;
+      if (structuredData.day0.breakfastStop) {
+        structuredData.day0.breakfastStopMapsLink = getGoogleMapsSearchUrl(structuredData.day0.breakfastStop);
+      }
+      if (structuredData.day0.lunchStop) {
+        structuredData.day0.lunchStopMapsLink = getGoogleMapsSearchUrl(structuredData.day0.lunchStop);
+      }
+      if (structuredData.day0.coffeeStop) {
+        structuredData.day0.coffeeStopMapsLink = getGoogleMapsSearchUrl(structuredData.day0.coffeeStop);
+      }
+      if (structuredData.day0.hotelCheckIn) {
+        structuredData.day0.hotelCheckInMapsLink = getGoogleMapsSearchUrl(`${structuredData.day0.hotelCheckIn}, ${location}`);
+      }
+      if (structuredData.day0.dinner) {
+        structuredData.day0.dinnerMapsLink = getGoogleMapsSearchUrl(`${structuredData.day0.dinner}, ${location}`);
+      }
+    }
+
+    if (structuredData.days && Array.isArray(structuredData.days)) {
+      structuredData.days.forEach((day: any, dIdx: number) => {
+        const routeToday = dayWiseRoutes[dIdx];
+        if (routeToday) {
+          day.totalDistance = `${routeToday.totalDistanceKm} km`;
+          day.totalDuration = routeToday.totalDurationText;
+
+          if (day.morning && day.morning.place) {
+            const leg = routeToday.legs[0];
+            if (leg) {
+              day.morning.place.distance = `${leg.distanceKm} km`;
+              day.morning.place.travelTime = leg.durationText;
+              day.morning.place.mapsLink = leg.mapsLink;
+              day.morning.place.navigation = `Distance: ${leg.distanceKm} km | Travel: ${leg.durationText}`;
+            } else {
+              day.morning.place.mapsLink = getGoogleMapsSearchUrl(`${day.morning.place.name}, ${location}`);
+            }
+            if (day.morning.breakfast) {
+              day.morning.breakfastMapsLink = getGoogleMapsSearchUrl(`${day.morning.breakfast.replace(/⭐.*/, "")}, ${location}`);
+            }
+          }
+
+          if (day.afternoon && day.afternoon.place) {
+            const leg = routeToday.legs[1];
+            if (leg) {
+              day.afternoon.place.distance = `${leg.distanceKm} km`;
+              day.afternoon.place.travelTime = leg.durationText;
+              day.afternoon.place.mapsLink = leg.mapsLink;
+              day.afternoon.place.navigation = `Distance: ${leg.distanceKm} km | Travel: ${leg.durationText}`;
+            } else {
+              day.afternoon.place.mapsLink = getGoogleMapsSearchUrl(`${day.afternoon.place.name}, ${location}`);
+            }
+            if (day.afternoon.lunch) {
+              day.afternoon.lunchMapsLink = getGoogleMapsSearchUrl(`${day.afternoon.lunch.replace(/⭐.*/, "")}, ${location}`);
+            }
+          }
+
+          if (day.evening) {
+            if (day.evening.sunsetPoint) {
+              day.evening.sunsetPointMapsLink = getGoogleMapsSearchUrl(`${day.evening.sunsetPoint}, ${location}`);
+            }
+            if (day.evening.streetFood) {
+              day.evening.streetFoodMapsLink = getGoogleMapsSearchUrl(`${day.evening.streetFood}, ${location}`);
+            }
+          }
+
+          if (day.night) {
+            if (day.night.dinner) {
+              day.night.dinnerMapsLink = getGoogleMapsSearchUrl(`${day.night.dinner.replace(/⭐.*/, "")}, ${location}`);
+            }
+          }
+        }
+      });
+    }
+
+    if (structuredData.hotelsList && Array.isArray(structuredData.hotelsList)) {
+      structuredData.hotelsList.forEach((hotel: any) => {
+        if (hotel.name) {
+          hotel.mapsLink = getGoogleMapsSearchUrl(`${hotel.name}, ${location}`);
+        }
+      });
+    }
+  }
+
+  // Optimized Proximity Clustering Algorithm using Google Maps Distance Matrix
+  async function clusterAttractions(
     attractions: any[],
     daysCount: number,
     cityCenter: { lat: number; lng: number }
-  ): any[][] {
+  ): Promise<any[][]> {
     const unvisited = [...attractions];
     const days: any[][] = Array.from({ length: daysCount }, () => []);
     
     if (unvisited.length === 0) return days;
 
-    let currentPoint = cityCenter;
+    const apiKey = getGoogleMapsApiKey();
+    let currentPoint: string | { lat: number; lng: number } = cityCenter;
 
     for (let d = 0; d < daysCount; d++) {
       let countToVisit = 2; // Day 1 & Last Day typically have fewer attractions due to travel
@@ -967,15 +1129,67 @@ async function startServer() {
         if (unvisited.length === 0) break;
 
         let closestIdx = 0;
+        let minTravelTime = Infinity;
         let minDistance = Infinity;
 
-        for (let j = 0; j < unvisited.length; j++) {
-          const item = unvisited[j];
-          if (item.lat && item.lng) {
-            const dist = getHaversineDistance(currentPoint, { lat: item.lat, lng: item.lng });
-            if (dist < minDistance) {
-              minDistance = dist;
-              closestIdx = j;
+        if (apiKey && unvisited.length > 0) {
+          try {
+            const originStr = typeof currentPoint === "string" ? currentPoint : `${currentPoint.lat},${currentPoint.lng}`;
+            const destinationsStr = unvisited.map(item => `${item.lat},${item.lng}`).join("|");
+            const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(originStr)}&destinations=${encodeURIComponent(destinationsStr)}&key=${apiKey}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            const elements = data.rows?.[0]?.elements;
+            
+            if (elements && elements.length === unvisited.length) {
+              for (let j = 0; j < elements.length; j++) {
+                const el = elements[j];
+                if (el.status === "OK") {
+                  const durationVal = el.duration?.value || Infinity;
+                  const distanceVal = el.distance?.value || Infinity;
+                  // Primary sort by duration (travel time), secondary by distance
+                  if (durationVal < minTravelTime || (durationVal === minTravelTime && distanceVal < minDistance)) {
+                    minTravelTime = durationVal;
+                    minDistance = distanceVal;
+                    closestIdx = j;
+                  }
+                }
+              }
+            } else {
+              throw new Error("Mismatch or empty elements in Distance Matrix");
+            }
+          } catch (err) {
+            console.warn("Distance Matrix calculation failed during clustering. Using Haversine:", err);
+            // Fallback to Haversine
+            let minHaversine = Infinity;
+            for (let j = 0; j < unvisited.length; j++) {
+              const item = unvisited[j];
+              if (item.lat && item.lng) {
+                const dist = getHaversineDistance(
+                  typeof currentPoint === "string" ? cityCenter : currentPoint,
+                  { lat: item.lat, lng: item.lng }
+                );
+                if (dist < minHaversine) {
+                  minHaversine = dist;
+                  closestIdx = j;
+                }
+              }
+            }
+          }
+        } else {
+          // No API key, fallback to Haversine
+          let minHaversine = Infinity;
+          for (let j = 0; j < unvisited.length; j++) {
+            const item = unvisited[j];
+            if (item.lat && item.lng) {
+              const dist = getHaversineDistance(
+                typeof currentPoint === "string" ? cityCenter : currentPoint,
+                { lat: item.lat, lng: item.lng }
+              );
+              if (dist < minHaversine) {
+                minHaversine = dist;
+                closestIdx = j;
+              }
             }
           }
         }
@@ -1000,7 +1214,7 @@ async function startServer() {
     return days;
   }
 
-  // Route calculation helper using Google Maps Routes & Directions APIs
+  // Route calculation helper using Google Maps Directions API and Distance Matrix API
   async function computeRouteBetweenPoints(
     from: string | { lat: number; lng: number },
     to: string | { lat: number; lng: number }
@@ -1008,51 +1222,38 @@ async function startServer() {
     const apiKey = getGoogleMapsApiKey();
 
     if (!apiKey) {
-      console.warn("Google Maps Platform API Key (GOOGLE_MAPS_PLATFORM_KEY) is missing. Using Haversine route estimation fallback.");
+      console.warn("Google Maps Platform API Key is missing. Using Haversine route estimation fallback.");
       return computeRouteFallback(from, to);
     }
 
-    // Try Routes API
-    try {
-      const response = await fetch("https://routes.googleapis.com/v1/computeRoutes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "routes.distanceMeters,routes.duration"
-        },
-        body: JSON.stringify({
-          origin: typeof from === "string" ? { address: from } : { location: { latLng: from } },
-          destination: typeof to === "string" ? { address: to } : { location: { latLng: to } },
-          travelMode: "DRIVE"
-        })
-      });
+    const originStr = typeof from === "string" ? from : `${from.lat},${from.lng}`;
+    const destinationStr = typeof to === "string" ? to : `${to.lat},${to.lng}`;
 
+    // 1. Try Google Maps Directions API
+    try {
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(originStr)}&destination=${encodeURIComponent(destinationStr)}&key=${apiKey}`;
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        const route = data.routes?.[0];
-        if (route) {
-          const distanceKm = Math.round((route.distanceMeters || 0) / 1000);
-          const durationSeconds = parseInt(route.duration?.replace("s", "") || "0");
-          const hours = Math.floor(durationSeconds / 3600);
-          const minutes = Math.floor((durationSeconds % 3600) / 60);
-          const durationText = hours > 0 ? `${hours} hours ${minutes} mins` : `${minutes} mins`;
+        if (data.status === "OK" && data.routes?.[0]?.legs?.[0]) {
+          const leg = data.routes[0].legs[0];
+          const distanceKm = Math.round((leg.distance?.value || 0) / 1000);
+          const durationSeconds = leg.duration?.value || 0;
+          const durationText = leg.duration?.text || "approx 30 mins";
           return { distanceKm, durationText, durationSeconds };
         } else {
-          throw new Error("No route returned from Google Routes API. Verify start and destination are drivable.");
+          console.warn("Directions API returned non-OK or empty legs, trying Distance Matrix...");
         }
-      } else {
-        const errJson = await response.json().catch(() => ({}));
-        const msg = errJson.error?.message || response.statusText || "Unknown Google Routes API error";
-        throw new Error(`Google Routes API Error: ${msg} (Status ${response.status})`);
       }
-    } catch (error: any) {
-      console.warn("Routes API compute failed, attempting Distance Matrix fallback:", error);
-      // Try Distance Matrix as fallback
-      try {
-        const origins = typeof from === "string" ? encodeURIComponent(from) : `${from.lat},${from.lng}`;
-        const destinations = typeof to === "string" ? encodeURIComponent(to) : `${to.lat},${to.lng}`;
-        const response = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins}&destinations=${destinations}&key=${apiKey}`);
+    } catch (error) {
+      console.warn("Google Maps Directions API request failed:", error);
+    }
+
+    // 2. Try Google Maps Distance Matrix API
+    try {
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(originStr)}&destinations=${encodeURIComponent(destinationStr)}&key=${apiKey}`;
+      const response = await fetch(url);
+      if (response.ok) {
         const data = await response.json();
         const element = data.rows?.[0]?.elements?.[0];
         if (element && element.status === "OK") {
@@ -1060,14 +1261,15 @@ async function startServer() {
           const durationText = element.duration?.text || "approx 30 mins";
           const durationSeconds = element.duration?.value || 1800;
           return { distanceKm, durationText, durationSeconds };
-        } else {
-          throw new Error(element?.status || "Invalid element status in Distance Matrix");
         }
-      } catch (dmErr: any) {
-        console.warn(`Distance Matrix fallback also failed: ${dmErr.message}. Returning Haversine route estimation.`);
-        return computeRouteFallback(from, to);
       }
+    } catch (error) {
+      console.warn("Google Maps Distance Matrix API request failed:", error);
     }
+
+    // If both fail, use computeRouteFallback
+    console.warn("Both Directions & Distance Matrix APIs failed. Falling back to Haversine.");
+    return computeRouteFallback(from, to);
   }
 
   async function computeRouteFallback(
@@ -1210,7 +1412,7 @@ async function startServer() {
       }
 
       // Cluster
-      const clusteredAttractions = clusterAttractions(attractions, duration, destLatLng);
+      const clusteredAttractions = await clusterAttractions(attractions, duration, destLatLng);
 
       // Compute day wise legs and totals
       const dayWiseRoutes: any[] = [];
@@ -1475,7 +1677,7 @@ YOUR OUTPUT MUST BE A SINGLE VALID JSON OBJECT conforming strictly to this forma
     { "category": "Luxury", "name": string, "desc": string, "ratePerNight": string }
   ],
   "budgetDashboard": {
-    "fuel": number (e.g. ${Math.round(totalTransitCost * 0.4)}),
+    "fuel": number (e.g. ${totalTransitCost}),
     "hotel": number (e.g. ${totalHotelCost}),
     "food": number (e.g. ${totalFoodCost}),
     "shopping": number (e.g. ${shoppingAllowance}),
@@ -1517,12 +1719,24 @@ DO NOT include any Markdown wrapping like \`\`\`json or \`\`\` in your response.
         const fallback = await generateLocalItinerary(startLocation, location, duration, travelStyle, numPeople, language, travelMode, travelDate, targetBudget, includeHiddenGems, includeLocalExperiences, weatherData);
         // Enrich local fallback
         if (fallback && fallback.structured) {
-          fallback.structured.hero.navigationLink = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(startLocation)}&destination=${encodeURIComponent(location)}`;
-          fallback.structured.hero.pdfLink = `#print`;
-          fallback.structured.hero.shareLink = `#share`;
-          fallback.structured.budgetDashboard.emergency = emergencyBuffer;
-          fallback.structured.budgetDashboard.grandTotal = totalCostWithBuffer;
-          fallback.structured.budgetDashboard.costPerPerson = costPerPerson;
+          enrichItineraryWithMaps(
+            fallback.structured,
+            dayWiseRoutes,
+            startLocation,
+            location,
+            duration,
+            outboundDist,
+            outboundDurationText,
+            totalTransitCost,
+            totalHotelCost,
+            totalFoodCost,
+            shoppingAllowance,
+            totalTicketCost,
+            totalLocalTransportCost,
+            emergencyBuffer,
+            totalCostWithBuffer,
+            costPerPerson
+          );
         }
         return res.json(fallback);
       }
@@ -1562,23 +1776,24 @@ DO NOT include any Markdown wrapping like \`\`\`json or \`\`\` in your response.
       }
 
       // Server-side dynamic financial & link enrichment to guarantee 100% mathematical accuracy and zero hallucination
-      structuredData.hero.navigationLink = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(startLocation)}&destination=${encodeURIComponent(location)}`;
-      structuredData.hero.pdfLink = `#print`;
-      structuredData.hero.shareLink = `#share`;
-      structuredData.hero.totalCost = totalCostWithBuffer;
-
-      if (!structuredData.budgetDashboard) {
-        structuredData.budgetDashboard = {};
-      }
-      structuredData.budgetDashboard.fuel = Math.round(totalTransitCost * 0.4);
-      structuredData.budgetDashboard.hotel = totalHotelCost;
-      structuredData.budgetDashboard.food = totalFoodCost;
-      structuredData.budgetDashboard.shopping = shoppingAllowance;
-      structuredData.budgetDashboard.activities = totalTicketCost;
-      structuredData.budgetDashboard.transport = totalLocalTransportCost;
-      structuredData.budgetDashboard.emergency = emergencyBuffer;
-      structuredData.budgetDashboard.grandTotal = totalCostWithBuffer;
-      structuredData.budgetDashboard.costPerPerson = costPerPerson;
+      enrichItineraryWithMaps(
+        structuredData,
+        dayWiseRoutes,
+        startLocation,
+        location,
+        duration,
+        outboundDist,
+        outboundDurationText,
+        totalTransitCost,
+        totalHotelCost,
+        totalFoodCost,
+        shoppingAllowance,
+        totalTicketCost,
+        totalLocalTransportCost,
+        emergencyBuffer,
+        totalCostWithBuffer,
+        costPerPerson
+      );
 
       // Generate a markdown fallback text for backwards compatibility if needed
       let outMarkdown = `# 🌍 ${structuredData.hero.destination} End-to-End Travel Itinerary\n\n`;
@@ -2306,7 +2521,7 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
     }
 
     // 4. Cluster attractions by day to optimize proximity
-    const clusteredAttractions = clusterAttractions(attractions, duration, destLatLng);
+    const clusteredAttractions = await clusterAttractions(attractions, duration, destLatLng);
 
     // 5. Generate day-wise optimized route
     const dayWiseRoutes: any[] = [];
@@ -2726,7 +2941,7 @@ ${gemsText}${experiencesText}
         tripCompleted: "Yes! Safely completed"
       },
       budgetDashboard: {
-        fuel: Math.round(totalTransitCost * 0.4),
+        fuel: totalTransitCost,
         hotel: totalHotelCost,
         food: totalFoodCost,
         shopping: shoppingAllowance,
@@ -3247,13 +3462,13 @@ Day ${duration} (Last Day): Checkout & Return Journey
     }
 
     // Set specialized chatbot roles / system instruction
-    let systemInstruction = "You are Travolor Travel Co-pilot, a friendly, ultra-knowledgeable, and professional travel assistant. Help the user plan journeys, suggest restaurants, advise on budgets, and provide local tips.";
+    let systemInstruction = "You are Travolor Travel Co-pilot, a friendly, ultra-knowledgeable, and professional travel assistant. Help the user plan journeys, suggest restaurants, advise on budgets, and provide local tips. This app is strictly focused on India, so prioritize destinations, routes, highway pitstops, dhabas, local culture, and advice within India.";
     if (botRole === "foodie") {
-      systemInstruction = "You are the Travolor Culinary Specialist. Your goal is to guide users to the finest local cuisines, street food, hidden restaurants, historical eateries, and dining tips for any city in the world.";
+      systemInstruction = "You are the Travolor Culinary Specialist. Your goal is to guide users to the finest local cuisines, street food, hidden restaurants, historical eateries, and dining tips, focused entirely on India's rich culinary traditions, highway dhabas, and local food culture.";
     } else if (botRole === "historian") {
-      systemInstruction = "You are the Travolor Historical Guide. Share ancient tales, architectural secrets, monument histories, and cultural significance behind popular landmarks and cities the user asks about.";
+      systemInstruction = "You are the Travolor Historical Guide. Share ancient tales, architectural secrets, temple and fort histories, and cultural significance behind popular landmarks, monuments, and cities in India.";
     } else if (botRole === "budget") {
-      systemInstruction = "You are the Travolor Budget Hack Advisor. Provide extreme money-saving tips, affordable transport alternatives, free attractions, cheap eats, and savvy itinerary optimizations.";
+      systemInstruction = "You are the Travolor Budget Hack Advisor. Provide extreme money-saving tips, affordable transport alternatives (IRCTC Indian Railways, state transport buses, local shared cabs), free attractions, cheap eats, and savvy itinerary optimizations within India.";
     }
 
     systemInstruction += ` CRITICAL: You must answer and write your responses ONLY in the ${language} language. Write all suggestions, travel advice, headings, and friendly comments in ${language}.`;
@@ -3383,6 +3598,19 @@ Day ${duration} (Last Day): Checkout & Return Journey
 
     // Adapt to requested language simple greeting formatting
     const isHindi = language.toLowerCase().startsWith("hi") || language.toLowerCase().includes("hindi");
+    const isMarathi = language.toLowerCase().startsWith("mr") || language.toLowerCase().includes("marathi");
+    const isGujarati = language.toLowerCase().startsWith("gu") || language.toLowerCase().includes("gujarati");
+    const isBengali = language.toLowerCase().startsWith("bn") || language.toLowerCase().includes("bengali");
+    const isTamil = language.toLowerCase().startsWith("ta") || language.toLowerCase().includes("tamil");
+    const isTelugu = language.toLowerCase().startsWith("te") || language.toLowerCase().includes("telugu");
+    const isKannada = language.toLowerCase().startsWith("kn") || language.toLowerCase().includes("kannada");
+    const isPunjabi = language.toLowerCase().startsWith("pa") || language.toLowerCase().includes("punjabi");
+    const isMalayalam = language.toLowerCase().startsWith("ml") || language.toLowerCase().includes("malayalam");
+    const isOdia = language.toLowerCase().startsWith("or") || language.toLowerCase().includes("odia");
+    const isAssamese = language.toLowerCase().startsWith("as") || language.toLowerCase().includes("assamese");
+    const isUrdu = language.toLowerCase().startsWith("ur") || language.toLowerCase().includes("urdu");
+    const isKonkani = language.toLowerCase().startsWith("ko") || language.toLowerCase().includes("konkani");
+    const isSanskrit = language.toLowerCase().startsWith("sa") || language.toLowerCase().includes("sanskrit");
     const isSpanish = language.toLowerCase().startsWith("es") || language.toLowerCase().includes("spanish");
     const isFrench = language.toLowerCase().startsWith("fr") || language.toLowerCase().includes("french");
 
@@ -3397,6 +3625,162 @@ Day ${duration} (Last Day): Checkout & Return Journey
         reply = "पैसे बचाने की तरकीबें मेरी विशेषता हैं! अपने बजट को सीमित रखने के लिए स्थानीय परिवहन (जैसे मेट्रो या बस सेवाओं) का उपयोग करें, पर्यटन कार्ड खरीदें, और महँगे रेस्टोरेंट्स् की बजाय प्रामाणिक स्ट्रीट फ़ूड आजमाएं।";
       } else {
         reply = "नमस्ते! मैं आपकी यात्रा को अद्भुत बनाने में सहायता करूँगा। अपनी मंज़िल, ठहरने की जगह (Hotels), या उड़ानों (Flights) के लिए ऊपर दिए गए टैब का उपयोग करके तुरंत लाइव दरें और जानकारी देखें!";
+      }
+    } else if (isMarathi) {
+      if (reply.startsWith("Hello!")) {
+        reply = "नमस्ते! तुमच्या ट्रॅव्होलर को-पायलट म्हणून, मी तुमच्या प्रवासाच्या नियोजनात मदत करण्यासाठी येथे आहे! आज मी तुम्हाला तुमचे गंतव्यस्थान, पॅकिंग यादी, बजेट पर्याय किंवा वाहतूक पर्यायांमध्ये कशी मदत करू?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "स्थानिक खाद्यसंस्कृतीचा आनंद घ्या! प्रवासाचा सुवर्ण नियम म्हणजे गर्दी असलेले छोटे पारंपरिक ढाबे आणि व्यस्त स्ट्रीट स्टॉल्स शोधणे. अस्सल प्रादेशिक पदार्थ आणि ताजे स्ट्रीट फूड नक्की ट्राय करा!";
+      } else if (reply.startsWith("What")) {
+        reply = "किती छान ऐतिहासिक प्रश्न! प्रत्येक वारसा स्थळाच्या वास्तुकलेत प्राचीन कथा दडलेल्या असतात. किल्ले, मंदिरे आणि ऐतिहासिक वास्तू गर्दीशिवाय पाहण्यासाठी सकाळी लवकर फिरणे केव्हाही उत्तम.";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "पैसे वाचवण्याच्या भारी टिप्स ही माझी खासियत आहे! तुमचे बजेट वाढवण्यासाठी स्थानिक वाहतूक सेवा (जसे की एसटी बस किंवा लोकल ट्रेन) वापरा, मोफत प्रवेश असलेली पर्यटन स्थळे पहा आणि महागड्या हॉटेलऐवजी स्थानिक स्ट्रीट फूड ट्राय करा.";
+      } else {
+        reply = "नमस्ते! मी तुमचा प्रवास अधिक सुखकर करण्यात मदत करेन. तुमच्या प्रवासाचे मार्ग, हॉटेल बुकिंग किंवा विमानाचे तिकीट तपासण्यासाठी वरील टॅबचा वापर करा!";
+      }
+    } else if (isGujarati) {
+      if (reply.startsWith("Hello!")) {
+        reply = "નમસ્તે! તમારા ટ્રેવોલર કો-પાયલોટ તરીકે, હું તમને પ્રવાસના આયોજનમાં મદદ કરવા માટે અહીં છું! આજે હું તમને તમારા ગંતવ્ય, પેકિંગ લિસ્ટ, બજેટ અથવા પરિવહન વિકલ્પોમાં કેવી રીતે મદદ કરી શકું?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "સ્થાનિક સ્વાદની મજા માણો! પ્રદેશ દરમિયાન સુવર્ણ નિયમ એ છે કે ભીડવાળા નાના પરંપરાગત ઢાબા અને વ્યસ્ત સ્ટ્રીટ સ્ટોલ્સ શોધો. અસલ પ્રાદેશિક વાનગીઓનો સ્વાદ માણો!";
+      } else if (reply.startsWith("What")) {
+        reply = "કેવો રસપ્રદ ઐતિહાસિક પ્રશ્ન! દરેક ધરોહર સ્થળ તેની અંદર સદીઓનો ઇતિહાસ ધરાવે છે. સવારે વહેલા ગાઇડેડ વૉક પર નીકળો જેથી તમે ગઢ, મંદિરો અને કિલ્લાઓ શાંતિથી જોઈ શકો.";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "પૈસા બચાવવાની ટિપ્સ મારી ખાસિયત છે! બજેટ મર્યાદિત રાખવા સ્થાનિક વાહનવ્યવહાર (જેમ કે બસ કે મેટ્રો) નો ઉપયોગ કરો અને પ્રખ્યાત સ્ટ્રીટ ફૂડ અજમાવો.";
+      } else {
+        reply = "નમસ્તે! હું તમારા પ્રવાસને અદ્ભુત બનાવવામાં મદદ કરીશ. ઉપર આપેલા ટેબનો ઉપયોગ કરીને હોટેલ, બસ અથવા ફ્લાઇટ્સ વિશેની માહિતી તુરંત જુઓ!";
+      }
+    } else if (isBengali) {
+      if (reply.startsWith("Hello!")) {
+        reply = "নমস্কার! আপনার ট্রাভেলার সহ-পাইলট হিসাবে, আমি আপনার ভ্রমণ পরিকল্পনায় সহায়তা করতে প্রস্তুত। আজ আপনার গন্তব্য, বাজেট বা পরিবহন নিয়ে কীভাবে সাহায্য করতে পারি?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "স্থানীয় খাবারের স্বাদ নিন! ভ্রমণের সুবর্ণ নিয়ম হলো ব্যস্ত ঐতিহ্যবাহী ধাবা বা স্ট্রিট ফুড স্টল খুঁজে বের করা। খাঁটি আঞ্চলিক খাবারের স্বাদ নিন!";
+      } else if (reply.startsWith("What")) {
+        reply = "দারুণ ঐতিহাসিক প্রশ্ন! প্রতিটি প্রাচীন স্থাপত্যের আড়ালে লুকিয়ে আছে রোমাঞ্চকর ইতিহাস। সকাল সকাল ঘুরে দেখুন কেল্লা, মন্দির এবং ঐতিহাসিক জাদুঘরগুলো।";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "টাকা বাঁচানোর দারুণ কৌশল আমার জানা আছে! বাজেট নিয়ন্ত্রণে রাখতে স্থানীয় পরিবহন (যেমন বাস বা ট্রেন) ব্যবহার করুন এবং বিলাসবহুল হোটেলের বদলে স্ট্রিট ফুড ট্রাই করুন।";
+      } else {
+        reply = "নমস্কার! আমি আপনার ভ্রমণকে সুন্দর করে তুলব। আপনার রুট বা hotel বুকিংয়ের জন্য উপরের ট্যাবগুলি ব্যবহার করুন!";
+      }
+    } else if (isTamil) {
+      if (reply.startsWith("Hello!")) {
+        reply = "வணக்கம்! உங்கள் டிராவலர் இணை விமானியாக, பயணத் திட்டமிடலில் உங்களுக்கு உதவ நான் தயாராக உள்ளேன். இன்று உங்கள் இலக்கு, பட்ஜெட் அல்லது போக்குவரத்து குறித்து நான் எவ்வாறு உதவ முடியும்?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "உள்ளூர் உணவை அனுபவியுங்கள்! பயணத்தின் போது சிறந்த வழி என்னவென்றால், பரபரப்பான பாரம்பரிய உணவகங்கள் மற்றும் தெருக்கடைகளைக் கண்டறிவதுதான். அசல் பாரம்பரிய உணவுகளை சுவையுங்கள்!";
+      } else if (reply.startsWith("What")) {
+        reply = "அற்புதமான வரலாற்று கேள்வி! ஒவ்வொரு பாரம்பரிய சின்னமும் ஒரு கதையைக் கொண்டுள்ளது. காலையிலேயே வரலாற்று இடங்கள் மற்றும் கோயில்களைப் பார்வையிடச் செல்லுங்கள்.";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "பணம் சேமிக்கும் வழிகள் எனது தனிச்சிறப்பு! பட்ஜெட்டைச் சேமிக்க அரசு பேருந்துகள் அல்லது ரயில்களைப் பயன்படுத்துங்கள், தெரு உணவுகளை முயற்சி செய்யுங்கள்.";
+      } else {
+        reply = "வணக்கம்! உங்கள் பயணத்தை சிறப்பானதாக மாற்ற நான் உதவுவேன். உங்கள் வழிகள் அல்லது தங்குமிடங்களை திட்டமிட மேலே உள்ள டேப்களைப் பயன்படுத்துங்கள்!";
+      }
+    } else if (isTelugu) {
+      if (reply.startsWith("Hello!")) {
+        reply = "നമസ്തേ! మీ ట్రావెలర్ కో-పైలట్‌గా, మీ ప్రయాణ ప్రణాళికలో సహాయం చేయడానికి నేను ఇక్కడ ఉన్నాను. ఈ రోజు మీ గమ్యస్థానం, బడ్జెట్ లేదా రవాణా గురించి నేను ఎలా సహాయపడగలను?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "స్థానిక రుచులను ఆస్వాదించండి! ప్రయాణంలో సువర్ణ సూత్రం ఏమిటంటే రద్దీగా ఉండే చిన్న సంప్రదాయ ధాబాలు మరియు స్ట్రీట్ ఫుడ్ స్టాల్స్‌ను సందర్శించడం.";
+      } else if (reply.startsWith("What")) {
+        reply = "అద్భుతమైన చారిత్రక ప్రశ్న! ప్రతి కట్టడం వెనుక ఒక గొప్ప చరిత్ర ఉంది. ఆలయాలు మరియు కోటలను ప్రశాంతంగా సందర్శించడానికి ఉదయాన్నే వెళ్ళండి.";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "డబ్బు ఆదా చేసే చిట్కాలు నా ప్రత్యేకత! బడ్జెట్ తగ్గించుకోవడానికి ప్రభుత్వ బస్సులు లేదా రైళ్లను వాడండి, స్థానిక స్ట్రీట్ ఫుడ్ రుచి చూడండి.";
+      } else {
+        reply = "നമസ്തే! మీ ప్రయాణాన్ని అద్భుతంగా మార్చడానికి నేను సహాయం చేస్తాను. రూట్లు లేదా హోటళ్ల వివరాల కోసం పై ట్యాబ్‌లను చూడండి!";
+      }
+    } else if (isKannada) {
+      if (reply.startsWith("Hello!")) {
+        reply = "ನಮಸ್ತೆ! ನಿಮ್ಮ ಟ್ರಾವೆಲರ್ ಸಹ-ಪೈಲಟ್ ಆಗಿ, ನಾನು ಪ್ರವಾಸದ ಯೋಜನೆಯಲ್ಲಿ ಸಹಾಯ ಮಾಡಲು ಇಲ್ಲಿದ್ದೇನೆ. ಇಂದು ನಿಮ್ಮ ಗಮ್ಯಸ್ಥಾನ, ಬಜೆಟ್ ಅಥವಾ ಸಾರಿಗೆಯ ಬಗ್ಗೆ ನಾನು ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "ಸ್ಥಳೀಯ ಆಹಾರದ ರುಚಿಯನ್ನು ಆನಂದಿಸಿ! ಪ್ರವಾಸದ ಸುವರ್ಣ ನಿಯಮವೆಂದರೆ ಜನದಟ್ಟಣೆ ಇರುವ ಸಣ್ಣ ಸಾಂಪ್ರದಾಯಿಕ ಧಾಬಾಗಳು ಮತ್ತು ಸ್ಟ್ರೀಟ್ ಫುಡ್ ಸ್ಟಾಲ್‌ಗಳನ್ನು ಹುಡುಕುವುದು.";
+      } else if (reply.startsWith("What")) {
+        reply = "ಅದ್ಭುತವಾದ ಐತಿಹಾಸಿಕ ಪ್ರಶ್ನೆ! ಪ್ರತಿ ಸ್ಮಾರಕದ ಹಿಂದೆ ಒಂದು ರೋಚಕ ಇತಿಹಾಸವಿದೆ. ದೇವಾಲಯಗಳು ಮತ್ತು ಕೋಟೆಗಳನ್ನು ವೀಕ್ಷಿಸಲು ಮುಂಜಾನೆಯೇ ಹೊರಡಿ.";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "ಹಣ ಉಳಿಸುವ ಸಲಹೆಗಳು ನನ್ನ ವಿಶೇಷತೆ! ಬಜೇಟ್ ಮಿತಿಯಲ್ಲಿಡಲು ಸರ್ಕಾರಿ ಬಸ್‌ಗಳು ಅಥವಾ ರೈಲುಗಳನ್ನು ಬಳಸಿ, ಸ್ಥಳೀಯ ಸ್ಟ್ರೀಟ್ ಫುಡ್ ಸವಿಯಿರಿ.";
+      } else {
+        reply = "ನಮಸ್ತೆ! ನಿಮ್ಮ ಪ್ರಯಾಣವನ್ನು ಸುಖಕರವಾಗಿಸಲು ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ. ಮಾರ್ಗಗಳು ಅಥವಾ ಹೋಟೆಲ್ ವಿವರಗಳಿಗಾಗಿ ಮೇಲಿನ ಟ್ಯಾಬ್‌ಗಳನ್ನು ಬಳಸಿ!";
+      }
+    } else if (isPunjabi) {
+      if (reply.startsWith("Hello!")) {
+        reply = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਤੁਹਾਡੇ ਟ੍ਰੈਵਲਰ ਕੋ-ਪਾਇਲਟ ਵਜੋਂ, ਮੈਂ ਤੁਹਾਡੀ ਯਾਤਰਾ ਯੋਜਨਾ ਵਿੱਚ ਮਦਦ ਕਰਨ ਲਈ ਤਿਆਰ ਹਾਂ। ਅੱਜ ਤੁਹਾਡੀ ਮੰਜ਼ਿਲ, ਬਜਟ ਜਾਂ ਟ੍ਰਾਂਸਪੋਰਟ ਬਾਰੇ ਮੈਂ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "ਸਥਾਨਕ ਸਵਾਦਾਂ ਦਾ ਅਨੰਦ ਲਓ! ਯਾਤਰਾ ਦਾ ਸੁਨਹਿਰੀ ਨਿਯਮ ਰਵਾਇਤੀ ਹਾਈਵੇਅ ਢਾਬਿਆਂ 'ਤੇ ਖਾਣਾ ਖਾਣਾ ਹੈ। ਅਸਲੀ ਦੇਸੀ ਸਵਾਦਾਂ ਦਾ ਲੁਤਫ ਉਠਾਓ!";
+      } else if (reply.startsWith("What")) {
+        reply = "ਬਹੁਤ ਹੀ ਦਿਲਚਸਪ ਇਤਿਹਾਸਕ ਸਵਾਲ! ਹਰ ਕਿਲ੍ਹਾ ਅਤੇ ਇਤਿਹਾਸਕ ਸਥਾਨ ਆਪਣੇ ਅੰਦਰ ਸਦੀਆਂ ਦੀ ਕਹਾਣੀ ਸਮੇਟੇ ਹੋਏ ਹੈ। ਸਵੇਰੇ ਜਲਦੀ ਇਤਿਹਾਸਕ ਥਾਵਾਂ ਦੇ ਦੌਰੇ 'ਤੇ ਜਾਓ।";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "ਪੈਸੇ ਬਚਾਉਣ ਦੇ ਤਰੀਕੇ ਮੇਰੀ ਖਾਸੀਅਤ ਹਨ! ਬਜਟ ਸੀਮਤ ਰੱਖਣ ਲਈ ਸਰਕਾਰੀ ਬੱਸਾਂ ਜਾਂ ਰੇਲਗੱਡੀ ਦੀ ਵਰਤੋਂ ਕਰੋ ਅਤੇ ਸਥਾਨਕ ਢਾਬਿਆਂ ਦਾ ਖਾਣਾ ਖਾਓ।";
+      } else {
+        reply = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਤੁਹਾਡੀ ਯਾਤਰਾ ਨੂੰ ਬਿਹਤਰੀਨ ਬਣਾਉਣ ਵਿੱਚ ਮਦਦ ਕਰਾਂਗਾ। ਫਲਾਈਟਾਂ, ਹੋਟਲਾਂ ਜਾਂ ਰੂਟਾਂ ਦੀ ਜਾਣਕਾਰੀ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਟੈਬਾਂ ਦੀ ਵਰਤੋਂ ਕਰੋ!";
+      }
+    } else if (isMalayalam) {
+      if (reply.startsWith("Hello!")) {
+        reply = "നമസ്തേ! നിങ്ങളുടെ ട്രാവൽ കോ-പൈലറ്റ് ആയി, യാത്ര ആസൂത്രണം ചെയ്യാൻ ഞാൻ ഇവിടെയുണ്ട്. നിങ്ങളുടെ ലക്ഷ്യസ്ഥാനം, ബജറ്റ് അല്ലെങ്കിൽ യാത്രാമാർഗ്ഗങ്ങളെക്കുറിച്ച് ഞാൻ എങ്ങനെ സഹായിക്കണം?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "പ്രാദേശിക ഭക്ഷണങ്ങൾ ആസ്വദിക്കൂ! യാത്ര ചെയ്യുമ്പോൾ തിരക്കേറിയ ചെറിയ തട്ടുകടകളും നാടൻ ഭക്ഷണശാലകളും കണ്ടെത്തുക എന്നതാണ് പ്രധാന തന്ത്രം.";
+      } else if (reply.startsWith("What")) {
+        reply = "വളരെ രസകരമായ ചരിത്ര ചോദ്യം! ഓരോ സ്മാരകത്തിന് പിന്നിലും വലിയ ചരിത്രമുണ്ട്. കോട്ടകളും ക്ഷേത്രങ്ങളും സന്ദർശിക്കാൻ രാവിലെ തന്നെ പുറപ്പെടുക.";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "പണം ലാഭിക്കുന്നതിനുള്ള തന്ത്രങ്ങൾ എന്റെ സവിശേഷതയാണ്! കെ.എസ്.ആർ.ടി.സി ബസുകളോ ട്രെയിനുകളോ ഉപയോഗിക്കുക, തട്ടുകടകളിലെ ഭക്ഷണം പരീക്ഷിക്കുക.";
+      } else {
+        reply = "നമസ്തേ! നിങ്ങളുടെ യാത്ര മികച്ചതാക്കാൻ ഞാൻ സഹായിക്കാം. റൂട്ടുകൾക്കോ ഹോട്ടലുകൾക്കോ ആയി മുകളിലെ ടാബുകൾ ഉപയോഗിക്കുക!";
+      }
+    } else if (isOdia) {
+      if (reply.startsWith("Hello!")) {
+        reply = "ନମସ୍କାର! ଆପଣଙ୍କ ଯାତ୍ରା ସହ-ପାଇଲଟ୍ ଭାବରେ, ମୁଁ ଆପଣଙ୍କୁ ସାହାଯ୍ୟ କରିବାକୁ ପ୍ରସ୍ତୁତ | ଆଜି ଆପଣଙ୍କର ଯାତ୍ରା ପ୍ଲାନ, ବଜେਟ୍ କିମ୍ବା ପରିବହନ ବିଷୟରେ ମୁଁ କିପରି ସାହାଯ្យ କରିପାରିବି?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "ସ୍ଥାନୀય ସ୍ୱାଦର ମଜା ନିଅନ୍ତು! ଯାତ୍ରା ସମୟରେ ସବୁଠାରୁ ଭଲ ଉପାୟ ହେଉଛି ପାରମ୍ପରିକ ଢାବା ଏବଂ ପ୍ରସିଦ୍ଧ ଷ୍ଟ୍ରିଟ୍ ଫୁଡ୍ ଖାଇବା |";
+      } else if (reply.startsWith("What")) {
+        reply = "ବହୁତ ସୁନ୍ଦର ଐତିହାସିକ ପ୍ରଶ୍ନ! ପ୍ରତ୍ୟେକ କୀର୍ତ୍ତିରାଜି ପଛରେ ଏକ ସୁନ୍ଦର ଇତିହାସ ଅଛି | ପ୍ରାଚୀନ ମନ୍ଦିર ଏବଂ ଦୁର୍ଗଗୁଡ଼ିକୁ ଶାନ୍ତିରେ ଦେଖିବା ପାଇଁ ସକାଳୁ ବୁଲିବାକୁ ଯାଆନ୍ତୁ |";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "ପଇସା ବଞ୍ଚାଇବା ଉପାୟ ମୋତେ ଭଲ ଭାବେ ଜଣା | ବଜେଟ୍ ସୀମିତ ରଖିବା ପାଇଁ ସରକାରୀ ବସ୍ କିମ୍ବା ଟ୍ରେନ୍ ବ୍ୟବହାର କରନ୍ତୁ ଏବଂ ସ୍ଥାନୀୟ ଖାଦ୍ୟ ଖାଆନ୍ତୁ |";
+      } else {
+        reply = "ନମସ୍କାର! ଆପଣଙ୍କ ଯାତ୍ରାକୁ ସୁନ୍ଦର କରିବାରେ ମୁଁ ସାହାଯ្យ କରିବି | ହୋଟେଲ୍ କିମ୍ବା ରୁଟ୍ ଚେକ୍ କରିବା ପାଇଁ ଉପରେ ଦିଆଯାଇଥିବା ଟ୍ୟାବ୍ ବ୍ୟବହାର କରନ୍ତୁ !";
+      }
+    } else if (isAssamese) {
+      if (reply.startsWith("Hello!")) {
+        reply = "নমস্কাৰ! আপোনাৰ ট্ৰেভেলার সহ-পাইলট হিচাপে, মই আপোনাক যাত্ৰা পৰিকল্পনাত সহায় কৰিবলৈ সাজু আছোঁ। আজি আপোনাৰ গন্তব্যস্থান, বাজেট বা পৰিবহন সম্পৰ্কে মই কেনেকৈ সহায় কৰিব পাৰোঁ?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "স্থানীয় সোৱাদৰ আনন্দ লওক! ভ্ৰমণৰ সোণালী নিয়মটো হ'ল ব্যস্ত থলুৱা ধাবা বা ষ্ট্ৰীট ফুড দোকানসমূহ বিচাৰি উলিওৱা। সোৱাদ লওক!";
+      } else if (reply.startsWith("What")) {
+        reply = "ঐতিহাসিক প্ৰশ্ন! প্ৰতিটো প্ৰাচীন কীৰ্তিচিহ্নৰ অন্তৰালত এক ঐতিহাসিক কাহিনী আছে। মন্দিৰ আৰু দুৰ্গসমূহ চাবলৈ পুৱাই ফুৰিবলৈ যাওক।";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "বাজেট সীমিত ৰাখিবলৈ চৰকাৰী বাছ বা ৰে'ল ব্যৱহাৰ কৰক আৰু স্থানীয় খাদ্য উপভোগ কৰক।";
+      } else {
+        reply = "নমস্কাৰ! মই আপোনাৰ যাত্ৰা ধুনীয়া কৰাত সহায় কৰিম। হোটেল বা ৰুটৰ বিৱৰণ চাবলৈ ওপৰৰ টেবসমূহ ব্যৱহাৰ কৰক!";
+      }
+    } else if (isUrdu) {
+      if (reply.startsWith("Hello!")) {
+        reply = "السلام علیکم! آپ کے ٹریولر کو-پائلٹ کے طور پر، میں آپ کے سفر کی منصوبہ بندی میں مدد کے لیے تیار ہوں۔ آج میں آپ کی منزل، بجٹ، یا ٹرانسپورٹ کے بارے میں کیسے مدد کر سکتا ہوں؟";
+      } else if (reply.startsWith("Delight")) {
+        reply = "مقامی ذائقوں سے لطف اندوز ہوں! سفر کے دوران سنہری اصول یہ ہے کہ آپ ڈھابوں اور گلی کے سٹالز تلاش کریں۔ اصل ذائقہ آزمائیں!";
+      } else if (reply.startsWith("What")) {
+        reply = "بہت ہی دلچسپ تاریخی سوال! ہر تاریخی عمارت کے پیچھے ایک قدیم کہانی ہوتی ہے۔ پرسکون ماحول میں مندروں اور قلعوں کو دیکھنے کے لیے صبح سویرے جائیں۔";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "پیسے بچانے کے طریقے میری خصوصیت ہیں! بجٹ کو محدود رکھنے کے لیے سرکاری بسوں کا استعمال کریں اور مقامی سستے کھانوں سے لطف اندوز ہوں۔";
+      } else {
+        reply = "السلام علیکم! میں آپ کے سفر کو خوبصورت بنانے میں مدد کروں گا۔ ہوٹلوں یا راستوں کے بارے میں تفصیلات جاننے کے لیے اوپر دیے گئے ٹیبز کا استعمال کریں۔";
+      }
+    } else if (isKonkani) {
+      if (reply.startsWith("Hello!")) {
+        reply = "नमस्ते! तुमचो ट्रॅव्हलर को-पायलट म्हणून, हांव तुमचे भोंवडेच्या नियोजनांत मदत करपाक तयार आसां। आज हांव तुमचे गंतव्य, बजेट वा वाहतूक पर्यायांविशीं कशी मदत करूं?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "थळाव्या जेवणाचा आस्वाद घेयात! प्रवासांतलो सुवर्ण नेम म्हळ्यार गर्दी आशिल्ले ल्हान पारंपरिक ढाबे आनी व्यस्त स्ट्रीट स्टॉल्स शोधप।";
+      } else if (reply.startsWith("What")) {
+        reply = "खूपच सोबीत इतिहासीक प्रस्न! दरेक वारसा थळाच्या वास्तुकलेंत पोरणी काणी दडिल्ली आसता।";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "पैसे वाटावपाच्यो बऱ्यो टिप्स म्हजी खाशेलताय आसा! बजेट दवरपाक सरकारी बस वा रेल्वेचो वापर करात.";
+      } else {
+        reply = "नमस्ते! हांव तुमची भोंवडी सुखी करपाक मदत करतलों। हॉटेल वा मार्गाविशीं माहिती खातीर वयर दिल्ल्या टॅबचो वापर करात!";
+      }
+    } else if (isSanskrit) {
+      if (reply.startsWith("Hello!")) {
+        reply = "नमो नमः! भवतः यात्रिक सह-चालक रूपेण, अहम् यात्राकल्पने साहाय्यं कर्तुम् उद्यतोऽस्मि। अद्य यात्रागन्तव्य-व्यय-परिवहनविषये कथं साहाय्यं कर्तुं शक्నోमि?";
+      } else if (reply.startsWith("Delight")) {
+        reply = "स्थानीयभोजनस्य रसं गृह्णन्तु! यात्राकाले सुवर्णनियमः अस्ति यत् जनसम्मर्दयुक्तान् पारम्परिकान् उपहारगृहान् तथा मार्गपार्श्वस्थान् खादन्तु।";
+      } else if (reply.startsWith("What")) {
+        reply = "अति सुन्दरः ऐतिहासिकः प्रश्नः! प्रत्येकस्य प्राचीनकीर्तिचिह्नस्य पृष्ठतः काचित् पुरातनी कथा वर्तते। मन्दिराणि दुर्गाणि च प्रफुल्लमनसा द्रष्टुं प्रातःकाले एव गच्छन्तु।";
+      } else if (reply.startsWith("Extreme")) {
+        reply = "धनरक्षणोपायाः मम विशेषता वर्तन्ते! व्ययनियन्त्रणार्थं सर्वकारीयवाहनानां रेलयानानां वा उपयोगं कुर्वन्तु।";
+      } else {
+        reply = "नमो नमः! अहम् यात्रां सुकरां कर्तुं साहाय्यं करिष्यामि। उपरि दत्तानां साधनानां प्रयोगं कृत्वा विवरणं पश्यन्तु।";
       }
     } else if (isSpanish) {
       if (reply.startsWith("Hello!")) {

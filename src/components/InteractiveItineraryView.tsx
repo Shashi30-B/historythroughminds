@@ -4,8 +4,9 @@ import {
   Calendar, Compass, MapPin, Sparkles, Navigation, Info, ArrowUpRight, 
   Clock, Shield, Star, Wallet, Hotel, Utensils, ShoppingBag, Eye, 
   Heart, HelpCircle, Phone, Printer, CheckCircle2, ChevronRight, 
-  Fuel, AlertTriangle, ExternalLink, Moon, Sun, Car
+  Fuel, AlertTriangle, ExternalLink, Moon, Sun, Car, FileDown
 } from 'lucide-react';
+import { exportItineraryToPDF } from '../services/pdfExport';
 
 interface InteractiveItineraryViewProps {
   structured: any;
@@ -15,6 +16,8 @@ interface InteractiveItineraryViewProps {
   travelMode: string;
   travelDate: string;
   duration: number;
+  travelStyle?: string;
+  numPeople?: number;
 }
 
 export function InteractiveItineraryView({ 
@@ -24,7 +27,9 @@ export function InteractiveItineraryView({
   locationInput, 
   travelMode, 
   travelDate, 
-  duration 
+  duration,
+  travelStyle = "standard",
+  numPeople = 2
 }: InteractiveItineraryViewProps) {
   if (!structured) {
     return (
@@ -54,6 +59,25 @@ export function InteractiveItineraryView({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      await exportItineraryToPDF({
+        location: locationInput || "Swadesh Destination",
+        startLocation: startLocation || "Mumbai",
+        duration: duration || 3,
+        numPeople: numPeople || 2,
+        travelStyle: travelStyle || "standard",
+        travelDate: travelDate || "Upcoming",
+        itineraryText: "",
+        structured: structured,
+        language: language
+      });
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      alert("Failed to export PDF itinerary. Please try again.");
+    }
   };
 
   return (
@@ -109,9 +133,9 @@ export function InteractiveItineraryView({
           <div className="mt-6 p-5 bg-[#1E90FF]/5 rounded-2xl border border-[#1E90FF]/10 text-xs font-semibold text-gray-600 dark:text-gray-300 space-y-3">
             <span className="text-[10px] font-black uppercase text-[#1E90FF] tracking-wider block">🚗 Optimized Transit Pit-Stops:</span>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-normal">
-              <div>🍳 <span className="font-bold">Breakfast Stop:</span> {day0.breakfastStop}</div>
-              <div>🍲 <span className="font-bold">Lunch Stop:</span> {day0.lunchStop}</div>
-              <div>☕ <span className="font-bold">Coffee/Tea Stop:</span> {day0.coffeeStop}</div>
+              <div>🍳 <span className="font-bold">Breakfast Stop:</span> {day0.breakfastStopMapsLink ? <a href={day0.breakfastStopMapsLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{day0.breakfastStop} ↗</a> : day0.breakfastStop}</div>
+              <div>🍲 <span className="font-bold">Lunch Stop:</span> {day0.lunchStopMapsLink ? <a href={day0.lunchStopMapsLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{day0.lunchStop} ↗</a> : day0.lunchStop}</div>
+              <div>☕ <span className="font-bold">Coffee/Tea Stop:</span> {day0.coffeeStopMapsLink ? <a href={day0.coffeeStopMapsLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{day0.coffeeStop} ↗</a> : day0.coffeeStop}</div>
             </div>
             <div className="pt-2 border-t border-gray-100 dark:border-slate-800/60 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-gray-500">
               <span>🚻 <strong>Restrooms:</strong> {day0.restStops}</span>
@@ -124,14 +148,26 @@ export function InteractiveItineraryView({
               <Hotel size={16} className="text-[#1E90FF] shrink-0 mt-0.5" />
               <div>
                 <span className="font-black text-gray-400 uppercase text-[9px] block">Accomodation Check-In</span>
-                <span className="font-bold text-gray-700 dark:text-gray-200">{day0.hotelCheckIn}</span>
+                {day0.hotelCheckInMapsLink ? (
+                  <a href={day0.hotelCheckInMapsLink} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 dark:text-blue-400 hover:underline block mt-0.5">
+                    {day0.hotelCheckIn} ↗
+                  </a>
+                ) : (
+                  <span className="font-bold text-gray-700 dark:text-gray-200">{day0.hotelCheckIn}</span>
+                )}
               </div>
             </div>
             <div className="flex items-start gap-2">
               <Utensils size={16} className="text-[#1E90FF] shrink-0 mt-0.5" />
               <div>
                 <span className="font-black text-gray-400 uppercase text-[9px] block">Dinner Recommendation</span>
-                <span className="font-bold text-gray-700 dark:text-gray-200">{day0.dinner}</span>
+                {day0.dinnerMapsLink ? (
+                  <a href={day0.dinnerMapsLink} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 dark:text-blue-400 hover:underline block mt-0.5">
+                    {day0.dinner} ↗
+                  </a>
+                ) : (
+                  <span className="font-bold text-gray-700 dark:text-gray-200">{day0.dinner}</span>
+                )}
               </div>
             </div>
           </div>
@@ -179,7 +215,15 @@ export function InteractiveItineraryView({
                   <div className="p-5 bg-orange-50/10 dark:bg-slate-900 border border-orange-500/10 dark:border-slate-800 rounded-3xl space-y-4">
                     <div className="flex justify-between items-start gap-2">
                       <div className="text-left">
-                        <h5 className="font-extrabold text-base text-[#000080] dark:text-blue-300">{day.morning.place?.name}</h5>
+                        {day.morning.place?.mapsLink ? (
+                          <a href={day.morning.place.mapsLink} target="_blank" rel="noopener noreferrer" className="group block">
+                            <h5 className="font-extrabold text-base text-[#000080] dark:text-blue-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:underline flex items-center gap-1.5">
+                              {day.morning.place?.name} <ExternalLink size={14} className="opacity-60" />
+                            </h5>
+                          </a>
+                        ) : (
+                          <h5 className="font-extrabold text-base text-[#000080] dark:text-blue-300">{day.morning.place?.name}</h5>
+                        )}
                         <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1 font-medium">
                           <MapPin size={11} /> {day.morning.place?.navigation}
                         </p>
@@ -226,7 +270,13 @@ export function InteractiveItineraryView({
                     )}
 
                     <div className="pt-2 border-t border-gray-100 dark:border-slate-800 text-xs text-gray-500">
-                      🍳 <strong>Breakfast Suggestion:</strong> {day.morning.breakfast}
+                      🍳 <strong>Breakfast Suggestion:</strong> {day.morning.breakfastMapsLink ? (
+                        <a href={day.morning.breakfastMapsLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold ml-1">
+                          {day.morning.breakfast} ↗
+                        </a>
+                      ) : (
+                        day.morning.breakfast
+                      )}
                     </div>
                   </div>
                 </div>
@@ -242,7 +292,15 @@ export function InteractiveItineraryView({
                   <div className="p-5 bg-blue-50/10 dark:bg-slate-900 border border-[#1E90FF]/10 dark:border-slate-800 rounded-3xl space-y-4">
                     <div className="flex justify-between items-start gap-2">
                       <div className="text-left">
-                        <h5 className="font-extrabold text-base text-[#000080] dark:text-blue-300">{day.afternoon.place?.name}</h5>
+                        {day.afternoon.place?.mapsLink ? (
+                          <a href={day.afternoon.place.mapsLink} target="_blank" rel="noopener noreferrer" className="group block">
+                            <h5 className="font-extrabold text-base text-[#000080] dark:text-blue-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:underline flex items-center gap-1.5">
+                              {day.afternoon.place?.name} <ExternalLink size={14} className="opacity-60" />
+                            </h5>
+                          </a>
+                        ) : (
+                          <h5 className="font-extrabold text-base text-[#000080] dark:text-blue-300">{day.afternoon.place?.name}</h5>
+                        )}
                         <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1 font-medium">
                           <MapPin size={11} /> {day.afternoon.place?.navigation}
                         </p>
@@ -283,7 +341,13 @@ export function InteractiveItineraryView({
                     )}
 
                     <div className="pt-2 border-t border-gray-100 dark:border-slate-800 text-xs text-gray-500">
-                      🍲 <strong>Lunch Suggestion:</strong> {day.afternoon.lunch}
+                      🍲 <strong>Lunch Suggestion:</strong> {day.afternoon.lunchMapsLink ? (
+                        <a href={day.afternoon.lunchMapsLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold ml-1">
+                          {day.afternoon.lunch} ↗
+                        </a>
+                      ) : (
+                        day.afternoon.lunch
+                      )}
                     </div>
                   </div>
                 </div>
@@ -298,14 +362,26 @@ export function InteractiveItineraryView({
                     <Sun size={14} className="animate-pulse" />
                     <span>Sunset Point</span>
                   </div>
-                  <p className="text-gray-700 dark:text-gray-300 font-semibold">{day.evening.sunsetPoint}</p>
+                  {day.evening.sunsetPointMapsLink ? (
+                    <a href={day.evening.sunsetPointMapsLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold block">
+                      {day.evening.sunsetPoint} ↗
+                    </a>
+                  ) : (
+                    <p className="text-gray-700 dark:text-gray-300 font-semibold">{day.evening.sunsetPoint}</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5 text-[#1E90FF] font-bold">
                     <Utensils size={14} />
                     <span>Native Snacks</span>
                   </div>
-                  <p className="text-gray-700 dark:text-gray-300 font-semibold">{day.evening.streetFood}</p>
+                  {day.evening.streetFoodMapsLink ? (
+                    <a href={day.evening.streetFoodMapsLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold block">
+                      {day.evening.streetFood} ↗
+                    </a>
+                  ) : (
+                    <p className="text-gray-700 dark:text-gray-300 font-semibold">{day.evening.streetFood}</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5 text-emerald-600 font-bold">
@@ -389,6 +465,12 @@ export function InteractiveItineraryView({
           className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-bold px-8 py-4 rounded-2xl shadow-sm flex items-center gap-2.5 transition-all text-sm cursor-pointer"
         >
           <Printer size={18} /> {t.print}
+        </button>
+        <button 
+          onClick={handleDownloadPDF}
+          className="bg-[#000080] hover:bg-[#000080]/90 text-white font-bold px-8 py-4 rounded-2xl shadow-md flex items-center gap-2.5 transition-all text-sm cursor-pointer"
+        >
+          <FileDown size={18} /> Export PDF
         </button>
       </div>
     </div>

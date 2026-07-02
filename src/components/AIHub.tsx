@@ -19,9 +19,10 @@ interface AIHubProps {
   setActiveSubTab?: (tab: "chat" | "route" | "board" | "india" | "group" | "passport" | "advisor") => void;
   user?: any | null;
   isLoaded?: boolean;
+  language?: string;
 }
 
-export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propSetSubTab, user, isLoaded }: AIHubProps = {}) {
+export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propSetSubTab, user, isLoaded, language = "English" }: AIHubProps = {}) {
   const [localSubTab, setLocalSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor">("chat");
   const activeSubTab = propSubTab !== undefined ? propSubTab : localSubTab;
   const setActiveSubTab = propSetSubTab !== undefined ? propSetSubTab : setLocalSubTab;
@@ -139,7 +140,7 @@ export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propS
                 />
               </div>
               <div className="lg:col-span-8 h-full">
-                <AICompanionChat />
+                <AICompanionChat language={language} />
               </div>
             </motion.div>
           )}
@@ -152,7 +153,7 @@ export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propS
               exit={{ opacity: 0, y: -15 }}
               className="space-y-8"
             >
-              <RoadTripPlanner />
+              <RoadTripPlanner language={language} />
               <InteractiveMapPlanner />
               <DragDropItinerary />
             </motion.div>

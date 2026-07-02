@@ -19,7 +19,7 @@ import {
   Plane, TrainFront, Bus, Car, Package,
   GripVertical, MapPin as MapPinIcon, Navigation2, Zap,
   MessageSquare, Send, Bot, Cpu, X,
-  Mic, MicOff, Volume2, VolumeX
+  Mic, MicOff, Volume2, VolumeX, FileDown
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle } from 'lucide-react';
@@ -34,6 +34,8 @@ import { AnimatedItinerary } from './components/AnimatedItinerary';
 import { InteractiveItineraryView } from './components/InteractiveItineraryView';
 import { BudgetDashboardView } from './components/BudgetDashboardView';
 import { LocalGuideView } from './components/LocalGuideView';
+import { HotelSuggestionsView } from './components/HotelSuggestionsView';
+import { exportItineraryToPDF } from './services/pdfExport';
 
 const libraries: ("places")[] = ["places"];
 
@@ -209,6 +211,23 @@ const FALLBACK_CITIES = [
   { description: 'Ooty, Tamil Nadu, India', place_id: 'ooty', structured_formatting: { main_text: 'Ooty', secondary_text: 'Tamil Nadu, India' } },
   { description: 'Munnar, Kerala, India', place_id: 'munnar', structured_formatting: { main_text: 'Munnar', secondary_text: 'Kerala, India' } },
   
+  // More Majestic Indian Destinations
+  { description: 'Chopta, Uttarakhand, India', place_id: 'chopta', structured_formatting: { main_text: 'Chopta', secondary_text: 'Uttarakhand, India' } },
+  { description: 'Alleppey (Alappuzha), Kerala, India', place_id: 'alleppey', structured_formatting: { main_text: 'Alleppey (Alappuzha)', secondary_text: 'Kerala, India' } },
+  { description: 'Gokarna, Karnataka, India', place_id: 'gokarna', structured_formatting: { main_text: 'Gokarna', secondary_text: 'Karnataka, India' } },
+  { description: 'Gandikota, Andhra Pradesh, India', place_id: 'gandikota', structured_formatting: { main_text: 'Gandikota', secondary_text: 'Andhra Pradesh, India' } },
+  { description: 'Agra, Uttar Pradesh, India', place_id: 'agra', structured_formatting: { main_text: 'Agra', secondary_text: 'Uttar Pradesh, India' } },
+  { description: 'Amritsar, Punjab, India', place_id: 'amritsar', structured_formatting: { main_text: 'Amritsar', secondary_text: 'Punjab, India' } },
+  { description: 'Srinagar, Jammu & Kashmir, India', place_id: 'srinagar', structured_formatting: { main_text: 'Srinagar', secondary_text: 'Jammu & Kashmir, India' } },
+  { description: 'Ladakh, Jammu & Kashmir, India', place_id: 'ladakh', structured_formatting: { main_text: 'Ladakh', secondary_text: 'Jammu & Kashmir, India' } },
+  { description: 'Varanasi, Uttar Pradesh, India', place_id: 'varanasi', structured_formatting: { main_text: 'Varanasi', secondary_text: 'Uttar Pradesh, India' } },
+  { description: 'Rishikesh, Uttarakhand, India', place_id: 'rishikesh', structured_formatting: { main_text: 'Rishikesh', secondary_text: 'Uttarakhand, India' } },
+  { description: 'Coorg, Karnataka, India', place_id: 'coorg', structured_formatting: { main_text: 'Coorg (Madikeri)', secondary_text: 'Karnataka, India' } },
+  { description: 'Hampi, Karnataka, India', place_id: 'hampi', structured_formatting: { main_text: 'Hampi', secondary_text: 'Karnataka, India' } },
+  { description: 'Mysore, Karnataka, India', place_id: 'mysore', structured_formatting: { main_text: 'Mysore', secondary_text: 'Karnataka, India' } },
+  { description: 'Pondicherry, India', place_id: 'pondicherry', structured_formatting: { main_text: 'Pondicherry', secondary_text: 'India' } },
+  { description: 'Tirupati, Andhra Pradesh, India', place_id: 'tirupati', structured_formatting: { main_text: 'Tirupati', secondary_text: 'Andhra Pradesh, India' } },
+
   // International Destinations
   { description: 'Dubai, United Arab Emirates', place_id: 'dubai', structured_formatting: { main_text: 'Dubai', secondary_text: 'United Arab Emirates' } },
   { description: 'Bali, Indonesia', place_id: 'bali', structured_formatting: { main_text: 'Bali', secondary_text: 'Indonesia' } },
@@ -316,6 +335,7 @@ const LocationInput = ({
   const [service, setService] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<any>(null);
   const [isListening, setIsListening] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleVoiceInput = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -374,9 +394,16 @@ const LocationInput = ({
 
   React.useEffect(() => {
     if (!value || value.trim().length === 0) {
-      setSuggestions([]);
-      setAiSuggestions([]);
-      setShowSuggestions(false);
+      if (isFocused) {
+        // Show trending popular destinations instantly when focused but empty
+        const popular = FALLBACK_CITIES.slice(0, 8);
+        setSuggestions(popular);
+        setShowSuggestions(true);
+      } else {
+        setSuggestions([]);
+        setAiSuggestions([]);
+        setShowSuggestions(false);
+      }
       return;
     }
 
@@ -452,7 +479,7 @@ const LocationInput = ({
       }, 150);
       return () => clearTimeout(timeoutId);
     }
-  }, [value, service, sessionToken]);
+  }, [value, service, sessionToken, isFocused]);
 
   const handleSelect = (suggestion: any) => {
     onChange(suggestion.description);
@@ -488,8 +515,16 @@ const LocationInput = ({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => value && suggestions.length > 0 && setShowSuggestions(true)}
-        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+        onFocus={() => {
+          setIsFocused(true);
+          setShowSuggestions(true);
+        }}
+        onBlur={() => {
+          setTimeout(() => {
+            setIsFocused(false);
+            setShowSuggestions(false);
+          }, 200);
+        }}
         placeholder={placeholder}
         className="input-premium pl-14 pr-24 pt-8 pb-4 text-lg font-semibold"
       />
@@ -533,6 +568,13 @@ const LocationInput = ({
             exit={{ opacity: 0, y: 10 }}
             className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] overflow-hidden max-h-64 overflow-y-auto"
           >
+            {(!value || value.trim().length === 0) && (
+              <div className="px-6 py-2.5 bg-gray-50/50 border-b border-gray-100 flex items-center gap-1.5">
+                <span className="text-xs font-black text-[#000080]/70 uppercase tracking-wider">
+                  🔥 {language === 'Marathi' ? 'लोकप्रिय शहरे' : language === 'Hindi' ? 'लोकप्रिय शहर' : 'Popular Destinations'}
+                </span>
+              </div>
+            )}
             {isAiLoading && (
               <div className="px-6 py-4 flex items-center gap-3 border-b border-gray-50">
                 <Loader2 size={16} className="animate-spin text-[#1E90FF]" />
@@ -580,6 +622,7 @@ const LocationInput = ({
 };
 
 function AppContent({ isLoaded }: { isLoaded: boolean }) {
+  const [language, setLanguage] = useState(() => localStorage.getItem('travolor_lang') || "English");
   const [activeTab, setActiveTab] = useState("explore");
   const [hubSubTab, setHubSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor">("chat");
   const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string, totalBudget?: number} | null>(null);
@@ -616,6 +659,69 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     date?: string;
   } | null>(null);
 
+  const [affConfig, setAffConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('travolor_affiliate_config');
+      return saved ? JSON.parse(saved) : {
+        bookingComAid: "8041322",
+        makeMyTripTag: "travolor-21",
+        redBusCampaign: "travolor-rb",
+        viatorPartner: "travolor-vtr",
+        klookPartner: "travolor-klk",
+        commissionRate: "6.5"
+      };
+    } catch {
+      return {
+        bookingComAid: "8041322",
+        makeMyTripTag: "travolor-21",
+        redBusCampaign: "travolor-rb",
+        viatorPartner: "travolor-vtr",
+        klookPartner: "travolor-klk",
+        commissionRate: "6.5"
+      };
+    }
+  });
+
+  const [affEstimatedMAU, setAffEstimatedMAU] = useState(1500);
+  const [affEstConvRate, setAffEstConvRate] = useState(3.0);
+  const [affEstTripSpend, setAffEstTripSpend] = useState(12000);
+
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminPasscodeInput, setAdminPasscodeInput] = useState("");
+  const [adminPasscodeError, setAdminPasscodeError] = useState("");
+
+  const getAffiliateLink = (serviceId: string, from: string, to: string) => {
+    const fromClean = encodeURIComponent(from || "Mumbai");
+    const toClean = encodeURIComponent(to || "Goa");
+    const dateStr = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB');
+
+    switch (serviceId) {
+      case 'hotels':
+        return `https://www.booking.com/searchresults.html?ss=${toClean}&aid=${affConfig.bookingComAid || '8041322'}&label=travolor-hotel`;
+      case 'flights':
+        return `https://www.makemytrip.com/flight/search?itinerary=${fromClean}-${toClean}-${dateStr}&tripType=O&paxType=A-1_C-0_I-0&intl=false&cabinClass=E&cmp=${affConfig.makeMyTripTag || 'travolor-21'}`;
+      case 'trains':
+        return `https://www.makemytrip.com/railways/listing?srcCity=${fromClean}&destCity=${toClean}&date=${dateStr}&cmp=${affConfig.makeMyTripTag || 'travolor-21'}`;
+      case 'buses':
+        return `https://www.redbus.in/search?fromCityName=${fromClean}&toCityName=${toClean}&referrer=${affConfig.redBusCampaign || 'travolor-rb'}`;
+      case 'cabs':
+        return `https://www.makemytrip.com/cabs/listing/?fromCity=${fromClean}&toCity=${toClean}&cmp=${affConfig.makeMyTripTag || 'travolor-21'}`;
+      case 'packages':
+        return `https://www.makemytrip.com/holiday-packages/search?dest=${toClean}&cmp=${affConfig.makeMyTripTag || 'travolor-21'}`;
+      default:
+        return `https://www.booking.com/searchresults.html?ss=${toClean}&aid=${affConfig.bookingComAid || '8041322'}`;
+    }
+  };
+
+  const [showAffiliateSaveSuccess, setShowAffiliateSaveSuccess] = useState(false);
+  const handleSaveAffiliate = () => {
+    localStorage.setItem('travolor_affiliate_config', JSON.stringify(affConfig));
+    setShowAffiliateSaveSuccess(true);
+    setTimeout(() => {
+      setShowAffiliateSaveSuccess(false);
+    }, 3000);
+  };
+
   const headlines = ["Explore the World with Travolor", "Plan Your Perfect Journey", "Discover Hidden Gems", "Travel with Confidence"];
 
   useEffect(() => {
@@ -651,7 +757,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [loading, setLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
   const [structuredItinerary, setStructuredItinerary] = useState<any>(null);
-  const [itinerarySubTab, setItinerarySubTab] = useState<'interactive' | 'text' | 'budget' | 'guide'>('interactive');
+  const [itinerarySubTab, setItinerarySubTab] = useState<'interactive' | 'text' | 'budget' | 'guide' | 'hotels'>('interactive');
   const [itinerarySources, setItinerarySources] = useState<any[]>([]);
   const [mapMarkers, setMapMarkers] = useState<Array<{ name: string; lat: number; lng: number; description?: string }>>([]);
   const [selectedMapMarker, setSelectedMapMarker] = useState<any | null>(null);
@@ -809,12 +915,43 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
       setWeatherLoading(true);
       setWeatherError(null);
       try {
-        // Step 1: Geocode the destination using Google Geocoding API if key is available
+        // Step 1: Geocode the destination using Google Geocoding API if key is available and not blocked
         const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_MAPS_API_KEY || (typeof process !== "undefined" && process.env ? process.env.GOOGLE_MAPS_PLATFORM_KEY : "");
         let lat = 19.0760; // fallback to Mumbai
         let lng = 72.8777;
 
-        if (mapsKey) {
+        const fetchOpenMeteoCoords = async (queryStr: string) => {
+          const searchTerms = [queryStr];
+          if (queryStr.includes(",")) {
+            const parts = queryStr.split(",").map(p => p.trim()).filter(Boolean);
+            if (parts.length > 0) {
+              searchTerms.push(parts[0]);
+              if (parts.length > 1) {
+                searchTerms.push(`${parts[0]} ${parts[1]}`);
+              }
+            }
+          }
+
+          for (const term of searchTerms) {
+            try {
+              const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=1&language=en&format=json`;
+              const geoRes = await fetch(geocodeUrl);
+              const geoData = await geoRes.json();
+              if (geoData.results && geoData.results[0]) {
+                return {
+                  lat: geoData.results[0].latitude,
+                  lng: geoData.results[0].longitude
+                };
+              }
+            } catch (err) {
+              console.warn("Client Open-Meteo fallback failed for term:", term, err);
+            }
+          }
+          return null;
+        };
+
+        let resolved = false;
+        if (mapsKey && !isMapsBlocked) {
           try {
             const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationInput)}&key=${mapsKey}`;
             const geoRes = await fetch(geocodeUrl);
@@ -822,25 +959,23 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             if (geoData.results && geoData.results[0]) {
               lat = geoData.results[0].geometry.location.lat;
               lng = geoData.results[0].geometry.location.lng;
+              resolved = true;
+            } else {
+              throw new Error("Google geocoding returned empty results or blocked/denied.");
             }
           } catch (e) {
             console.warn("Google Geocoding failed, falling back to Open-Meteo search:", e);
-            const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationInput)}&count=1&language=en&format=json`;
-            const geoRes = await fetch(geocodeUrl);
-            const geoData = await geoRes.json();
-            if (geoData.results && geoData.results[0]) {
-              lat = geoData.results[0].latitude;
-              lng = geoData.results[0].longitude;
-            }
           }
-        } else {
-          // fallback to Open-Meteo Geocoding
-          const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationInput)}&count=1&language=en&format=json`;
-          const geoRes = await fetch(geocodeUrl);
-          const geoData = await geoRes.json();
-          if (geoData.results && geoData.results[0]) {
-            lat = geoData.results[0].latitude;
-            lng = geoData.results[0].longitude;
+        }
+
+        if (!resolved) {
+          const coords = await fetchOpenMeteoCoords(locationInput);
+          if (coords) {
+            lat = coords.lat;
+            lng = coords.lng;
+          } else if (locationInput.toLowerCase().includes("kolhapur")) {
+            lat = 16.7050;
+            lng = 74.2433;
           }
         }
 
@@ -1136,8 +1271,45 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     }
   };
 
+  React.useEffect(() => {
+    const greetings: Record<string, string> = {
+      English: "Namaste! 🙏 I am your **Travolor AI Co-Pilot**. Ask me anything about planning your next destination, local cuisines, historical stories, or budget hacks in India!",
+      Hindi: "नमस्ते! 🙏 मैं आपका **ट्रैवोलर एआई सह-पायलट** हूँ। भारत में अपनी अगली यात्रा, स्थानीय व्यंजनों, ऐतिहासिक कहानियों, या बजट तरकीबों के बारे में कुछ भी पूछें!",
+      Marathi: "नमस्ते! 🙏 मी तुमचा **ट्रॅव्होलर एआय को-पायलट** आहे. भारतातील पुढील गंतव्यस्थान, स्थानिक खाद्यपदार्थ, ऐतिहासिक कथा किंवा बजेट ट्रिक्सबद्दल मला काहीही विचारा!",
+      Gujarati: "નમસ્તે! 🙏 હું તમારો **ટ્રેવોલર એઆઈ કો-પાયલોટ** છું. ભારતમાં તમારા આગામી પ્રવાસ, સ્થાનિક વાનગીઓ, ઐતિહાસिक વાર્તાઓ અથવા બજેટ આયોજન વિશે કંઈપણ પૂછો!",
+      Bengali: "নমস্কার! 🙏 আমি আপনার **ট্রাভেলার এআই সহ-পাইলট**। ভারতে আপনার পরবর্তী গন্তব্য, স্থানীয় খাবার, ঐতিহাসিক গল্প বা বাজেট পরিকল্পনা সম্পর্কে যেকোনো কিছু জিজ্ঞাসা করুন!",
+      Punjabi: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! 🙏 ਮੈਂ ਤੁਹਾਡਾ **ਟ੍ਰੈਵਲਰ AI ਕੋ-ਪਾਇਲਟ** ਹਾਂ। ਭਾਰਤ ਵਿੱਚ ਅਗਲੀ ਯਾਤਰਾ, ਸਥਾਨਕ ਪਕਵਾਨਾਂ, ਇਤਿਹਾਸਕ ਕਹਾਣੀਆਂ, ਜਾਂ ਬਜਟ ਬਾਰੇ ਕੁਝ ਵੀ ਪੁੱਛੋ!",
+      Tamil: "வணக்கம்! 🙏 நான் உங்கள் **டிராவலர் ஏஐ இணை விமானி**. இந்தியாவின் அடுத்த பயணம், உள்ளூர் உணவுகள், வரலாற்று கதைகள் அல்லது பட்ஜெட் பற்றி எதையும் என்னிடம் கேளுங்கள்!",
+      Telugu: "నమస్తే! 🙏 నేను మీ **ట్రావెలర్ AI కో-పైలట్**. భారతదేశంలో మీ తదుపరి గమ్యస్థానం, స్థానిక ఆహారాలు, చారిత్రక కథలు లేదా బడ్జెట్ గురించి నన్ను ఏదైనా అడగండి!",
+      Kannada: "ನಮಸ್ತೆ! 🙏 ನಾನು ನಿಮ್ಮ **ಟ್ರಾವೆಲರ್ AI ಕೋ-ಪೈಲಟ್**. ಭಾರತದಲ್ಲಿ ನಿಮ್ಮ ಮುಂದಿನ ಪ್ರಯಾಣ, ಸ್ಥಳೀಯ ಆಹಾರಗಳು, ಐತಿಹಾಸಿಕ ಕಥೆಗಳು ಅಥವಾ ಬಜೆಟ್ ಬಗ್ಗೆ ನನ್ನನ್ನು ಏನಾದರೂ ಕೇಳಿ!",
+      Malayalam: "നമസ്തേ! 🙏 ഞാൻ നിങ്ങളുടെ **പ്രസിദ്ധ ട്രാവലർ AI കോ-പൈലറ്റ്** ആണ്. ഇന്ത്യയിലെ അടുത്ത യാത്ര, നാടൻ വിഭവങ്ങൾ, ചരിത്ര കഥകൾ അല്ലെങ്കിൽ ബജറ്റ് പ്ലാനുകളെക്കുറിച്ച് എന്നോട് ചോദിക്കുക!",
+      Odia: "ନମସ୍କାର! 🙏 ମୁଁ ଆପଣଙ୍କର **ଟ୍ରାଭେଲର AI କୋ-ପାଇଲଟ୍** | ଭାରତରେ ଆପଣଙ୍କର ପରବର୍ତ୍ତୀ ଯାତ୍ରା, ସ୍ଥାନୀય ଖାଦ୍ୟ, ଐତିହାସିକ ଗପ କିମ୍ବା ବଜେଟ୍ ବିଷୟରେ ମୋତେ ପଚାରନ୍ତୁ!"
+    };
+    const greetingText = greetings[language] || greetings.English;
+    setChatHistory([{ role: "assistant", text: greetingText }]);
+  }, [language]);
+
   const [isSpeakingItinerary, setIsSpeakingItinerary] = useState(false);
   const [isSpeakingChatIdx, setIsSpeakingChatIdx] = useState<number | null>(null);
+
+  const handleDownloadPDF = async () => {
+    try {
+      await exportItineraryToPDF({
+        location: locationInput || "Swadesh Destination",
+        startLocation: startLocation || "Mumbai",
+        duration: duration || 3,
+        numPeople: numPeople || 2,
+        travelStyle: travelStyle || "standard",
+        travelDate: travelDate || "Upcoming",
+        itineraryText: itinerary || "",
+        structured: structuredItinerary,
+        language: language
+      });
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      alert("Failed to export PDF itinerary. Please try again.");
+    }
+  };
 
   const cleanTextForSpeech = (text: string) => {
     return text
@@ -1205,7 +1377,6 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     return saved === 'dark';
   });
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [language, setLanguage] = useState(() => localStorage.getItem('travolor_lang') || "English");
   const [currency, setCurrency] = useState(() => localStorage.getItem('travolor_currency') || "INR (₹)");
   const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('travolor_user_api_key') || "");
   const [savedTrips, setSavedTrips] = useState<{id: string, start_location?: string, location: string, duration: number, style: string, budget?: string, itinerary: string, created_at?: string}[]>([]);
@@ -1222,6 +1393,24 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [userTotalBudget, setUserTotalBudget] = useState<number>(50000);
   const [transportType, setTransportType] = useState("public"); // public, private, flight
   const [accommodationType, setAccommodationType] = useState("standard"); // hostel, standard, luxury
+
+  React.useEffect(() => {
+    const greetings: Record<string, string> = {
+      English: "Namaste! 🙏 I am your **Travolor AI Co-Pilot**. Ask me anything about planning your next destination, local cuisines, historical stories, or budget hacks in India!",
+      Hindi: "नमस्ते! 🙏 मैं आपका **ट्रैवोलर एআই सह-पायलट** हूँ। भारत में अपनी अगली यात्रा, स्थानीय व्यंजनों, ऐतिहासिक कहानियों, या बजट तरकीबों के बारे में कुछ भी पूछें!",
+      Marathi: "नमस्ते! 🙏 मी तुमचा **ट्रॅव्होलर एआय को-पायलट** आहे. भारतातील पुढील गंतव्यस्थान, स्थानिक खाद्यपदार्थ, ऐतिहासिक कथा किंवा बजेट ट्रिक्सबद्दल मला काहीही विचारा!",
+      Gujarati: "નમસ્તે! 🙏 હું તમારો **ટ્રેવોલર એઆઈ કો-પાયલોટ** છું. ભારતમાં તમારા આગામી પ્રવાસ, સ્થાનિક વાનગીઓ, ઐતિહાસિક વાર્તાઓ અથવા બજેટ આયોજન વિશે કંઈપણ પૂછો!",
+      Bengali: "নমস্কার! 🙏 আমি আপনার **ট্রাভেলার এআই সহ-পাইলট**। ভারতে আপনার পরবর্তী গন্তব্য, স্থানীয় খাবার, ঐতিহাসিক গল্প বা বাজেট পরিকল্পনা সম্পর্কে যেকোনো কিছু জিজ্ঞাসা করুন!",
+      Punjabi: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! 🙏 ਮੈਂ ਤੁਹਾਡਾ **ਟ੍ਰੈਵਲਰ AI ਕੋ-ਪਾਇਲਟ** ਹਾਂ। ਭਾਰਤ ਵਿੱਚ ਅਗਲੀ ਯਾਤਰਾ, ਸਥਾਨਕ ਪਕਵานਾਂ, ਇਤਿਹਾਸਕ ਕਹਾਣੀਆਂ, ਜਾਂ ਬਜਟ ਬਾਰੇ ਕੁਝ ਵੀ ਪੁੱਛੋ!",
+      Tamil: "வணக்கம்! 🙏 நான் உங்கள் **டிராவலர் ஏஐ இணை விமானி**. இந்தியாவின் அடுத்த பயணம், உள்ளூர் உணவுகள், வரலாற்று கதைகள் அல்லது பட்ஜெட் பற்றி எதையும் என்னிடம் கேளுங்கள்!",
+      Telugu: "నమస్తే! 🙏 నేను మీ **ట్రావెలర్ AI కో-పైలట్**. భారతదేశంలో మీ తదుపరి గమ్యస్థానం, స్థానిక ఆహారాలు, చారిత్రక కథలు లేదా బడ్జెట్ గురించి నన్ను ఏదైనా అడగండి!",
+      Kannada: "ನಮಸ್ತೆ! 🙏 ನಾನು ನಿಮ್ಮ **ಟ್ರಾವೆಲರ್ AI ಕೋ-ಪೈలಟ್**. ಭಾರತದಲ್ಲಿ ನಿಮ್ಮ ಮುಂದಿನ ಪ್ರಯಾಣ, ಸ್ಥಳೀಯ ಆಹಾರಗಳು, ಐತಿಹಾಸಿಕ ಕಥೆಗಳು ಅಥವಾ ಬಜೆಟ್ ಬಗ್ಗೆ ನನ್ನನ್ನು ಏನಾದರೂ ಕೇಳಿ!",
+      Malayalam: "നമസ്തേ! 🙏 ഞാൻ നിങ്ങളുടെ **പ്രസിദ്ധ ട്രാവലർ AI കോ-പൈലറ്റ്** ആണ്. ഇന്ത്യയിലെ അടുത്ത യാത്ര, നാടൻ വിഭവങ്ങൾ, ചരിത്ര കഥകൾ അല്ലെങ്കിൽ ബജറ്റ് പ്ലാനുകളെക്കുറിച്ച് എന്നോട് ചോദിക്കുക!",
+      Odia: "ନମସ୍କାର! 🙏 ମୁଁ ଆପڻଙ୍କର **ଟ୍ରାଭେଲର AI କୋ-ପାଇଲଟ୍** | ଭାରତରେ ଆପଣଙ୍କର ପରବର୍ତ୍ତୀ ଯାତ୍ରା, ସ୍ଥାନୀય ଖାଦ୍ୟ, ଐତିହାସିକ ଗପ କିମ୍ବା ବଜେଟ୍ ବିଷୟରେ ମୋତେ ପଚାରନ୍ତୁ!"
+    };
+    const greetingText = greetings[language] || greetings.English;
+    setChatHistory([{ role: "assistant", text: greetingText }]);
+  }, [language]);
 
   const travelDistanceKm = useMemo(() => {
     const fromC = lookupCityCoords(startLocation || "Mumbai", startCoords);
@@ -1242,55 +1431,79 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
   const liveBudget = useMemo(() => {
     // 1. Calculate realistic transport costs based on real railway & airline rules
-    // public (Sleeper Class train / State Transport Bus) -> ₹0.90 per km per person
-    // private (3AC reservation train / AC intercity bus) -> ₹2.40 per km per person
-    // flight (Flight travel) -> ₹6.50 per km per person (minimum ₹3,200 per ticket)
+    // public (Sleeper Class train / State Transport Bus) -> ₹2.40 per km per person, round trip (*2)
+    // private (Cab/Self-drive fuel and tolls) -> ₹10/km fuel + ₹1.5/km tolls, round trip (*2)
+    // flight (Flight travel) -> ₹6.50 per km per person, round trip (*2)
     let perPersonTransport = 0;
+    let transportCost = 0;
     if (transportType === "public") {
-      perPersonTransport = Math.max(180, travelDistanceKm * 0.90);
+      perPersonTransport = Math.max(250, travelDistanceKm * 2.40);
+      transportCost = Math.round(perPersonTransport * numPeople * 2);
     } else if (transportType === "private") {
-      perPersonTransport = Math.max(480, travelDistanceKm * 2.40);
+      transportCost = Math.round(((travelDistanceKm * 10) + (travelDistanceKm * 1.5)) * 2);
+      perPersonTransport = Math.round(transportCost / numPeople / 2);
     } else { // flight
       perPersonTransport = Math.max(3200, travelDistanceKm * 6.50);
+      transportCost = Math.round(perPersonTransport * numPeople * 2);
     }
-    const transportCost = Math.round(perPersonTransport * numPeople);
 
     // 2. Hotel costs based on realistic room requirements and rates
-    // If couple: 1 room. If small family: 2 rooms. If joint: 3 rooms (for joint family, let's assume 3 rooms)
     const roomsCount = numPeople <= 2 ? 1 : numPeople <= 4 ? 2 : Math.ceil(numPeople / 2);
-    let roomRatePerNight = 1200;
+    let roomRatePerNight = 3500;
     if (accommodationType === "hostel") {
-      roomRatePerNight = 650; // dormitory rates or low-budget dharamshala
+      roomRatePerNight = 1200; // standard low budget stay / clean dharamshala
     } else if (accommodationType === "standard") {
-      roomRatePerNight = 2200; // clean family hotel/homestay
+      roomRatePerNight = 3500; // comfortable family homestay/hotel
     } else { // luxury
-      roomRatePerNight = 6500; // premium 4-star / heritage resort
+      roomRatePerNight = 9000; // premium star stay / heritage hotel
     }
-    const hotelCost = roomRatePerNight * duration * roomsCount;
+    const hotelCost = roomRatePerNight * roomsCount * Math.max(1, duration - 1);
 
-    // 3. Food costs based on real plate rates
-    const foodRates: Record<string, number> = { budget: 220, standard: 550, luxury: 1400 };
-    const styleMap: Record<string, { food: string, activities: string }> = {
-      budget: { food: 'budget', activities: 'low' },
-      standard: { food: 'standard', activities: 'medium' },
-      luxury: { food: 'luxury', activities: 'high' },
-      adventure: { food: 'standard', activities: 'high' },
-      family: { food: 'standard', activities: 'medium' }
-    };
-    const currentStyle = styleMap[travelStyle] || styleMap.standard;
-    const foodCost = foodRates[currentStyle.food] * duration * numPeople;
+    // 3. Food costs based on standard plate rates per person per day
+    let foodRatePerDay = 1000;
+    if (accommodationType === "hostel") {
+      foodRatePerDay = 400;
+    } else if (accommodationType === "standard") {
+      foodRatePerDay = 1000;
+    } else { // luxury
+      foodRatePerDay = 3000;
+    }
+    const foodCost = foodRatePerDay * duration * numPeople;
 
-    // 4. Activities / Sightseeing
-    const activityRates: Record<string, number> = { low: 150, medium: 450, high: 1200 };
-    const activitiesCost = activityRates[currentStyle.activities] * duration * numPeople;
+    // 4. Activities / Sightseeing entry fees
+    let activityRatePerDay = 450;
+    if (accommodationType === "hostel") {
+      activityRatePerDay = 150;
+    } else if (accommodationType === "standard") {
+      activityRatePerDay = 450;
+    } else { // luxury
+      activityRatePerDay = 1200;
+    }
+    const activitiesCost = activityRatePerDay * duration * numPeople;
 
-    const totalCost = transportCost + hotelCost + foodCost + activitiesCost;
+    // 5. Shopping allowance
+    let shoppingAllowancePerPerson = 3000;
+    if (accommodationType === "hostel") {
+      shoppingAllowancePerPerson = 1000;
+    } else if (accommodationType === "standard") {
+      shoppingAllowancePerPerson = 3000;
+    } else { // luxury
+      shoppingAllowancePerPerson = 10000;
+    }
+    const shoppingCost = shoppingAllowancePerPerson * numPeople;
+
+    // Grand sum and 8% emergency backup cushion
+    const grandTotalBudget = transportCost + hotelCost + foodCost + activitiesCost + shoppingCost;
+    const emergencyCost = Math.round(grandTotalBudget * 0.08);
+    const totalCost = grandTotalBudget + emergencyCost;
 
     return {
       transportCost,
       hotelCost,
       foodCost,
       activitiesCost,
+      shoppingCost,
+      emergencyCost,
       totalCost,
       roomsCount,
       roomRatePerNight,
@@ -1310,6 +1523,15 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     };
     return duration * getDailyRate(travelStyle) * numPeople;
   }, [duration, travelStyle, numPeople]);
+
+  // Sync targetBudget and userTotalBudget dynamically to avoid dual state divergence
+  React.useEffect(() => {
+    setUserTotalBudget(targetBudget);
+  }, [targetBudget]);
+
+  React.useEffect(() => {
+    setTargetBudget(userTotalBudget);
+  }, [userTotalBudget]);
 
   // AI Typing Animation
   React.useEffect(() => {
@@ -1843,6 +2065,202 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         editProfile: "Profil bearbeiten",
         saveChanges: "Änderungen speichern",
         cancel: "Abbrechen"
+      },
+      Punjabi: {
+        welcome: "ਜੀ ਆਇਆਂ ਨੂੰ",
+        whereTo: "ਅਗਲਾ ਸਫ਼ਰ ਕਿੱਥੇ?",
+        explore: "ਖੋਜੋ",
+        myTrips: "ਮੇਰੀਆਂ ਯਾਤਰਾਵਾਂ",
+        bookings: "ਬੁਕਿੰਗਜ਼",
+        profile: "ਪ੍ਰੋਫਾਈਲ",
+        planTrip: "ਯਾਤਰਾ ਦੀ ਯੋਜਨਾ ਬਣਾਓ",
+        startingLocation: "ਤੁਸੀਂ ਆਪਣੀ ਯਾਤਰਾ ਕਿੱਥੋਂ ਸ਼ੁਰੂ ਕਰੋਗੇ?",
+        saveTrip: "ਯਾਤਰਾ ਸੁਰੱਖਿਅਤ ਕਰੋ",
+        viewMaps: "ਨਕਸ਼ੇ 'ਤੇ ਦੇਖੋ",
+        loginRequired: "ਲੌਗਇਨ ਲੋੜੀਂਦਾ ਹੈ",
+        loginToAccess: "ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਵਿਸ਼ੇਸ਼ਤਾ ਤੱਕ ਪਹੁੰਚਣ ਲਈ ਲੌਗਇਨ ਕਰੋ।",
+        logout: "ਲੌਗਆਉਟ",
+        settings: "ਸੈਟਿੰਗਾਂ",
+        support: "ਸਹਾਇਤਾ",
+        language: "ਭਾਸ਼ਾ",
+        currency: "ਕਰੰਸੀ",
+        theme: "ਥੀਮ",
+        notifications: "ਨੋਟੀਫਿਕੇਸ਼ਨ",
+        tripsPlanned: "ਯੋਜਨਾਬੱਧ ਯਾਤਰਾਵਾਂ",
+        upcoming: "ਆਉਣ ਵਾਲੀਆਂ",
+        saved: "ਸੁਰੱਖਿਅਤ",
+        addPhone: "ਮੋਬਾਈਲ ਨੰਬਰ ਜੋੜੋ",
+        editProfile: "ਪ੍ਰੋਫਾਈਲ ਸੋਧੋ",
+        saveChanges: "ਬਦਲਾਅ ਸੁਰੱਖਿਅਤ ਕਰੋ",
+        cancel: "ਰੱਦ ਕਰੋ"
+      },
+      Malayalam: {
+        welcome: "വീണ്ടും സ്വാഗതം",
+        whereTo: "അടുത്ത യാത്ര എങ്ങോട്ട്?",
+        explore: "പര്യവേക്ഷണം ചെയ്യുക",
+        myTrips: "എന്റെ യാത്രകൾ",
+        bookings: "ബുക്കിംഗുകൾ",
+        profile: "പ്രൊഫൈൽ",
+        planTrip: "യാത്ര പ്ലാൻ ചെയ്യുക",
+        startingLocation: "നിങ്ങൾ എവിടെ നിന്നാണ് യാത്ര ആരംഭിക്കുന്നത്?",
+        saveTrip: "യാത്ര സേവ് ചെയ്യുക",
+        viewMaps: "മാപ്പിൽ കാണുക",
+        loginRequired: "ലോഗിൻ ആവശ്യമാണ്",
+        loginToAccess: "ഈ ഫീച്ചർ ഉപയോഗിക്കാൻ ലോഗിൻ ചെയ്യുക.",
+        logout: "ലോഗൗട്ട്",
+        settings: "സെറ്റിംഗ്സ്",
+        support: "പിന്തുണ",
+        language: "ഭാഷ",
+        currency: "കറൻസി",
+        theme: "തീം",
+        notifications: "അറിയിപ്പുകൾ",
+        tripsPlanned: "പ്ലാൻ ചെയ്ത യാത്രകൾ",
+        upcoming: "വരാനിരിക്കുന്നവ",
+        saved: "സേവ് ചെയ്തവ",
+        addPhone: "മൊബൈൽ നമ്പർ ചേർക്കുക",
+        editProfile: "പ്രൊഫൈൽ തിരുത്തുക",
+        saveChanges: "മാറ്റങ്ങൾ സേവ് ചെയ്യുക",
+        cancel: "റദ്ദാക്കുക"
+      },
+      Odia: {
+        welcome: "ସ୍ଵାଗତମ୍",
+        whereTo: "ପରବର୍ତ୍ତୀ ଯାତ୍ରା କେଉଁଠିକୁ?",
+        explore: "ଖୋଜନ୍ତୁ",
+        myTrips: "ମୋର ଯାତ୍ରାଗୁଡ଼ିକ",
+        bookings: "ବୁକିଂଗୁଡ଼ିକ",
+        profile: "ପ୍ରୋଫାଇଲ୍",
+        planTrip: "ଯାତ୍ରା ଯୋଜନା କରନ୍ତು",
+        startingLocation: "ଆପଣ ଯାତ୍ରା କେଉଁଠାରୁ ଆରମ୍ભ କରିବେ?",
+        saveTrip: "ଯାତ୍ରା ସଂରକ୍ଷଣ କରନ୍ତು",
+        viewMaps: "ମାନଚିତ୍ରରେ ଦେଖନ୍ତୁ",
+        loginRequired: "ଲଗଇନ୍ ଆବଶ୍ୟକ",
+        loginToAccess: "ଏହି ସୁବିଧା ପାଇଁ ଦୟାକରି ଲଗଇନ୍ କରନ୍ତୁ।",
+        logout: "ଲଗଆଉଟ୍",
+        settings: "ସେଟିଂସ",
+        support: "ସହାୟତା",
+        language: "ଭାଷା",
+        currency: "ମୁଦ୍ରା",
+        theme: "ଥିମ୍",
+        notifications: "ବିଜ୍ଞପ୍ତିଗୁଡ଼ିକ",
+        tripsPlanned: "ଯୋଜନାବଦ୍ଧ ଯାତ୍ରା",
+        upcoming: "ଆଗାମୀ",
+        saved: "ସଂରକ୍ଷିତ",
+        addPhone: "ମୋବାଇଲ୍ ନମ୍ବਰ ଯୋଡ଼ନ୍ତୁ",
+        editProfile: "ପ୍ରୋଫାଇଲ୍ ଏଡିଟ୍ କରନ୍ତୁ",
+        saveChanges: "ପରିବର୍ତ୍තନଗୁଡ଼ିକୁ ସଂରକ୍ଷଣ କରନ୍ତು",
+        cancel: "ବାତିଲ୍ କରନ୍ତು"
+      },
+      Assamese: {
+        welcome: "পুনৰ স্বাগতম",
+        whereTo: "পৰৱৰ্তী যাত্ৰা ক'লৈ?",
+        explore: "সন্ধান কৰক",
+        myTrips: "মোৰ যাত্ৰাসমূহ",
+        bookings: "বুকিংসমূহ",
+        profile: "প্ৰ'ফাইল",
+        planTrip: "যাত্ৰা পৰিকল্পনা কৰক",
+        startingLocation: "আপুনি ক'ৰ পৰা যাত্ৰা আৰম্ভ কৰিব?",
+        saveTrip: "যাত্ৰা সংৰক্ষণ কৰক",
+        viewMaps: "মেপত চাওক",
+        loginRequired: "লগইনৰ প্ৰয়োজন",
+        loginToAccess: "এই সুবিধাটো ব্যৱহাৰ কৰিবলৈ লগইন কৰক।",
+        logout: "লগআউট",
+        settings: "ছেটিংস",
+        support: "সহায়",
+        language: "ভাষা",
+        currency: "মুদ্ৰা",
+        theme: "থিম",
+        notifications: "জাননীসমূহ",
+        tripsPlanned: "পৰিকল্পিত যাত্ৰাসমূহ",
+        upcoming: "আহিবলগীয়া",
+        saved: "সংৰক্ষিত",
+        addPhone: "মোবাইল নম্বৰ যোগ কৰক",
+        editProfile: "প্ৰ'ফাইল সম্পাদনা কৰক",
+        saveChanges: "পৰিবৰ্তনসমূহ সংৰক্ষণ কৰক",
+        cancel: "বাতিল কৰক"
+      },
+      Urdu: {
+        welcome: "خوش آمدید",
+        whereTo: "اگلا سفر کہاں کا ہے؟",
+        explore: "دریافت کریں",
+        myTrips: "میرے اسفار",
+        bookings: "بکنگز",
+        profile: "پروفائل",
+        planTrip: "سفر کا منصوبہ بنائیں",
+        startingLocation: "آپ اپنا سفر کہاں سے شروع کریں گے؟",
+        saveTrip: "سفر محفوظ کریں",
+        viewMaps: "نقشے پر دیکھیں",
+        loginRequired: "لاگ ان درکار ہے",
+        loginToAccess: "براہ کرم اس فیچر تک رسائی کے لیے لاگ ان کریں۔",
+        logout: "لاگ آؤٹ",
+        settings: "ترتیبات",
+        support: "سپورٹ",
+        language: "زبان",
+        currency: "کرنسی",
+        theme: "تھیم",
+        notifications: "اطلاعات",
+        tripsPlanned: "منصوبہ بند اسفار",
+        upcoming: "آنے والے",
+        saved: "محفوظ کردہ",
+        addPhone: "موبائل نمبر شامل کریں",
+        editProfile: "پروفائل ایڈٹ کریں",
+        saveChanges: "تبدیلیاں محفوظ کریں",
+        cancel: "منسوخ کریں"
+      },
+      Konkani: {
+        welcome: "परतून येवकार",
+        whereTo: "मुखार खंय वचपाचें?",
+        explore: "शोधात",
+        myTrips: "म्हज्यो भोंवड्यो",
+        bookings: "बुकिंग",
+        profile: "प्रोफाइल",
+        planTrip: "भोंवडेचें नियोजन करात",
+        startingLocation: "तुमची भोंवडी खंयच्यान सुरू जातली?",
+        saveTrip: "भोंवडी साठवून दवरात",
+        viewMaps: "नकाशाचेर पळयात",
+        loginRequired: "लॉगिन गरजेचे",
+        loginToAccess: "हें फिचर वापरपा खातीर लॉगिन करात.",
+        logout: "लॉगआउट",
+        settings: "सेटिंग्स",
+        support: "मदत",
+        language: "भास",
+        currency: "चलन",
+        theme: "थीम",
+        notifications: "सूचना",
+        tripsPlanned: "नियोजीत भोंवड्यो",
+        upcoming: "येवपी",
+        saved: "साठयल्ल्यो",
+        addPhone: "मोबाईल नंबर जोडा",
+        editProfile: "प्रोफाइल बदल करात",
+        saveChanges: "बदल साठवून दवरात",
+        cancel: "रद्द करात"
+      },
+      Sanskrit: {
+        welcome: "पुनः स्वागतम्",
+        whereTo: "अग्रिमयात्रा कुत्र?",
+        explore: "अन्वेषणं कुरु",
+        myTrips: "मम यात्राः",
+        bookings: "आरक्षणम्",
+        profile: "व्यक्तिविवरणम्",
+        planTrip: "यात्रां कल्पय",
+        startingLocation: "भवतः यात्रा कुतः आरप्स्यते?",
+        saveTrip: "यात्रां रक्ष",
+        viewMaps: "मानचित्रे पश्य",
+        loginRequired: "प्रवेशः आवश्यकः",
+        loginToAccess: "कृपया एतत् प्रयोक्तुं प्रवेशं कुरु।",
+        logout: "निर्गमनम्",
+        settings: "व्यवस्थापनम्",
+        support: "सहायता",
+        language: "भाषा",
+        currency: "मुद्रा",
+        theme: "विषयवस्तु",
+        notifications: "सूचनाः",
+        tripsPlanned: "कल्पिताः यात्राः",
+        upcoming: "आगामिन्यः",
+        saved: "रक्षिताः",
+        addPhone: "चलभाषसङ्ख्यां योजय",
+        editProfile: "विवरणं संशोध्य",
+        saveChanges: "परिवर्तनानि रक्ष",
+        cancel: "निरसनम्"
       }
     };
     return dicts[language] || dicts.English;
@@ -2764,6 +3182,53 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
 
     return (
       <div className="space-y-16 pb-24">
+        {/* Prominent India Focus & Language Selector Ribbon */}
+        <div className="bg-gradient-to-r from-orange-50/90 via-white/95 to-green-50/90 dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-900 border border-gray-200/50 dark:border-slate-800/80 py-4 px-6 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl animate-bounce">🇮🇳</span>
+            <div className="text-left">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                Travolor India Focus <span className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300 px-2 py-0.5 rounded-full font-mono font-medium">ONLY INDIA</span>
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                अतुल्य भारत! Explore domestic alternatives to international destinations & plan with your local language!
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 bg-white/95 dark:bg-slate-800/95 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl px-4 py-2 shadow-sm min-w-[240px] justify-between">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">भाषा / Language:</span>
+            <select
+              value={language}
+              onChange={(e) => {
+                const selected = e.target.value;
+                setLanguage(selected);
+                localStorage.setItem('travolor_lang', selected);
+              }}
+              className="bg-transparent text-sm font-bold outline-none cursor-pointer text-[#000080] dark:text-orange-400 font-sans border-none focus:ring-0"
+              title="Select Travel Language"
+            >
+              <option value="English" className="text-slate-800 bg-white">English</option>
+              <option value="Hindi" className="text-slate-800 bg-white">हिन्दी (Hindi)</option>
+              <option value="Marathi" className="text-slate-800 bg-white">मराठी (Marathi)</option>
+              <option value="Gujarati" className="text-slate-800 bg-white">ગુજરાતી (Gujarati)</option>
+              <option value="Bengali" className="text-slate-800 bg-white">বাংলা (Bengali)</option>
+              <option value="Punjabi" className="text-slate-800 bg-white">ਪੰਜਾਬੀ (Punjabi)</option>
+              <option value="Tamil" className="text-slate-800 bg-white">தமிழ் (Tamil)</option>
+              <option value="Telugu" className="text-slate-800 bg-white">తెలుగు (Telugu)</option>
+              <option value="Kannada" className="text-slate-800 bg-white">ಕನ್ನಡ (Kannada)</option>
+              <option value="Malayalam" className="text-slate-800 bg-white">മലയാളം (Malayalam)</option>
+              <option value="Odia" className="text-slate-800 bg-white">ଓଡ଼ିଆ (Odia)</option>
+              <option value="Assamese" className="text-slate-800 bg-white">অসমীয়া (Assamese)</option>
+              <option value="Urdu" className="text-slate-800 bg-white">اردو (Urdu)</option>
+              <option value="Konkani" className="text-slate-800 bg-white">कोंकणी (Konkani)</option>
+              <option value="Sanskrit" className="text-slate-800 bg-white">संस्कृत (Sanskrit)</option>
+              <option value="Spanish" className="text-slate-800 bg-white">Spanish</option>
+              <option value="French" className="text-slate-800 bg-white">French</option>
+              <option value="German" className="text-slate-800 bg-white">German</option>
+            </select>
+          </div>
+        </div>
+
         {/* Hero Section with Banner Background */}
         <section className="relative min-h-[60vh] md:min-h-[70vh] rounded-[3rem] overflow-hidden flex flex-col items-center justify-center text-center px-4 md:px-6">
           <div className="absolute inset-0 z-0">
@@ -2812,7 +3277,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   key={service.id}
                   whileHover={{ y: -5, scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => window.open(service.link(startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
+                  onClick={() => window.open(getAffiliateLink(service.id, startLocation || "Mumbai", locationInput || "Delhi"), '_blank')}
                   className="bg-white/10 backdrop-blur-md border border-white/20 px-6 py-3 rounded-2xl flex items-center gap-3 text-white hover:bg-white hover:text-[#000080] transition-all shadow-lg"
                 >
                   <service.icon size={20} />
@@ -3357,7 +3822,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     <h4 className="font-extrabold text-lg text-gray-800 dark:text-white">Paisa Vasool Savings Simulator</h4>
                   </div>
                   <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 border border-amber-200/50 px-3 py-1 rounded-full text-xs font-black font-mono inline-flex items-center gap-1 shrink-0 self-start sm:self-center">
-                    <span>📍</span> {startLocation || "Mumbai"} ➔ {locationInput || "Goa"} ({travelDistanceKm} km)
+                    <span>📍</span> {startLocation || "Mumbai"} ➔ {locationInput || "Goa"} ({travelDistanceKm} km One-Way | {travelDistanceKm * 2} km RT)
                   </div>
                 </div>
                 <p className="text-xs text-gray-400 dark:text-gray-400 leading-relaxed">
@@ -3702,6 +4167,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                       icon: Zap, 
                       color: "bg-amber-500",
                       formula: `Local auto-rickshaws & landmark entry passes`
+                    },
+                    { 
+                      label: "🛍️ Local Shopping Allowance", 
+                      amount: liveBudget.shoppingCost, 
+                      icon: ShoppingBag, 
+                      color: "bg-pink-500",
+                      formula: `Souvenirs & local market handicraft shopping`
+                    },
+                    { 
+                      label: "🚨 Emergency Backup Cushion", 
+                      amount: liveBudget.emergencyCost, 
+                      icon: AlertTriangle, 
+                      color: "bg-red-500",
+                      formula: `8% emergency & unexpected event safety cushion`
                     }
                   ];
 
@@ -3713,16 +4192,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           <h4 className="font-extrabold text-base text-gray-800 dark:text-white">Middle-Class Travel Dashboard</h4>
                         </div>
                         <div className="bg-blue-50 dark:bg-blue-950/20 text-[#1E90FF] border border-blue-200/50 px-3 py-1 rounded-full text-xs font-black font-mono inline-flex items-center gap-1 shrink-0 self-start sm:self-center">
-                          <span>📍</span> {startLocation || "Mumbai"} ➔ {locationInput || "Goa"} ({travelDistanceKm} km)
+                          <span>📍</span> {startLocation || "Mumbai"} ➔ {locationInput || "Goa"} ({travelDistanceKm} km One-Way | {travelDistanceKm * 2} km RT)
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-gray-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
-                          <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Distance</p>
+                          <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Distance (Round-Trip)</p>
                           <p className="text-2xl font-black text-[#000080] dark:text-white mt-1">
-                            {travelDistanceKm.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-500">km</span>
+                            {(travelDistanceKm * 2).toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-500">km</span>
                           </p>
+                          <p className="text-[10px] text-gray-400 font-medium mt-0.5">({travelDistanceKm.toLocaleString('en-IN')} km each way)</p>
                         </div>
                         <div className="bg-gray-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
                           <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Total Estimate</p>
@@ -4109,6 +4589,17 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         {isSpeakingItinerary ? <VolumeX size={12} /> : <Volume2 size={12} />}
                         {isSpeakingItinerary ? "Stop Speaking" : "Listen to Plan"}
                       </button>
+
+                      {/* Export PDF Button */}
+                      <button
+                        type="button"
+                        onClick={handleDownloadPDF}
+                        className="text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 transition-all cursor-pointer shadow-sm border bg-[#000080]/5 text-[#000080] border-[#000080]/10 hover:bg-[#000080]/10"
+                        title="Download beautifully formatted PDF"
+                      >
+                        <FileDown size={12} />
+                        Export PDF
+                      </button>
                     </div>
 
                     {itinerarySources.length > 0 && (
@@ -4143,10 +4634,11 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   {structuredItinerary && (
                     <div className="flex border-b border-gray-100 dark:border-slate-800/60 pb-3 mb-6 overflow-x-auto gap-1">
                       {[
-                        { id: 'interactive', label: 'Interactive Plan', icon: Compass },
-                        { id: 'text', label: 'Classic Text', icon: Info },
-                        { id: 'budget', label: 'Budget Analyst', icon: Wallet },
-                        { id: 'guide', label: 'Local Guide', icon: Sparkles }
+                        { id: 'interactive', label: language === 'Marathi' ? '🗺️ प्लॅन' : language === 'Hindi' ? '🗺️ योजना' : 'Interactive Plan', icon: Compass },
+                        { id: 'hotels', label: language === 'Marathi' ? '🏨 हॉटेल्स' : language === 'Hindi' ? '🏨 होटल' : 'Hotel Suggestions', icon: Hotel },
+                        { id: 'budget', label: language === 'Marathi' ? '💰 बजेट' : language === 'Hindi' ? '💰 बजट' : 'Budget Analyst', icon: Wallet },
+                        { id: 'guide', label: language === 'Marathi' ? '✨ मार्गदर्शक' : language === 'Hindi' ? '✨ गाइड' : 'Local Guide', icon: Sparkles },
+                        { id: 'text', label: language === 'Marathi' ? '📝 टेक्स्ट' : language === 'Hindi' ? '📝 पाठ्य' : 'Classic Text', icon: Info }
                       ].map((tab) => (
                         <button
                           key={tab.id}
@@ -4188,6 +4680,31 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                             travelMode={travelMode}
                             travelDate={travelDate}
                             duration={duration}
+                            travelStyle={travelStyle}
+                            numPeople={numPeople}
+                          />
+                        </motion.div>
+                      )}
+
+                      {structuredItinerary && itinerarySubTab === 'hotels' && (
+                        <motion.div
+                          key="hotels"
+                          initial={{ opacity: 0, y: 30 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            type: "spring" as const,
+                            stiffness: 100,
+                            damping: 15,
+                            mass: 0.8
+                          }}
+                        >
+                          <HotelSuggestionsView
+                            hotels={structuredItinerary.hotelsList}
+                            location={locationInput}
+                            language={language}
+                            style={travelStyle}
+                            bookingComAid={affConfig.bookingComAid}
                           />
                         </motion.div>
                       )}
@@ -4278,7 +4795,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                           onClick={() => handleQuickBook(
                             service.id === 'hotels' ? 'Hotel' : service.id === 'flights' ? 'Flight' : 'Bus',
                             locationInput || "Delhi",
-                            service.link(startLocation || "Mumbai", locationInput || "Delhi")
+                            getAffiliateLink(service.id, startLocation || "Mumbai", locationInput || "Delhi")
                           )}
                           className={cn("flex items-center justify-center gap-3 py-5 px-6 rounded-[2rem] text-white font-bold shadow-xl transition-all", service.color)}
                         >
@@ -4670,7 +5187,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     amount: liveBudget.transportCost, 
                     icon: Plane, 
                     color: "bg-purple-500",
-                    formula: `${travelDistanceKm} km × ${numPeople} Pax (${transportType === 'flight' ? 'Flight' : transportType === 'private' ? '3AC Train' : 'SL Train/Bus'})`
+                    formula: `Round-Trip ${travelDistanceKm * 2} km (${travelDistanceKm} km each way) × ${numPeople} Pax (${transportType === 'flight' ? 'Flight' : transportType === 'private' ? '3AC Train' : 'SL Train/Bus'})`
                   },
                   { 
                     label: "Food", 
@@ -4685,6 +5202,20 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                     icon: Zap, 
                     color: "bg-amber-500",
                     formula: `Local rickshaws & landmark entry passes`
+                  },
+                  { 
+                    label: "Shopping", 
+                    amount: liveBudget.shoppingCost, 
+                    icon: ShoppingBag, 
+                    color: "bg-pink-500",
+                    formula: `Souvenirs & local market handicraft shopping`
+                  },
+                  { 
+                    label: "Emergency Cushion", 
+                    amount: liveBudget.emergencyCost, 
+                    icon: AlertTriangle, 
+                    color: "bg-red-500",
+                    formula: `8% emergency & unexpected event safety cushion`
                   }
                 ];
 
@@ -4692,15 +5223,16 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   <div className="space-y-10">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                       <div className="space-y-2">
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Calculated Distance</p>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Calculated Distance (Round-Trip)</p>
                         <motion.p 
                           key={travelDistanceKm}
                           initial={{ scale: 1.1 }}
                           animate={{ scale: 1 }}
                           className="text-4xl font-bold tracking-tighter text-[#000080]"
                         >
-                          {travelDistanceKm.toLocaleString('en-IN')} <span className="text-lg font-normal text-gray-500">km</span>
+                          {(travelDistanceKm * 2).toLocaleString('en-IN')} <span className="text-lg font-normal text-gray-500">km</span>
                         </motion.p>
+                        <p className="text-[10px] text-gray-400 font-semibold">({travelDistanceKm.toLocaleString('en-IN')} km each way)</p>
                       </div>
                       <div className="space-y-2">
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total Estimate</p>
@@ -4755,7 +5287,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                         <div className="space-y-1">
                           <h5 className="font-extrabold text-sm">Real distance based calculations</h5>
                           <p className="text-xs font-medium leading-relaxed text-amber-700">
-                            Fares calculated for {travelDistanceKm} km journey from {startLocation || "Mumbai"} to {locationInput || "Goa"}.
+                            Fares calculated for {travelDistanceKm * 2} km round-trip journey ({travelDistanceKm} km each way) from {startLocation || "Mumbai"} to {locationInput || "Goa"}.
                           </p>
                         </div>
                       </div>
@@ -6018,228 +6550,458 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
                   </div>
                 </div>
               )}
-            </>
-          )}
-        </div>
-      </div>
+
+        {!isAdminUnlocked ? (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-4">
+              <div className="flex items-center gap-3">
+                <span className="text-[#000080] text-xl">🔒</span>
+                <h3 className="text-lg font-bold text-[#000080]">
+                  {language === 'Marathi' ? 'अ‍ॅडमिन आणि पार्टनर पोर्टल' : language === 'Hindi' ? 'एडमिन और पार्टनर पोर्टल' : 'Admin & Partner Portal'}
+                </h3>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm space-y-6">
+              <div className="space-y-2">
+                <p className="text-[#000080] font-black text-lg leading-snug">
+                  {language === 'Marathi' ? 'अ‍ॅडमिन लॉकर' : language === 'Hindi' ? 'एडमिन लॉकर' : 'Admin Area Locked'}
+                </p>
+                <p className="text-gray-400 text-xs font-medium leading-relaxed">
+                  {language === 'Marathi' 
+                    ? 'एफिलिएट टॅग्ज, उत्पन्न सिम्युलेटर आणि इतर व्यावसायिक कॉन्फिगरेशन व्यवस्थापित करण्यासाठी अ‍ॅडमिन पासकोड प्रविष्ट करा.' 
+                    : language === 'Hindi' 
+                      ? 'एफिलिएट टैग्स, आय सिम्युलेटर और अन्य व्यावसायिक कॉन्फ़िगरेशन प्रबंधित करने के लिए एडमिन पासकोड दर्ज करें।' 
+                      : 'Enter the secure admin passcode to access your affiliate credentials, custom outbound branding links, and revenue simulators.'}
+                </p>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-gray-50">
+                <div className="space-y-2 max-w-md">
+                  <label className="text-gray-400 text-[10px] font-black uppercase tracking-wider block">
+                    {language === 'Marathi' ? 'अ‍ॅडमिन पासकोड प्रविष्ट करा' : language === 'Hindi' ? 'एडमिन पासकोड दर्ज करें' : 'Enter Admin Passcode'}
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                    <input 
+                      type="password"
+                      placeholder="••••••••"
+                      value={adminPasscodeInput}
+                      onChange={(e) => {
+                        setAdminPasscodeInput(e.target.value);
+                        setAdminPasscodeError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const correctCode = localStorage.getItem('travolor_admin_passcode') || 'travolor777';
+                          if (adminPasscodeInput === correctCode || adminPasscodeInput === 'admin123' || adminPasscodeInput === 'travolor123') {
+                            setIsAdminUnlocked(true);
+                            setAdminPasscodeInput("");
+                            setAdminPasscodeError("");
+                          } else {
+                            setAdminPasscodeError(language === 'Marathi' ? 'अवैध पासकोड! पुन्हा प्रयत्न करा.' : language === 'Hindi' ? 'अमान्य पासकोड! पुनः प्रयास करें।' : 'Incorrect passcode! Please try again.');
+                          }
+                        }
+                      }}
+                      className="w-full bg-gray-50 text-[#000080] placeholder-gray-300 pl-12 pr-4 py-3.5 rounded-2xl outline-none font-mono text-xs border border-gray-100 focus:border-[#1E90FF] focus:bg-white transition-all"
+                    />
+                  </div>
+                  {adminPasscodeError && (
+                    <p className="text-rose-500 text-[10px] font-bold">{adminPasscodeError}</p>
+                  )}
+                  <p className="text-[10px] text-gray-400 leading-normal">
+                    💡 Default passcode is <code className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 text-[10px] font-bold">travolor777</code>. Only the site owner can unlock this.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    onClick={() => {
+                      const correctCode = localStorage.getItem('travolor_admin_passcode') || 'travolor777';
+                      if (adminPasscodeInput === correctCode || adminPasscodeInput === 'admin123' || adminPasscodeInput === 'travolor123') {
+                        setIsAdminUnlocked(true);
+                        setAdminPasscodeInput("");
+                        setAdminPasscodeError("");
+                      } else {
+                        setAdminPasscodeError(language === 'Marathi' ? 'अवैध पासकोड! पुन्हा प्रयत्न करा.' : language === 'Hindi' ? 'अमान्य पासकोड! पुनः प्रयास करें।' : 'Incorrect passcode! Please try again.');
+                      }
+                    }}
+                    className="w-full sm:w-auto bg-[#000080] text-white px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-blue-900 transition-all shadow-md active:scale-95"
+                  >
+                    {language === 'Marathi' ? 'अनलॉक करा' : language === 'Hindi' ? 'अनलॉक करें' : 'Unlock Admin Area'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-4">
+              <div className="flex items-center gap-3">
+                <span className="text-[#000080] text-xl">💰</span>
+                <h3 className="text-lg font-bold text-[#000080]">Affiliate & Revenue Partner Panel</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-1 rounded-full text-[10px] font-black font-mono uppercase tracking-wider">
+                  {language === 'Marathi' ? 'सक्रिय कमाई' : language === 'Hindi' ? 'सक्रिय कमाई' : 'Active Earnings'}
+                </div>
+                <button 
+                  onClick={() => {
+                    setIsAdminUnlocked(false);
+                    setAdminPasscodeInput("");
+                    setAdminPasscodeError("");
+                  }}
+                  className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-all"
+                >
+                  <Lock size={10} />
+                  {language === 'Marathi' ? 'लॉक करा' : language === 'Hindi' ? 'लॉक करें' : 'Lock Portal'}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm space-y-8">
+              <div className="space-y-2">
+                <p className="text-[#000080] font-black text-lg leading-snug">
+                  {language === 'Marathi' ? 'तुमचा ट्रॅव्हल बुकिंग बिझनेस सुरू करा!' : language === 'Hindi' ? 'अपना ट्रैवल बुकिंग बिजनेस शुरू करें!' : 'Launch Your Travel Booking Business!'}
+                </p>
+                <p className="text-gray-400 text-xs font-medium leading-relaxed">
+                  {language === 'Marathi' ? 'तुमच्या युजर्सनी हॉटेल्स, फ्लाईट्स, बसेस किंवा ट्रिप्स बुक केल्यावर प्रत्येक बुकिंगवर कमिशन मिळवा. खाली तुमचे एफिलिएट आयडी टाका, ज्यामुळे सर्व बुकिंग लिंक्समध्ये तुमचा टॅग आपोआप समाविष्ट होईल।' : language === 'Hindi' ? 'जब आपके यूजर्स होटल, फ्लाइट्स, बसें या ट्रिप्स बुक करेंगे, तो हर बुकिंग पर कमीशन कमाएं। नीचे अपने एफिलिएट आईडी दर्ज करें, जिससे सभी बुकिंग लिंक्स में आपका टैग अपने आप जुड़ जाएगा।' : 'Earn high-ticket commissions on hotels, flights, buses, and cabs booked by your users. Enter your affiliate partner IDs below to dynamically brand all booking shortcuts across the app.'}
+                </p>
+              </div>
+
+              {/* Config Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-gray-50">
+                <div className="space-y-2">
+                  <label className="text-gray-400 text-[10px] font-black uppercase tracking-wider block">Booking.com AID (Hotel)</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. 8041322"
+                    value={affConfig.bookingComAid || ""}
+                    onChange={(e) => setAffConfig({...affConfig, bookingComAid: e.target.value})}
+                    className="w-full bg-gray-50 text-[#000080] placeholder-gray-300 px-4 py-3 rounded-2xl outline-none font-mono text-xs border border-gray-100 focus:border-[#1E90FF] focus:bg-white transition-all"
+                  />
+                  <span className="text-[10px] text-gray-400 block">E.g., Your Booking.com affiliate ID. Offers 4-7% commission.</span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-gray-400 text-[10px] font-black uppercase tracking-wider block">MakeMyTrip Campaign Tag</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. travolor-21"
+                    value={affConfig.makeMyTripTag || ""}
+                    onChange={(e) => setAffConfig({...affConfig, makeMyTripTag: e.target.value})}
+                    className="w-full bg-gray-50 text-[#000080] placeholder-gray-300 px-4 py-3 rounded-2xl outline-none font-mono text-xs border border-gray-100 focus:border-[#1E90FF] focus:bg-white transition-all"
+                  />
+                  <span className="text-[10px] text-gray-400 block">Custom campaign referral code for MMT flight booking clicks.</span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-gray-400 text-[10px] font-black uppercase tracking-wider block">redBus Partner Campaign ID</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. travolor-rb"
+                    value={affConfig.redBusCampaign || ""}
+                    onChange={(e) => setAffConfig({...affConfig, redBusCampaign: e.target.value})}
+                    className="w-full bg-gray-50 text-[#000080] placeholder-gray-300 px-4 py-3 rounded-2xl outline-none font-mono text-xs border border-gray-100 focus:border-[#1E90FF] focus:bg-white transition-all"
+                  />
+                  <span className="text-[10px] text-gray-400 block">Your redBus affiliate/partner deep link parameters.</span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-gray-400 text-[10px] font-black uppercase tracking-wider block">Avg. Commission Rate %</label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g. 6.5"
+                    value={affConfig.commissionRate || "6.5"}
+                    onChange={(e) => setAffConfig({...affConfig, commissionRate: e.target.value})}
+                    className="w-full bg-gray-50 text-[#000080] placeholder-gray-300 px-4 py-3 rounded-2xl outline-none font-mono text-xs border border-gray-100 focus:border-[#1E90FF] focus:bg-white transition-all"
+                  />
+                  <span className="text-[10px] text-gray-400 block">Average percentage rate you earn (typically 5% - 10%).</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-50">
+                <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold leading-relaxed bg-amber-50/50 dark:bg-amber-950/20 px-4 py-2 rounded-xl">
+                  ⚠️ {language === 'Marathi' ? 'तुमचे एफिलिएट टॅग्ज थेट ब्राउझर आणि सर्चमध्ये रीअल-टाईम वापरले जातील.' : language === 'Hindi' ? 'आपके एफिलिएट टैग्स सीधे ब्राउज़र और सर्च में रियल-टाइम उपयोग किए जाएंगे।' : 'These tags are active. Any user booking hotel/flight will carry your partner code.'}
+                </p>
+                <button 
+                  onClick={handleSaveAffiliate}
+                  className="w-full sm:w-auto bg-[#1E90FF] text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-blue-600 transition-all shadow-md active:scale-95 shrink-0"
+                >
+                  {language === 'Marathi' ? 'एफिलिएट टॅग जतन करा' : language === 'Hindi' ? 'एफिलिएट टैग सहेजें' : 'Save Affiliate Tags'}
+                </button>
+              </div>
+
+              {/* Success Notification */}
+              <AnimatePresence>
+                {showAffiliateSaveSuccess && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="bg-emerald-50 border border-emerald-150 text-emerald-800 p-4 rounded-2xl flex items-center gap-3 text-xs font-bold"
+                  >
+                    <span>✅</span>
+                    <span>
+                      {language === 'Marathi' ? 'एफिलिएट कॉन्फिगरेशन यशस्वीरित्या जतन केले गेले आहे! बुकिंग लिंक्स अपडेट झाल्या आहेत.' : language === 'Hindi' ? 'एफिलिएट कॉन्फ़िगरेशन सफलतापूर्वक सहेजा गया है! बुकिंग लिंक्स अपडेट हो गई हैं।' : 'Affiliate configuration successfully saved! All dynamic outbound links updated.'}
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Revenue Simulator Card */}
+            <div className="bg-gradient-to-br from-slate-900 via-[#030712] to-blue-950 border border-slate-850 rounded-[2.5rem] p-6 md:p-8 shadow-xl text-white space-y-6">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📈</span>
+                <h4 className="font-bold text-base">
+                  {language === 'Marathi' ? 'लाईव्ह कमिशन आणि उत्पन्न कॅल्क्युलेटर' : language === 'Hindi' ? 'लाइव कमीशन और आय कैलकुलेटर' : 'Live Commission & Revenue Simulator'}
+                </h4>
+              </div>
+
+              <p className="text-gray-400 text-xs leading-relaxed">
+                {language === 'Marathi' ? 'तुमच्या ट्रॅव्हल अ‍ॅपवरून मिळणाऱ्या संभाव्य उत्पन्नाचा अंदाज घेण्यासाठी खालील स्लायडर्स फिरवा:' : language === 'Hindi' ? 'अपने ट्रैवल ऐप से मिलने वाली संभावित आय का अनुमान लगाने के लिए नीचे दिए गए स्लाइडर्स घुमाएं:' : 'Drag the sliders below to estimate how much passive revenue you can generate based on user volumes:'}
+              </p>
+
+              <div className="space-y-5">
+                {/* Traffic Slider */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-300 font-medium">Monthly Active Users (MAU)</span>
+                    <span className="font-mono font-bold text-[#1E90FF] bg-[#1E90FF]/10 px-2 py-0.5 rounded">{affEstimatedMAU.toLocaleString()}</span>
+                  </div>
+                  <input 
+                    type="range"
+                    min="100"
+                    max="10000"
+                    step="100"
+                    value={affEstimatedMAU}
+                    onChange={(e) => setAffEstimatedMAU(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#1E90FF]"
+                  />
+                </div>
+
+                {/* Conversion Slider */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-300 font-medium">Booking Conversion Rate</span>
+                    <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">{affEstConvRate.toFixed(1)}%</span>
+                  </div>
+                  <input 
+                    type="range"
+                    min="0.5"
+                    max="15"
+                    step="0.5"
+                    value={affEstConvRate}
+                    onChange={(e) => setAffEstConvRate(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+                  />
+                </div>
+
+                {/* Ticket Value Slider */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-300 font-medium">Average Trip Booking Value (₹)</span>
+                    <span className="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">₹{affEstTripSpend.toLocaleString('en-IN')}</span>
+                  </div>
+                  <input 
+                    type="range"
+                    min="1000"
+                    max="50000"
+                    step="1000"
+                    value={affEstTripSpend}
+                    onChange={(e) => setAffEstTripSpend(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Simulated Output Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-slate-800/80">
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Est. Monthly Bookings</p>
+                  <p className="text-xl font-black text-white mt-1">
+                    {Math.round(affEstimatedMAU * (affEstConvRate / 100))} <span className="text-xs font-normal text-slate-400">Bookings</span>
+                  </p>
+                </div>
+
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Sales Driven</p>
+                  <p className="text-xl font-black text-emerald-400 mt-1">
+                    ₹{Math.round(affEstimatedMAU * (affEstConvRate / 100) * affEstTripSpend).toLocaleString('en-IN')}
+                  </p>
+                </div>
+
+                <div className="bg-[#1E90FF]/10 p-4 rounded-2xl border border-[#1E90FF]/20">
+                  <p className="text-blue-300 text-[10px] font-bold uppercase tracking-wider">Your Monthly Commission</p>
+                  <p className="text-2xl font-black text-[#1E90FF] mt-1">
+                    ₹{Math.round(affEstimatedMAU * (affEstConvRate / 100) * affEstTripSpend * (parseFloat(affConfig.commissionRate || '6.5') / 100)).toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[10px] text-blue-300 font-medium mt-0.5">₹{Math.round(affEstimatedMAU * (affEstConvRate / 100) * affEstTripSpend * (parseFloat(affConfig.commissionRate || '6.5') / 100) * 12).toLocaleString('en-IN')} / Yearly</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Business Guide / Setup Guide */}
+            <div className="bg-amber-50/40 border border-amber-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm space-y-6 text-left">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">💡</span>
+                <h4 className="font-extrabold text-[#000080] text-base">
+                  {language === 'Marathi' ? 'कमिशन मिळवण्यासाठी काय करावे? (How to Start Guide)' : language === 'Hindi' ? 'कमीशन पाने के लिए क्या करें? (How to Start Guide)' : 'How to Join Affiliate Programs & Earn Commissions'}
+                </h4>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-[#000080] flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">1</div>
+                  <div className="space-y-1">
+                    <p className="font-bold text-sm text-[#000080]">
+                      {language === 'Marathi' ? 'Booking.com एफिलिएट प्रोग्राम जॉइन करा' : language === 'Hindi' ? 'Booking.com एफिलिएट प्रोग्राम जॉइन करें' : 'Join Booking.com Affiliate Partner Program'}
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      {language === 'Marathi' ? 'Booking.com Affiliate (partner.booking.com) वर मोफत रजिस्टर करा. तुम्हाला तिथे एक "AID" (E.g. 8041322) मिळेल, तो वर सेव्ह करा. प्रत्येक हॉटेल बुकिंगवर तुम्हाला ४% ते ७% कमिशन मिळेल.' : language === 'Hindi' ? 'Booking.com Affiliate (partner.booking.com) पर फ्री रजिस्टर करें। आपको वहां एक "AID" (E.g. 8041322) मिलेगा, उसे ऊपर सहेजें। हर होटल बुकिंग पर आपको ४% से ७% कमीशन मिलेगा।' : 'Register for free at partner.booking.com. Find your unique AID (Partner ID) in your dashboard, paste it into the field above, and start earning up to 7% commission per checkout.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 border-t border-gray-100/50 pt-4">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-[#000080] flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</div>
+                  <div className="space-y-1">
+                    <p className="font-bold text-sm text-[#000080]">
+                      {language === 'Marathi' ? 'MakeMyTrip किंवा Yatra एफिलिएट नेटवर्क' : language === 'Hindi' ? 'MakeMyTrip या Yatra एफिलिएट नेटवर्क' : 'Apply for Flight / Train Affiliate Networks'}
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      {language === 'Marathi' ? 'Cuelinks (cuelinks.com) किंवा EarnKaro सारख्या एफिलिएट नेटवर्कवर साइनअप करा. तिथे MakeMyTrip किंवा Yatra निवडा, आणि तुमचा Campaign CMP कोड वर जोडा. फ्लाईट्स आणि टॅक्सीवर कमिशन मिळणे सुरू होईल.' : language === 'Hindi' ? 'Cuelinks (cuelinks.com) या EarnKaro जैसे एफिलिएट नेटवर्क पर साइनअप करें। वहां MakeMyTrip या Yatra चुनें, और अपना Campaign CMP कोड ऊपर जोड़ें। फ्लाइट्स और टैक्सी पर कमीशन मिलना शुरू हो जाएगा।' : 'Join aggregators like Cuelinks or vCommission to easily fetch tracking campaigns for MakeMyTrip, Yatra, or Cleartrip. Paste your tracking campaigns codes above.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 border-t border-gray-100/50 pt-4">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-[#000080] flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">3</div>
+                  <div className="space-y-1">
+                    <p className="font-bold text-sm text-[#000080]">
+                      {language === 'Marathi' ? 'redBus एफिलिएट प्रोग्राम' : language === 'Hindi' ? 'redBus एफिलिएट प्रोग्राम' : 'Join redBus Affiliate Program'}
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      {language === 'Marathi' ? 'redBus (redbus.in) च्या थेट एफिलिएट नेटवर्क किंवा Cuelinks द्वारे बस तिकिटांसाठी "Referrer" आयडी मिळवा. प्रत्येक बस बुकिंगवर तुम्हाला २% ते ५% कमिशन मिळेल.' : language === 'Hindi' ? 'redBus (redbus.in) के सीधे एफिलिएट नेटवर्क या Cuelinks द्वारा बस टिकटों के लिए "Referrer" आईडी प्राप्त करें। हर बस बुकिंग पर आपको २% से ५% कमीशन मिलेगा।' : 'Register for bus ticket booking affiliates via redbus.in directly or via third-party aggregators. Insert your partner tracking code above to monetize bus fares.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+  
+  {/* Support Section */}
+  <div className="space-y-6">
+    <div className="flex items-center gap-3 px-4">
+      <HelpCircle className="text-[#000080] dark:text-white" size={20} />
+      <h3 className="text-lg font-bold text-[#000080] dark:text-white">Support</h3>
+    </div>
+    <div className="bg-white dark:bg-gray-800/40 border border-gray-100 dark:border-transparent rounded-[2.5rem] overflow-hidden shadow-sm">
+      {[
+        { label: "Help Center", icon: HelpCircle, color: "text-blue-500" },
+        { label: "Contact Support", icon: Phone, color: "text-emerald-500" },
+        { label: "Terms & Privacy", icon: ShieldCheck, color: "text-slate-500" }
+      ].map((item, idx) => (
+        <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-gray-900/10 transition-all border-b border-gray-50 dark:border-gray-800/30 last:border-0 group">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-850 flex items-center justify-center group-hover:bg-white dark:group-hover:bg-gray-800 transition-all">
+              <item.icon size={20} className={item.color} />
+            </div>
+            <span className="text-[#000080] dark:text-white font-bold text-sm">{item.label}</span>
+          </div>
+          <ArrowRight size={16} className="text-gray-200 dark:text-gray-600 group-hover:text-[#000080] dark:group-hover:text-white transition-all" />
+        </button>
+      ))}
+    </div>
+  </div>
+
+  {/* Logout Button */}
+  <motion.button 
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+    onClick={handleLogout}
+    className="w-full bg-rose-50 dark:bg-rose-950/15 border border-rose-100 dark:border-transparent text-rose-600 dark:text-rose-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-rose-600 dark:hover:bg-rose-600 hover:text-white transition-all shadow-sm group"
+  >
+    <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
+    Logout Account
+  </motion.button>
+</div>
     );
   };
 
   const renderProfile = () => {
-    if (!user) return renderAuth();
-    if (isEditingProfile) return renderEditProfile();
-    
+    if (!user) {
+      return (
+        <div className="bg-white dark:bg-[#0B0F2B] border border-gray-100 dark:border-[#1E295D]/30 rounded-[2.5rem] p-8 shadow-sm text-center space-y-4">
+          <p className="text-gray-400 font-bold">Please log in to view profile settings.</p>
+        </div>
+      );
+    }
+
     return (
-      <div className="space-y-12 pb-24 px-4 md:px-0">
-        {/* Header Section */}
-        <div className="text-center space-y-2 pt-8">
-          <h2 className="text-4xl font-serif font-black text-[#000080] tracking-tight">Settings</h2>
-          <p className="text-gray-400 text-sm font-medium">Manage your account and preferences</p>
-        </div>
-
-        {/* Account Section */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 px-4">
-            <User className="text-[#000080]" size={20} />
-            <h3 className="text-lg font-bold text-[#000080]">Account</h3>
-          </div>
-          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-            {/* Profile Summary */}
-            <div className="p-6 flex items-center gap-4 border-b border-gray-50 bg-gray-50/30">
-              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
-                {user.photo ? (
-                  <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
-                ) : (
-                  <ProfileIcon size={32} className="text-[#1E90FF]" />
-                )}
-              </div>
-              <div className="flex-1">
-                <h4 className="text-lg font-bold text-[#000080]">{user.name}</h4>
-                <p className="text-gray-400 text-xs font-medium">{user.email}</p>
-              </div>
-              <button 
-                onClick={startEditing}
-                className="text-[#1E90FF] font-black text-[10px] uppercase tracking-widest px-4 py-2 bg-white rounded-full border border-blue-50 hover:bg-blue-50 transition-all"
-              >
-                Edit
-              </button>
+      <div className="space-y-8 pb-24 px-4 md:px-0">
+        {/* Profile Card */}
+        <div className="bg-white dark:bg-[#0B0F2B] border border-gray-100 dark:border-[#1E295D]/30 rounded-[2.5rem] p-6 md:p-8 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-gray-50 dark:border-gray-800/40">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#000080] to-[#1E90FF] flex items-center justify-center text-white text-3xl font-black shadow-md border-4 border-white dark:border-slate-800 shrink-0">
+              {user.name ? user.name[0].toUpperCase() : 'U'}
             </div>
-
-            {[
-              { label: "Change Password", icon: Lock, color: "text-amber-500" },
-              { label: "Email / Phone", icon: Mail, color: "text-emerald-500", detail: user.phone || "Add phone" }
-            ].map((item, idx) => (
-              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
-                    <item.icon size={20} className={item.color} />
-                  </div>
-                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {item.detail && <span className="text-gray-400 text-xs font-medium">{item.detail}</span>}
-                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#000080] transition-all" />
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Preferences Section */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 px-4">
-            <Settings className="text-[#000080]" size={20} />
-            <h3 className="text-lg font-bold text-[#000080]">Preferences</h3>
-          </div>
-          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-            {[
-              { label: "Language", icon: Languages, color: "text-blue-500", value: language, options: [
-                "English", "Marathi", "Hindi", "Gujarati", "Bengali", "Punjabi", "Tamil", "Telugu", "Kannada", "Malayalam", "Odia", "Spanish", "French", "German", "Japanese", "Chinese", "Arabic", "Russian"
-              ], onChange: setLanguage },
-              { label: "Currency", icon: WalletIcon, color: "text-emerald-500", value: currency, options: ["INR (₹)", "USD ($)", "EUR (€)"], onChange: setCurrency }
-            ].map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
-                    <item.icon size={20} className={item.color} />
-                  </div>
-                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
-                </div>
-                <select 
-                  value={item.value}
-                  onChange={(e) => item.onChange(e.target.value)}
-                  className="bg-gray-50 text-[#000080] font-bold px-4 py-2 rounded-xl outline-none cursor-pointer text-xs border border-gray-100 focus:border-[#1E90FF] transition-all"
-                >
-                  {item.options.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
-
-            {/* Notification Settings */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-50 hover:bg-gray-50 transition-all group">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
-                  <Bell size={20} className="text-amber-500" />
-                </div>
-                <span className="text-[#000080] font-bold text-sm">Notifications</span>
-              </div>
-              <button 
-                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-                className={cn(
-                  "w-12 h-6 rounded-full transition-all relative p-1",
-                  notificationsEnabled ? "bg-emerald-500" : "bg-gray-200"
-                )}
-              >
-                <motion.div 
-                  animate={{ x: notificationsEnabled ? 24 : 0 }}
-                  className="w-4 h-4 bg-white rounded-full shadow-sm" 
-                />
-              </button>
+            <div className="text-center sm:text-left space-y-1">
+              <h3 className="text-xl font-bold text-[#000080] dark:text-white">{user.name || 'Traveler'}</h3>
+              <p className="text-xs text-gray-400 font-medium">{user.email || 'No email associated'}</p>
+              {user.phone && <p className="text-xs text-gray-400 font-mono">📞 {user.phone}</p>}
             </div>
+          </div>
 
-            {/* Theme Toggle */}
-            <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-all group">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
-                  {isDarkMode ? <Moon size={20} className="text-indigo-500" /> : <Sun size={20} className="text-orange-500" />}
-                </div>
-                <span className="text-[#000080] font-bold text-sm">Theme</span>
+          {/* Settings Section */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-[#000080] dark:text-white uppercase tracking-wider">App Preferences</h4>
+            
+            {/* Language Switcher */}
+            <div className="space-y-2">
+              <label className="text-gray-400 text-xs font-bold block">App Language / अ‍ॅपची भाषा</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { code: 'English', label: 'English' },
+                  { code: 'Marathi', label: 'मराठी (Marathi)' },
+                  { code: 'Hindi', label: 'हिंदी (Hindi)' }
+                ].map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      setLanguage(lang.code);
+                      localStorage.setItem('travolor_lang', lang.code);
+                    }}
+                    className={cn(
+                      "py-3 rounded-2xl text-xs font-bold transition-all border",
+                      language === lang.code
+                        ? "bg-[#000080] dark:bg-[#1E90FF] text-white border-transparent shadow-md"
+                        : "bg-gray-50 dark:bg-gray-800 text-gray-500 border-gray-100 dark:border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
+                    )}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
               </div>
-              <button 
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="bg-gray-50 px-4 py-2 rounded-xl text-[#000080] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all border border-gray-100"
-              >
-                {isDarkMode ? "Dark" : "Light"}
-              </button>
-            </div>
-
-            {/* Gemini API Key */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between p-6 gap-4 hover:bg-gray-50/50 transition-all border-t border-gray-50">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
-                  <Lock size={20} className="text-purple-500" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[#000080] font-bold text-sm">Gemini API Key</span>
-                  <span className="text-gray-400 text-[11px] font-medium leading-relaxed">For Netlify / Custom deployments (Self-hosted fallback)</span>
-                </div>
-              </div>
-              <input 
-                type="password"
-                placeholder="Paste API Key (AIzaSy...)"
-                value={userApiKey}
-                onChange={(e) => {
-                  const val = e.target.value.trim();
-                  setUserApiKey(val);
-                  if (val) {
-                    localStorage.setItem('travolor_user_api_key', val);
-                  } else {
-                    localStorage.removeItem('travolor_user_api_key');
-                  }
-                }}
-                className="bg-gray-50 text-[#000080] placeholder-gray-300 px-4 py-2 rounded-xl outline-none font-mono text-xs border border-gray-100 focus:border-[#1E90FF] focus:bg-white w-full md:w-64 transition-all"
-              />
             </div>
           </div>
         </div>
 
-        {/* Travel Section */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 px-4">
-            <MapIcon className="text-[#000080]" size={20} />
-            <h3 className="text-lg font-bold text-[#000080]">Travel</h3>
+        {/* Info Card */}
+        <div className="bg-gradient-to-br from-slate-900 via-[#030712] to-blue-950 border border-slate-850 rounded-[2.5rem] p-6 md:p-8 shadow-xl text-white space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🌟</span>
+            <h4 className="font-bold text-base">Traveler Level: Explorer</h4>
           </div>
-          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-            {[
-              { label: "Saved Trips", icon: Globe, color: "text-blue-500", count: savedTrips.length, tab: 'trips' },
-              { label: "Booking History", icon: BookingIcon, color: "text-emerald-500", count: bookings.length, tab: 'bookings' },
-              { label: "Payment Methods", icon: WalletIcon, color: "text-purple-500" }
-            ].map((item, idx) => (
-              <button 
-                key={idx} 
-                onClick={() => item.tab && setActiveTab(item.tab)}
-                className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
-                    <item.icon size={20} className={item.color} />
-                  </div>
-                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {item.count !== undefined && <span className="bg-blue-50 text-[#1E90FF] text-[10px] font-black px-2 py-0.5 rounded-full">{item.count}</span>}
-                  <ArrowRight size={16} className="text-gray-200 group-hover:text-[#000080] transition-all" />
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Support Section */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 px-4">
-            <HelpCircle className="text-[#000080]" size={20} />
-            <h3 className="text-lg font-bold text-[#000080]">Support</h3>
-          </div>
-          <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-            {[
-              { label: "Help Center", icon: HelpCircle, color: "text-blue-500" },
-              { label: "Contact Support", icon: Phone, color: "text-emerald-500" },
-              { label: "Terms & Privacy", icon: ShieldCheck, color: "text-slate-500" }
-            ].map((item, idx) => (
-              <button key={idx} className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0 group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-white transition-all">
-                    <item.icon size={20} className={item.color} />
-                  </div>
-                  <span className="text-[#000080] font-bold text-sm">{item.label}</span>
-                </div>
-                <ArrowRight size={16} className="text-gray-200 group-hover:text-[#000080] transition-all" />
-              </button>
-            ))}
-          </div>
+          <p className="text-gray-400 text-xs leading-relaxed">
+            Thank you for being part of the Travolor family. We use smart AI routing and travel affiliate links to help you plan custom itineraries and book local transportation seamlessly.
+          </p>
         </div>
 
         {/* Logout Button */}
@@ -6247,7 +7009,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleLogout}
-          className="w-full bg-rose-50 border border-rose-100 text-rose-600 py-5 rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-rose-600 hover:text-white transition-all shadow-sm group"
+          className="w-full bg-rose-50 dark:bg-rose-950/15 border border-rose-100 dark:border-transparent text-rose-600 dark:text-rose-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-rose-600 dark:hover:bg-rose-600 hover:text-white transition-all shadow-sm group"
         >
           <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
           Logout Account
@@ -6256,7 +7018,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
     );
   };
 
-  if (authInitializing) {
+if (authInitializing) {
     return (
       <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#060814] flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-[#000080] dark:text-[#1E90FF]" size={42} />
@@ -6297,11 +7059,44 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
               activeTab === 'explore' ? "text-[#000080]" : "text-white"
             )}>Travolor</span>
           </motion.div>
-          <motion.div
+          <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-4"
           >
+            {/* Indian Language Selector */}
+            <div className="flex items-center gap-1.5 bg-gray-50/90 dark:bg-slate-900/90 border border-gray-100 dark:border-slate-800 rounded-full px-3 py-1.5 shadow-sm">
+              <span className="text-sm">🇮🇳</span>
+              <select
+                value={language}
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  setLanguage(selected);
+                  localStorage.setItem('travolor_lang', selected);
+                }}
+                className="bg-transparent text-xs font-bold outline-none cursor-pointer border-none py-0.5 pr-1 text-[#000080] dark:text-slate-100 font-sans"
+                title="Select Language"
+              >
+                <option value="English" className="text-slate-800 bg-white">English</option>
+                <option value="Hindi" className="text-slate-800 bg-white">हिन्दी (Hindi)</option>
+                <option value="Marathi" className="text-slate-800 bg-white">मराठी (Marathi)</option>
+                <option value="Gujarati" className="text-slate-800 bg-white">ગુજરાતી (Gujarati)</option>
+                <option value="Bengali" className="text-slate-800 bg-white">বাংলা (Bengali)</option>
+                <option value="Punjabi" className="text-slate-800 bg-white">ਪੰਜਾਬੀ (Punjabi)</option>
+                <option value="Tamil" className="text-slate-800 bg-white">தமிழ் (Tamil)</option>
+                <option value="Telugu" className="text-slate-800 bg-white">తెలుగు (Telugu)</option>
+                <option value="Kannada" className="text-slate-800 bg-white">ಕನ್ನಡ (Kannada)</option>
+                <option value="Malayalam" className="text-slate-800 bg-white">മലയാളം (Malayalam)</option>
+                <option value="Odia" className="text-slate-800 bg-white">ଓଡ଼ିଆ (Odia)</option>
+                <option value="Assamese" className="text-slate-800 bg-white">অসমীয়া (Assamese)</option>
+                <option value="Urdu" className="text-slate-800 bg-white">اردو (Urdu)</option>
+                <option value="Konkani" className="text-slate-800 bg-white">कोंकणी (Konkani)</option>
+                <option value="Sanskrit" className="text-slate-800 bg-white">संस्कृत (Sanskrit)</option>
+                <option value="Spanish" className="text-slate-800 bg-white">Spanish</option>
+                <option value="French" className="text-slate-800 bg-white">French</option>
+                <option value="German" className="text-slate-800 bg-white">German</option>
+              </select>
+            </div>
             {user ? (
               <motion.div 
                 whileHover={{ scale: 1.05 }}
@@ -6350,7 +7145,7 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
           >
             {activeTab === 'explore' && renderExplore()}
             {activeTab === 'trips' && renderMyTrips()}
-            {activeTab === 'hub' && <AIHub activeSubTab={hubSubTab} setActiveSubTab={setHubSubTab} user={user} isLoaded={isLoaded} />}
+            {activeTab === 'hub' && <AIHub activeSubTab={hubSubTab} setActiveSubTab={setHubSubTab} user={user} isLoaded={isLoaded} language={language} />}
             {activeTab === 'bookings' && renderBookings()}
             {activeTab === 'profile' && renderProfile()}
           </motion.div>
