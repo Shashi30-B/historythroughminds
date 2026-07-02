@@ -946,28 +946,109 @@ async function startServer() {
     return null;
   }
 
-  // Attractions search helper using Google Places API
-  async function getRealAttractions(city: string): Promise<any[]> {
+  // Attractions search helper using Google Places API with Gemini Search Grounding fallback
+  async function getRealAttractions(city: string, cityCoords?: { lat: number; lng: number }): Promise<any[]> {
     const apiKey = getGoogleMapsApiKey();
-    if (!apiKey) return [];
-    try {
-      const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=tourist+attractions+in+${encodeURIComponent(city)}&key=${apiKey}`);
-      const data = await response.json();
-      if (data.results) {
-        return data.results.slice(0, 15).map((item: any) => ({
-          name: item.name,
-          address: item.formatted_address,
-          lat: item.geometry?.location?.lat,
-          lng: item.geometry?.location?.lng,
-          rating: item.rating || 4.5,
-          ratingCount: item.user_ratings_total || 100,
-          placeId: item.place_id
-        }));
+    let results: any[] = [];
+
+    if (apiKey) {
+      try {
+        const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=tourist+attractions+in+${encodeURIComponent(city)}&key=${apiKey}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.results && data.results.length > 0) {
+            results = data.results.slice(0, 15).map((item: any) => ({
+              name: item.name,
+              address: item.formatted_address,
+              lat: item.geometry?.location?.lat,
+              lng: item.geometry?.location?.lng,
+              rating: item.rating || 4.5,
+              ratingCount: item.user_ratings_total || 100,
+              placeId: item.place_id
+            }));
+          }
+        }
+      } catch (error) {
+        console.warn("Fetching attractions via Google Maps API failed for:", city, error);
       }
-    } catch (error) {
-      console.warn("Fetching attractions failed for:", city, error);
     }
-    return [];
+
+    // Fallback to Gemini with Google Search Grounding if results are empty
+    if (results.length === 0) {
+      console.log(`[getRealAttractions] Google Maps Key missing or no results. Falling back to Gemini Search Grounding for "${city}"...`);
+      try {
+        const ai = getAi();
+        if (ai) {
+          const latRef = cityCoords?.lat || 19.0760;
+          const lngRef = cityCoords?.lng || 72.8777;
+          
+          const prompt = `You are a professional travel geographer. Find the top 12 real, highly popular, authentic, specific tourist spots, landmarks, historical places, viewpoints, temples, beaches, or attractions in the city/area: "${city}". 
+Do NOT recommend generic fallback places like "Main City Center Plaza" or generic "Historical Heritage Fort". They must be REAL locations in/around ${city}.
+
+Return ONLY a valid JSON array of objects conforming strictly to the following structure. Do not wrap the JSON in markdown code blocks like \`\`\`json. Return only the raw JSON string starting with [ and ending with ].
+
+JSON Structure:
+[
+  {
+    "name": "Exact, real name of the tourist spot",
+    "address": "Real address or location description in ${city}",
+    "lat": ${latRef} (approximate real latitude of this spot),
+    "lng": ${lngRef} (approximate real longitude of this spot),
+    "rating": number (real average rating, e.g. 4.7),
+    "ratingCount": number (realistic rating count, e.g. 1500)
+  }
+]`;
+
+          const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: prompt,
+            config: {
+              tools: [{ googleSearch: {} }]
+            }
+          });
+
+          const text = (response.text || "").trim();
+          let parsed: any[] = [];
+          try {
+            parsed = JSON.parse(text);
+          } catch (jsonErr) {
+            // Try cleaning markdown backticks if any
+            const match = text.match(/\[[\s\S]*\]/);
+            if (match) {
+              parsed = JSON.parse(match[0]);
+            }
+          }
+
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            console.log(`[getRealAttractions] Successfully fetched ${parsed.length} authentic tourist spots for "${city}" using Gemini Search Grounding.`);
+            results = parsed.map((item: any, idx: number) => {
+              let latVal = parseFloat(item.lat);
+              let lngVal = parseFloat(item.lng);
+              if (isNaN(latVal) || latVal === 0 || latVal === latRef) {
+                latVal = latRef + (Math.sin(idx) * 0.02);
+              }
+              if (isNaN(lngVal) || lngVal === 0 || lngVal === lngRef) {
+                lngVal = lngRef + (Math.cos(idx) * 0.02);
+              }
+
+              return {
+                name: String(item.name || `Attraction ${idx + 1}`),
+                address: String(item.address || `${item.name || 'Attraction'}, ${city}`),
+                lat: latVal,
+                lng: lngVal,
+                rating: parseFloat(item.rating) || 4.5,
+                ratingCount: parseInt(item.ratingCount) || 120 + (idx * 30),
+                placeId: `gemini-grounded-${idx}`
+              };
+            });
+          }
+        }
+      } catch (geminiErr) {
+        console.warn("[getRealAttractions] Gemini Search Grounding fallback failed for attractions:", geminiErr);
+      }
+    }
+
+    return results;
   }
 
   // Helper functions to generate verified Google Maps Links
@@ -1141,10 +1222,11 @@ async function startServer() {
             const data = await response.json();
             const elements = data.rows?.[0]?.elements;
             
-            if (elements && elements.length === unvisited.length) {
+            let foundValid = false;
+            if (elements && Array.isArray(elements) && elements.length === unvisited.length) {
               for (let j = 0; j < elements.length; j++) {
                 const el = elements[j];
-                if (el.status === "OK") {
+                if (el && el.status === "OK") {
                   const durationVal = el.duration?.value || Infinity;
                   const distanceVal = el.distance?.value || Infinity;
                   // Primary sort by duration (travel time), secondary by distance
@@ -1152,11 +1234,13 @@ async function startServer() {
                     minTravelTime = durationVal;
                     minDistance = distanceVal;
                     closestIdx = j;
+                    foundValid = true;
                   }
                 }
               }
-            } else {
-              throw new Error("Mismatch or empty elements in Distance Matrix");
+            }
+            if (!foundValid) {
+              throw new Error("No OK elements in Distance Matrix or response was invalid");
             }
           } catch (err) {
             console.warn("Distance Matrix calculation failed during clustering. Using Haversine:", err);
@@ -1388,7 +1472,7 @@ async function startServer() {
       }
 
       // Fetch real attractions
-      let attractions = await getRealAttractions(location);
+      let attractions = await getRealAttractions(location, destLatLng);
       if (attractions.length === 0) {
         const cleanLoc = location.toLowerCase().trim();
         const fallbacks = FALLBACK_ATTRACTIONS[cleanLoc] || [
@@ -1427,7 +1511,7 @@ async function startServer() {
         let todayDistanceKm = 0;
         let todayDurationSeconds = 0;
 
-        let currentLegPoint: string | { lat: number; lng: number } = d === 0 ? startLocation : destLatLng;
+        let currentLegPoint: string | { lat: number; lng: number } = destLatLng;
 
         for (let i = 0; i < attractionsToday.length; i++) {
           const att = attractionsToday[i];
@@ -1435,7 +1519,7 @@ async function startServer() {
           const route = await computeRouteBetweenPoints(currentLegPoint, attLatLng);
           
           legs.push({
-            from: typeof currentLegPoint === "string" ? currentLegPoint : "Previous Spot",
+            from: typeof currentLegPoint === "string" ? currentLegPoint : (i === 0 ? "Hotel / Center" : "Previous Spot"),
             to: att.name,
             distanceKm: route.distanceKm,
             durationText: route.durationText,
@@ -1448,11 +1532,11 @@ async function startServer() {
         }
 
         if (attractionsToday.length > 0) {
-          const returnPoint = (d === duration - 1) ? startLocation : destLatLng;
+          const returnPoint = destLatLng;
           const routeBack = await computeRouteBetweenPoints(currentLegPoint, returnPoint);
           legs.push({
             from: attractionsToday[attractionsToday.length - 1].name,
-            to: (d === duration - 1) ? startLocation : "Hotel / Center",
+            to: "Hotel / Center",
             distanceKm: routeBack.distanceKm,
             durationText: routeBack.durationText,
             mapsLink: `https://www.google.com/maps/dir/?api=1&origin=${attractionsToday[attractionsToday.length - 1].lat},${attractionsToday[attractionsToday.length - 1].lng}&destination=${typeof returnPoint === "string" ? encodeURIComponent(returnPoint) : `${returnPoint.lat},${returnPoint.lng}`}`
@@ -1462,13 +1546,8 @@ async function startServer() {
           todayDurationSeconds += routeBack.durationSeconds;
         }
 
-        if (d === 0 || d === duration - 1) {
-          totalLocalDistanceKm += Math.max(0, todayDistanceKm - outboundDist);
-          totalLocalDurationSeconds += Math.max(0, todayDurationSeconds - outboundDurationSecs);
-        } else {
-          totalLocalDistanceKm += todayDistanceKm;
-          totalLocalDurationSeconds += todayDurationSeconds;
-        }
+        totalLocalDistanceKm += todayDistanceKm;
+        totalLocalDurationSeconds += todayDurationSeconds;
 
         const hours = Math.floor(todayDurationSeconds / 3600);
         const minutes = Math.floor((todayDurationSeconds % 3600) / 60);
@@ -2497,7 +2576,7 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
     const outboundDurationSecs = transitRoute.durationSeconds;
 
     // 3. Fetch real attractions in destination
-    let attractions = await getRealAttractions(location);
+    let attractions = await getRealAttractions(location, destLatLng);
     if (attractions.length === 0) {
       const cleanLoc = location.toLowerCase().trim();
       const fallbacks = FALLBACK_ATTRACTIONS[cleanLoc] || [
@@ -2536,7 +2615,7 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
       let todayDistanceKm = 0;
       let todayDurationSeconds = 0;
 
-      let currentLegPoint: string | { lat: number; lng: number } = d === 0 ? startLocation : destLatLng;
+      let currentLegPoint: string | { lat: number; lng: number } = destLatLng;
 
       for (let i = 0; i < attractionsToday.length; i++) {
         const att = attractionsToday[i];
@@ -2544,7 +2623,7 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
         const route = await computeRouteBetweenPoints(currentLegPoint, attLatLng);
         
         legs.push({
-          from: typeof currentLegPoint === "string" ? currentLegPoint : "Previous Spot",
+          from: typeof currentLegPoint === "string" ? currentLegPoint : (i === 0 ? "Hotel / Center" : "Previous Spot"),
           to: att.name,
           distanceKm: route.distanceKm,
           durationText: route.durationText,
@@ -2557,11 +2636,11 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
       }
 
       if (attractionsToday.length > 0) {
-        const returnPoint = (d === duration - 1) ? startLocation : destLatLng;
+        const returnPoint = destLatLng;
         const routeBack = await computeRouteBetweenPoints(currentLegPoint, returnPoint);
         legs.push({
           from: attractionsToday[attractionsToday.length - 1].name,
-          to: (d === duration - 1) ? startLocation : "Hotel / Center",
+          to: "Hotel / Center",
           distanceKm: routeBack.distanceKm,
           durationText: routeBack.durationText,
           mapsLink: `https://www.google.com/maps/dir/?api=1&origin=${attractionsToday[attractionsToday.length - 1].lat},${attractionsToday[attractionsToday.length - 1].lng}&destination=${typeof returnPoint === "string" ? encodeURIComponent(returnPoint) : `${returnPoint.lat},${returnPoint.lng}`}`
@@ -2571,13 +2650,8 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
         todayDurationSeconds += routeBack.durationSeconds;
       }
 
-      if (d === 0 || d === duration - 1) {
-        totalLocalDistanceKm += Math.max(0, todayDistanceKm - outboundDist);
-        totalLocalDurationSeconds += Math.max(0, todayDurationSeconds - outboundDurationSecs);
-      } else {
-        totalLocalDistanceKm += todayDistanceKm;
-        totalLocalDurationSeconds += todayDurationSeconds;
-      }
+      totalLocalDistanceKm += todayDistanceKm;
+      totalLocalDurationSeconds += todayDurationSeconds;
 
       const hours = Math.floor(todayDurationSeconds / 3600);
       const minutes = Math.floor((todayDurationSeconds % 3600) / 60);

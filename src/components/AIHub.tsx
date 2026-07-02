@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, MessageSquare, Map, Landmark, Users, Compass, HelpCircle, Award, Sparkles as AdvisorIcon } from "lucide-react";
+import { Sparkles, MessageSquare, Map, Landmark, Users, Compass, HelpCircle, Award, Sparkles as AdvisorIcon, Volume2 } from "lucide-react";
 
 import TravelPersonalityTest, { TravelPersonality, PERSONALITY_META } from "./TravelPersonalityTest";
 import AICompanionChat from "./AICompanionChat";
@@ -13,17 +13,19 @@ import SmartRecommender from "./SmartRecommender";
 import SwadeshPassport from "./SwadeshPassport";
 import TravelAdvisorHub from "./TravelAdvisorHub";
 import { RoadTripPlanner } from "./RoadTripPlanner";
+import AIVoiceGuide from "./AIVoiceGuide";
 
 interface AIHubProps {
-  activeSubTab?: "chat" | "route" | "board" | "india" | "group" | "passport" | "advisor";
-  setActiveSubTab?: (tab: "chat" | "route" | "board" | "india" | "group" | "passport" | "advisor") => void;
+  activeSubTab?: "chat" | "route" | "board" | "india" | "group" | "passport" | "advisor" | "voice";
+  setActiveSubTab?: (tab: "chat" | "route" | "board" | "india" | "group" | "passport" | "advisor" | "voice") => void;
   user?: any | null;
   isLoaded?: boolean;
   language?: string;
 }
 
 export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propSetSubTab, user, isLoaded, language = "English" }: AIHubProps = {}) {
-  const [localSubTab, setLocalSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor">("chat");
+  const [localSubTab, setLocalSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor" | "voice">("chat");
+
   const activeSubTab = propSubTab !== undefined ? propSubTab : localSubTab;
   const setActiveSubTab = propSetSubTab !== undefined ? propSetSubTab : setLocalSubTab;
   const [personality, setPersonality] = useState<TravelPersonality | null>(() => {
@@ -94,6 +96,7 @@ export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propS
         <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
           {[
             { id: "chat", label: "🎒 Companion & Quiz", icon: MessageSquare },
+            { id: "voice", label: "🎙️ Voice Guide (USP)", icon: Volume2 },
             { id: "route", label: "🗺️ Map & Itinerary", icon: Map },
             { id: "board", label: "✨ Board & Gems", icon: Compass },
             { id: "advisor", label: "🌟 Advisor & Flights", icon: AdvisorIcon },
@@ -191,6 +194,17 @@ export default function AIHub({ activeSubTab: propSubTab, setActiveSubTab: propS
               exit={{ opacity: 0, y: -15 }}
             >
               <GroupCoordinator user={user} />
+            </motion.div>
+          )}
+
+          {activeSubTab === "voice" && (
+            <motion.div
+              key="voice"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <AIVoiceGuide />
             </motion.div>
           )}
 

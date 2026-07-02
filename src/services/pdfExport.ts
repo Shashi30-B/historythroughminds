@@ -20,12 +20,12 @@ async function loadDevanagariFonts(): Promise<{ regular: string; bold: string } 
   }
 
   const fontUrls = {
-    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
-    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansdevanagari/NotoSansDevanagari-Bold.ttf"
+    regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
+    bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf"
   };
 
   try {
-    const fetchWithTimeout = async (url: string, timeoutMs = 6000) => {
+    const fetchWithTimeout = async (url: string, timeoutMs = 8000) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -66,13 +66,13 @@ async function loadDevanagariFonts(): Promise<{ regular: string; bold: string } 
 
     return devanagariFontCache;
   } catch (err) {
-    console.error("Failed to load Devanagari fonts from primary CDN:", err);
+    console.error("Failed to load Poppins fonts from primary CDN:", err);
     
-    // Attempt fallback to Poppins
+    // Fallback to Noto Sans Devanagari from variable if needed, or other mirrors
     try {
       const fallbackUrls = {
-        regular: "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
-        bold: "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf"
+        regular: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-400-normal.woff", // woff is rarely accepted by jsPDF but we can try other github mirrors
+        bold: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-700-normal.woff"
       };
       
       const controller = new AbortController();
@@ -187,23 +187,23 @@ export async function exportItineraryToPDF(options: PDFExportOptions) {
 
   if (hasDevanagariFont && devanagariFontCache) {
     try {
-      doc.addFileToVFS("NotoSansDevanagari-Regular.ttf", devanagariFontCache.regular);
-      doc.addFont("NotoSansDevanagari-Regular.ttf", "NotoSansDevanagari", "normal");
+      doc.addFileToVFS("Poppins-Regular.ttf", devanagariFontCache.regular);
+      doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
       
-      doc.addFileToVFS("NotoSansDevanagari-Bold.ttf", devanagariFontCache.bold);
-      doc.addFont("NotoSansDevanagari-Bold.ttf", "NotoSansDevanagari", "bold");
+      doc.addFileToVFS("Poppins-Bold.ttf", devanagariFontCache.bold);
+      doc.addFont("Poppins-Bold.ttf", "Poppins", "bold");
       
-      // Override doc.setFont on this instance so helvetica maps to NotoSansDevanagari
+      // Override doc.setFont on this instance so helvetica maps to Poppins
       const originalSetFont = doc.setFont;
       doc.setFont = function(fontNameParam: string, style?: string, ...args: any[]) {
-        const targetFont = fontNameParam === 'helvetica' ? "NotoSansDevanagari" : fontNameParam;
+        const targetFont = fontNameParam === 'helvetica' ? "Poppins" : fontNameParam;
         return originalSetFont.call(this, targetFont, style, ...args);
       };
       
       // Set initial font
-      doc.setFont("NotoSansDevanagari", "normal");
+      doc.setFont("Poppins", "normal");
     } catch (fontAddErr) {
-      console.error("Failed to register Devanagari fonts to jsPDF:", fontAddErr);
+      console.error("Failed to register Poppins fonts to jsPDF:", fontAddErr);
       hasDevanagariFont = false;
     }
   }

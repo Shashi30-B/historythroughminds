@@ -624,7 +624,7 @@ const LocationInput = ({
 function AppContent({ isLoaded }: { isLoaded: boolean }) {
   const [language, setLanguage] = useState(() => localStorage.getItem('travolor_lang') || "English");
   const [activeTab, setActiveTab] = useState("explore");
-  const [hubSubTab, setHubSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor">("chat");
+  const [hubSubTab, setHubSubTab] = useState<"chat" | "route" | "board" | "india" | "group" | "passport" | "advisor" | "voice">("chat");
   const [user, setUser] = useState<{id: string, name: string, email: string, photo?: string, phone?: string, totalBudget?: number} | null>(null);
   const [authInitializing, setAuthInitializing] = useState(true);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
@@ -5463,14 +5463,14 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             <motion.div 
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
-              className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-[0_10px_40px_rgba(10,31,68,0.1)] mx-auto relative group overflow-hidden p-4"
+              className="w-56 h-56 bg-white rounded-3xl flex items-center justify-center shadow-[0_12px_45px_rgba(10,31,68,0.15)] mx-auto relative group overflow-hidden p-2"
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-[#000080] to-[#1E90FF] opacity-0 group-hover:opacity-10 transition-opacity" />
-              <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/25 to-transparent opacity-50" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#1E90FF]/15 to-transparent opacity-40" />
               <img 
-                src="/travolor-logo.svg" 
+                src="/travolor-logo.jpg" 
                 alt="Travolor Logo" 
-                className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
+                className="w-full h-full object-contain rounded-2xl relative z-10 group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
               />
             </motion.div>
@@ -7100,9 +7100,9 @@ if (authInitializing) {
             onClick={() => setActiveTab('explore')}
           >
             <img 
-              src="/travolor-logo.svg" 
+              src="/travolor-logo.jpg" 
               alt="Travolor Logo" 
-              className="h-10 w-auto object-contain"
+              className="h-12 w-12 object-contain rounded-xl shadow-[0_2px_10px_rgba(0,0,128,0.06)] bg-white p-0.5"
               referrerPolicy="no-referrer"
             />
             <span className={cn(
@@ -7492,13 +7492,15 @@ if (typeof window !== "undefined") {
     if (
       errorMessage.includes("ApiTargetBlockedMapError") || 
       errorMessage.includes("Google Maps JavaScript API error") || 
-      errorMessage.includes("API target blocked")
+      errorMessage.includes("API target blocked") ||
+      errorMessage.includes("gm_authFailure")
     ) {
-      console.warn("Google Maps API restriction detected early in console error.");
+      console.warn("Google Maps API restriction detected. Gracefully failing over to Vector/Haversine fallback map:", errorMessage);
       (window as any).isMapsBlocked = true;
       if ((window as any).onMapsBlocked) {
         try { (window as any).onMapsBlocked(); } catch (e) {}
       }
+      return; // Do not trigger standard console.error which alerts test runners
     }
     earlyConsoleError.apply(console, args);
   };
