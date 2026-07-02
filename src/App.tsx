@@ -1701,6 +1701,57 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
             }
           }
 
+          // 4. If still missing, try Open-Meteo geocoder (extremely robust, CORS-friendly, zero rate-limiting)
+          if (!lat1 || !lat2) {
+            try {
+              const fetchOpenMeteo = async (queryStr: string) => {
+                const searchTerms = [queryStr];
+                if (queryStr.includes(",")) {
+                  const parts = queryStr.split(",").map(p => p.trim()).filter(Boolean);
+                  if (parts.length > 0) {
+                    searchTerms.push(parts[0]);
+                    if (parts.length > 1) {
+                      searchTerms.push(`${parts[0]} ${parts[1]}`);
+                    }
+                  }
+                }
+                for (const term of searchTerms) {
+                  try {
+                    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=1&language=en&format=json`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.results && data.results[0]) {
+                      return {
+                        lat: data.results[0].latitude,
+                        lng: data.results[0].longitude
+                      };
+                    }
+                  } catch (e) {
+                    console.warn(`Open-Meteo fallback failed in calculateRoute for "${term}":`, e);
+                  }
+                }
+                return null;
+              };
+
+              if (!lat1) {
+                const coords = await fetchOpenMeteo(startLocation);
+                if (coords) {
+                  lat1 = coords.lat;
+                  lon1 = coords.lng;
+                }
+              }
+              if (!lat2) {
+                const coords = await fetchOpenMeteo(locationInput);
+                if (coords) {
+                  lat2 = coords.lat;
+                  lon2 = coords.lng;
+                }
+              }
+            } catch (openMeteoErr) {
+              console.warn("Open-Meteo geocoder failed in calculateRoute:", openMeteoErr);
+            }
+          }
+
           if (lat1 && lat2) {
             setStartCoords(prev => {
               if (!prev || prev.lat !== lat1 || prev.lng !== lon1) {
