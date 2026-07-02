@@ -821,8 +821,18 @@ async function startServer() {
     hampi: { lat: 15.3350, lng: 76.4600 },
     mysore: { lat: 12.2958, lng: 76.6394 },
     pondicherry: { lat: 11.9416, lng: 79.8083 },
-    tirupati: { lat: 13.6288, lng: 79.4192 }
+    tirupati: { lat: 13.6288, lng: 79.4192 },
+    kolhapur: { lat: 16.7050, lng: 74.2433 }
   };
+
+  function getCityCoordsFallback(cityName: string): { lat: number; lng: number } | null {
+    const clean = cityName.toLowerCase().trim();
+    if (!clean) return null;
+    const matchedKey = Object.keys(CITY_COORDS_FALLBACK).find(key => 
+      clean.includes(key) || key.includes(clean)
+    );
+    return matchedKey ? CITY_COORDS_FALLBACK[matchedKey] : null;
+  }
 
   // Fallback attractions dictionary for Travolor
   const FALLBACK_ATTRACTIONS: Record<string, string[]> = {
@@ -831,7 +841,9 @@ async function startServer() {
     delhi: ["Red Fort", "Qutub Minar", "India Gate", "Lotus Temple", "Humayun's Tomb", "Akshardham Temple", "Chandni Chowk", "Rashtrapati Bhavan"],
     agra: ["Taj Mahal", "Agra Fort", "Fatehpur Sikri", "Mehtab Bagh", "Tomb of Itimad-ud-Daulah"],
     jaipur: ["Hawa Mahal", "Amer Fort", "City Palace", "Jantar Mantar", "Nahargarh Fort", "Chokhi Dhani", "Albert Hall Museum"],
-    pune: ["Shaniwar Wada", "Aga Khan Palace", "Sinhagad Fort", "Dagadusheth Halwai Ganapati", "Rajiv Gandhi Zoological Park", "Osho Teerth Park"]
+    pune: ["Shaniwar Wada", "Aga Khan Palace", "Sinhagad Fort", "Dagadusheth Halwai Ganapati", "Rajiv Gandhi Zoological Park", "Osho Teerth Park"],
+    kolhapur: ["Mahalakshmi (Ambabai) Temple", "Rankala Lake", "Panhala Fort", "Jyotiba Temple", "New Palace Museum", "Kaneri Math", "Shalini Palace", "Town Hall Museum"],
+    tirupati: ["Sri Venkateswara Swamy Temple (Tirumala)", "Sri Padmavathi Ammavari Temple (Tiruchanur)", "Sri Kapileswara Swamy Temple", "ISKCON Temple Tirupati", "Silathoranam (Natural Arch)", "Talakona Waterfalls", "Chandragiri Fort", "Regional Science Centre"]
   };
 
   // Haversine distance calculator
@@ -924,7 +936,7 @@ async function startServer() {
 
     // Check fallback database
     for (const term of searchTerms) {
-      const fallback = CITY_COORDS_FALLBACK[term.toLowerCase().trim()];
+      const fallback = getCityCoordsFallback(term);
       if (fallback) {
         return {
           lat: fallback.lat,
@@ -999,13 +1011,23 @@ JSON Structure:
   }
 ]`;
 
-          const response = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
-            contents: prompt,
-            config: {
-              tools: [{ googleSearch: {} }]
-            }
-          });
+          let response;
+          try {
+            console.log(`[getRealAttractions] Attempting Gemini Search Grounding for "${city}"...`);
+            response = await ai.models.generateContent({
+              model: "gemini-3.5-flash",
+              contents: prompt,
+              config: {
+                tools: [{ googleSearch: {} }]
+              }
+            });
+          } catch (searchErr: any) {
+            console.warn("[getRealAttractions] Gemini Search Grounding failed, retrying with standard Gemini generation (no search tool):", searchErr?.message || searchErr);
+            response = await ai.models.generateContent({
+              model: "gemini-3.5-flash",
+              contents: prompt
+            });
+          }
 
           const text = (response.text || "").trim();
           let parsed: any[] = [];
@@ -1475,7 +1497,10 @@ JSON Structure:
       let attractions = await getRealAttractions(location, destLatLng);
       if (attractions.length === 0) {
         const cleanLoc = location.toLowerCase().trim();
-        const fallbacks = FALLBACK_ATTRACTIONS[cleanLoc] || [
+        const matchedKey = cleanLoc ? Object.keys(FALLBACK_ATTRACTIONS).find(key => 
+          cleanLoc.includes(key) || key.includes(cleanLoc)
+        ) : undefined;
+        const fallbacks = (matchedKey ? FALLBACK_ATTRACTIONS[matchedKey] : null) || [
           "Main City Center Plaza",
           "Historical Heritage Fort",
           "Serene Local Lake & Garden",
@@ -1607,6 +1632,16 @@ JSON Structure:
 
       const prompt = `You are the expert AI Travel Planner engine for "Travolor", the premium professional travel platform.
 Your task is to generate an incredibly high-fidelity, highly detailed, production-ready, beautiful travel itinerary JSON string conforming EXACTLY to the TypeScript schema below.
+
+CRITICAL DESTINATION VALIDATION REQUIREMENT:
+Verify that the requested Destination: '${location}' is a real, valid, and confirmable geographical location (e.g., a city, town, island, state, country, or established tourist region).
+- If the destination is a completely fake place, gibberish, non-existent, or is a specific monument/attraction that cannot serve as a trip destination on its own, or if you cannot confirm its real-world existence and identity, you MUST refuse to generate any itinerary.
+- In this refusal case, your entire response MUST be exactly this JSON:
+{
+  "error": "Destination Not Found"
+}
+Do not include any other fields, text, markdown, or code blocks in the response if you refuse. Only return the JSON with the "error" key set to "Destination Not Found".
+
 Never generate fake travel distance. Never generate fake driving or travel time. Leverage the exact Google Maps computations and Live Weather values provided below.
 
 We computed the exact travel route and attraction clusters from the starting point to destination using the Google Maps Platform:
@@ -1830,28 +1865,117 @@ DO NOT include any Markdown wrapping like \`\`\`json or \`\`\` in your response.
         config.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
       }
 
-      const response = await getAi().models.generateContent({
-        model: model,
-        contents: prompt,
-        config: config
-      });
-
-      const responseText = (response.text || "").trim();
+      let responseText = "";
       let structuredData: any = null;
 
       try {
-        // Safe parse
-        structuredData = JSON.parse(responseText);
-      } catch (pe) {
-        console.error("Failed to parse Gemini output as JSON, trying clean regex:", pe);
-        const match = responseText.match(/\{[\s\S]*\}/);
-        if (match) {
-          structuredData = JSON.parse(match[0]);
+        const response = await getAi().models.generateContent({
+          model: model,
+          contents: prompt,
+          config: config
+        });
+
+        responseText = (response.text || "").trim();
+        
+        try {
+          // Safe parse
+          structuredData = JSON.parse(responseText);
+        } catch (pe) {
+          console.error("Failed to parse Gemini output as JSON, trying clean regex:", pe);
+          const match = responseText.match(/\{[\s\S]*\}/);
+          if (match) {
+            try {
+              structuredData = JSON.parse(match[0]);
+            } catch (e2) {
+              console.error("Regex matched JSON parsing failed as well:", e2);
+            }
+          }
         }
+      } catch (geminiError: any) {
+        console.warn("Gemini API call failed (possibly billing, permission or quota issue). Falling back to local offline itinerary engine:", geminiError);
+        const fallback = await generateLocalItinerary(
+          startLocation,
+          location,
+          duration,
+          travelStyle,
+          numPeople,
+          language,
+          travelMode,
+          travelDate,
+          targetBudget,
+          includeHiddenGems,
+          includeLocalExperiences,
+          weatherData
+        );
+        if (fallback && fallback.structured) {
+          fallback.structured.suggestionsFallbackNotice = "Travolor is currently running in fallback mode due to live AI service limit/permission issues, but we have generated a high-fidelity offline itinerary for you.";
+          enrichItineraryWithMaps(
+            fallback.structured,
+            dayWiseRoutes,
+            startLocation,
+            location,
+            duration,
+            outboundDist,
+            outboundDurationText,
+            totalTransitCost,
+            totalHotelCost,
+            totalFoodCost,
+            shoppingAllowance,
+            totalTicketCost,
+            totalLocalTransportCost,
+            emergencyBuffer,
+            totalCostWithBuffer,
+            costPerPerson
+          );
+        }
+        return res.json({
+          ...fallback,
+          offlineFallback: true,
+          fallbackNotice: "Travolor is currently running in high-fidelity offline fallback mode due to live AI service limit/permission issues."
+        });
+      }
+
+      if (structuredData && structuredData.error) {
+        return res.status(404).json({ error: structuredData.error });
       }
 
       if (!structuredData || !structuredData.hero) {
-        throw new Error("Invalid structured schema returned by model.");
+        console.warn("Invalid or empty structured schema returned by model. Triggering local generator fallback.");
+        const fallback = await generateLocalItinerary(
+          startLocation,
+          location,
+          duration,
+          travelStyle,
+          numPeople,
+          language,
+          travelMode,
+          travelDate,
+          targetBudget,
+          includeHiddenGems,
+          includeLocalExperiences,
+          weatherData
+        );
+        if (fallback && fallback.structured) {
+          enrichItineraryWithMaps(
+            fallback.structured,
+            dayWiseRoutes,
+            startLocation,
+            location,
+            duration,
+            outboundDist,
+            outboundDurationText,
+            totalTransitCost,
+            totalHotelCost,
+            totalFoodCost,
+            shoppingAllowance,
+            totalTicketCost,
+            totalLocalTransportCost,
+            emergencyBuffer,
+            totalCostWithBuffer,
+            costPerPerson
+          );
+        }
+        return res.json(fallback);
       }
 
       // Server-side dynamic financial & link enrichment to guarantee 100% mathematical accuracy and zero hallucination
@@ -2438,13 +2562,21 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
       }
     } catch (error: any) {
       const isQuota = error?.status === "RESOURCE_EXHAUSTED" || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.message?.includes("spending cap") || error?.message?.includes("429");
+      const isBillingOrPermission = error?.status === "PERMISSION_DENIED" || error?.message?.includes("PERMISSION_DENIED") || error?.message?.includes("deny") || error?.status === 403;
+      
       if (isQuota) {
-        console.log("Gemini API spending cap or quota exceeded. Using local roadtrip engine.");
+        console.warn("Gemini API spending cap or quota exceeded. Using local offline roadtrip engine.");
+      } else if (isBillingOrPermission) {
+        console.warn("Gemini API billing or permission issue detected. Using local offline roadtrip engine.");
       } else {
-        console.log("Gemini Roadtrip notice (using fallback):", error?.message || error);
+        console.warn("Gemini Roadtrip error. Using local offline roadtrip engine:", error?.message || error);
       }
       const fallback = generateLocalRoadTrip(startLocation, destination, duration, travelMode, language);
-      res.json(fallback);
+      res.json({
+        ...fallback,
+        offlineFallback: true,
+        fallbackNotice: "Travolor is currently running in high-fidelity offline fallback mode due to live AI service limit/permission issues."
+      });
     }
   });
 
@@ -2524,6 +2656,26 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
           { name: "Dal Baati Churma Feast", desc: "Relishing thick ghee-loaded Dal Baati with sweet Churma in Rajasthani village setting.", mr: "अस्सल राजस्थानी चवीचे तुपातील डाळ-बाटी आणि गोड चुरमा भोजनाचा आनंद घेणे.", hi: "शुद्ध घी से बने पारंपरिक राजस्थानी दाल-बाटी और चूरमा के शाही भोजन का स्वाद लेना।" }
         ]
       },
+      kolhapur: {
+        gems: [
+          { name: "Siddhagiri Kaneri Math (Gramjivan Museum)", desc: "A fascinating open-air wax museum depicting traditional rural self-sufficient village life.", mr: "सिद्धगिरी कणेरी मठ (ग्रामजीवन संग्रहालय): ग्रामीण संस्कृती आणि स्वयंपूर्ण गाव दाखवणारे अप्रतिम मेणाचे संग्रहालय.", hi: "सिद्धगिरी कणेरी मठ (ग्रामजीवन संग्रहालय): पारंपरिक ग्रामीण जीवन और संस्कृति को दर्शाने वाला एक शानदार वैक्स संग्रहालय।" },
+          { name: "Rankala Lake & Shalini Palace View", desc: "A historic lake perfect for evening boating, surrounded by the majestic Shalini Palace backdrop.", mr: "रंकाळा तलाव आणि शालिनी पॅलेस: संध्याकाळच्या वेळी बोटिंग करण्यासाठी आणि शालिनी पॅलेसचे भव्य दृश्य पाहण्यासाठी सर्वोत्तम जागा.", hi: "रंकाला झील और शालिनी पैलेस: शाम की बोटिंग और ऐतिहासिक शालिनी पैलेस के भव्य नजारों का आनंद लेने के लिए आदर्श स्थान।" }
+        ],
+        experiences: [
+          { name: "Kolhapuri Misal & Authentic Pandhra/Tambda Rassa", desc: "Savor the iconic spicy Kolhapuri Misal and traditional chicken/mutton rassa thali.", mr: "झणझणीत कोल्हापुरी मिसळ आणि अस्सल तांबडा-पांढरा रस्सा थाळीचा आस्वाद घेणे.", hi: "प्रसिद्ध तीखी कोल्हापुरी मिसाल और पारंपरिक तांबड़ा-पांढरा रस्सा थाली का स्वाद लेना।" },
+          { name: "Crafting Kolhapuri Chappals & Jewelry Shopping", desc: "Visit local leather artisans making legendary hand-crafted Kolhapuri footwear and shop for Kolhapuri Saaj jewelry.", mr: "पारंपरिक कोल्हापुरी चप्पल बनवणाऱ्या कारागिरांना भेटणे आणि कोल्हापुरी साज दागिन्यांची खरेदी करणे.", hi: "हाथ से बनी प्रसिद्ध कोल्हापुरी चप्पल के कारीगरों से मिलना और कोल्हापुरी साज आभूषणों की खरीदारी करना।" }
+        ]
+      },
+      tirupati: {
+        gems: [
+          { name: "Silathoranam (Natural Arch)", desc: "A rare geological wonder and prehistoric natural stone arch located in Tirumala hills.", mr: "शिलाथोरणम (नैसर्गिक कमान): तिरुमला टेकड्यांमधील एक अत्यंत दुर्मिळ प्रागैतिहासिक नैसर्गिक दगडाची कमान.", hi: "शिलाथोरणम (प्राकृतिक मेहराब): तिरुमला की पहाड़ियों में स्थित एक अत्यंत दुर्लभ प्राकृतिक पत्थर का मेहराब।" },
+          { name: "Talakona Waterfalls & Canopy Walk", desc: "The highest waterfall in Andhra Pradesh nestled inside Sri Venkateswara National Park.", mr: "तळकोना धबधबा: श्री वेंकटेश्वर राष्ट्रीय उद्यानातील आंध्र प्रदेशातील सर्वात उंच आणि नयनरम्य धबधबा.", hi: "तलकोना झरना: श्री वेंकटेश्वर राष्ट्रीय उद्यान के भीतर स्थित आंध्र प्रदेश का सबसे ऊंचा और सुंदर झरना।" }
+        ],
+        experiences: [
+          { name: "Venkateswara Swamy Temple Darshan & Prasadam", desc: "Experience the grand spiritual darshan and taste the divine, GI-tagged Tirupati Laddoo prasadam.", mr: "श्री वेंकटेश्वर स्वामी मंदिरातील भव्य दर्शन आणि जगप्रसिद्ध तिरुपती लाडू प्रसादाचा आस्वाद.", hi: "श्री वेंकटेश्वर स्वामी के भव्य दर्शन और दिव्य एवं विश्वप्रसिद्ध तिरुपति लड्डू प्रसाद का आनंद।" },
+          { name: "Chandragiri Fort Light & Sound Show", desc: "Explore the historic 11th-century fort of Vijayanagara emperors with a night light and sound show.", mr: "चंद्रगिरी किल्ला: विजयनगर साम्राज्यातील ११ व्या शतकातील ऐतिहासिक किल्ला आणि तेथील भव्य लाईट अँड साऊंड शो.", hi: "चंद्रगिरी किला: विजयनगर साम्राज्य का 11वीं सदी का ऐतिहासिक किला और वहां का भव्य लाइट एंड साउंड शो।" }
+        ]
+      },
       generic: {
         gems: [
           { name: "Secret Sunset Hilltop", desc: "A quiet, non-crowded elevated spot perfect for watching the sun go down in peace.", mr: "गुपित सूर्यास्त टेकडी: गर्दी नसलेली अतिशय शांत उंच जागा जिथून विहंगम सूर्यास्त पाहता येतो.", hi: "गुप्त सूर्यास्त पहाड़ी: बिना भीड़भाड़ वाली बेहद शांत ऊंचाई वाली जगह जहां से खूबसूरत सूर्यास्त देखा जा सकता है।" },
@@ -2537,7 +2689,10 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
     };
 
     const cleanLocKey = cleanLocation.toLowerCase().trim();
-    const cityData = LOCAL_GEMS_AND_EXPERIENCES[cleanLocKey] || LOCAL_GEMS_AND_EXPERIENCES["generic"];
+    const matchedExperienceKey = Object.keys(LOCAL_GEMS_AND_EXPERIENCES).find(key => 
+      cleanLocKey.includes(key) || key.includes(cleanLocKey)
+    );
+    const cityData = (matchedExperienceKey ? LOCAL_GEMS_AND_EXPERIENCES[matchedExperienceKey] : null) || LOCAL_GEMS_AND_EXPERIENCES["generic"];
 
     let gemsText = "";
     let experiencesText = "";
@@ -2563,8 +2718,8 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
     }
 
     // 1. Get coordinates for start and destination cities
-    const startCoordsData = await getCityCoordinates(startLocation) || CITY_COORDS_FALLBACK[startLocation.toLowerCase().trim()] || { lat: 19.0760, lng: 72.8777 };
-    const destCoordsData = await getCityCoordinates(location) || CITY_COORDS_FALLBACK[location.toLowerCase().trim()] || { lat: 15.2993, lng: 74.1240 };
+    const startCoordsData = await getCityCoordinates(startLocation) || getCityCoordsFallback(startLocation) || { lat: 19.0760, lng: 72.8777 };
+    const destCoordsData = await getCityCoordinates(location) || getCityCoordsFallback(location) || { lat: 15.2993, lng: 74.1240 };
 
     const startLatLng = { lat: startCoordsData.lat, lng: startCoordsData.lng };
     const destLatLng = { lat: destCoordsData.lat, lng: destCoordsData.lng };
@@ -2579,7 +2734,10 @@ Output ONLY a raw, valid JSON object. No markdown, no \`\`\`json blocks. If you 
     let attractions = await getRealAttractions(location, destLatLng);
     if (attractions.length === 0) {
       const cleanLoc = location.toLowerCase().trim();
-      const fallbacks = FALLBACK_ATTRACTIONS[cleanLoc] || [
+      const matchedKey = cleanLoc ? Object.keys(FALLBACK_ATTRACTIONS).find(key => 
+        cleanLoc.includes(key) || key.includes(cleanLoc)
+      ) : undefined;
+      const fallbacks = (matchedKey ? FALLBACK_ATTRACTIONS[matchedKey] : null) || [
         "Main City Center Plaza",
         "Historical Heritage Fort",
         "Serene Local Lake & Garden",

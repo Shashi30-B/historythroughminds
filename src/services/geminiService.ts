@@ -113,8 +113,20 @@ export async function generateItinerary(request: ItineraryRequest): Promise<Itin
         grounded: data.grounded,
         structured: data.structured
       };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error || `Server responded with status ${response.status}`;
+      throw new Error(errorMessage);
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message && (
+      error.message.includes("Destination Not Found") || 
+      error.message.includes("Not Found") || 
+      error.message.includes("required") || 
+      error.message.includes("resolve coordinates")
+    )) {
+      throw error;
+    }
     console.warn("Server-side generateItinerary not available, falling back to client-side. Error:", error);
   }
 
@@ -277,14 +289,20 @@ Rules:
 2. Replace all bracketed items (like [Real attraction name], [Amount in INR]) with real, actual details for the requested trip. Do not keep the brackets or template text in the final output.
 3. Be direct, enthusiastic, and provide extremely practical advice. No placeholder or bracketed templates should remain.
 4. Do NOT add ANY conversational filler or introduction/conclusion commentary before or after the itinerary. Start immediately with "🌍 [Destination Name]" and end exactly at the Trip Summary.
-5. Calculate approx costs in Indian Rupees (INR). Ensure the total estimated cost is within or close to the target budget of ₹${targetBudget.toLocaleString('en-IN')}.`;
+5. Calculate approx costs in Indian Rupees (INR). Ensure the total estimated cost is within or close to the target budget of ₹${targetBudget.toLocaleString('en-IN')}.
+6. CRITICAL DESTINATION VALIDATION: Verify that the requested Destination: '${location}' is a real, valid, and confirmable geographical location (e.g., a city, town, island, state, country, or established tourist region). If the destination is a fake place, gibberish, non-existent, or is a specific monument/attraction that cannot serve as a trip destination on its own, or if you cannot confirm its real-world existence and identity, you MUST refuse to generate any itinerary. In this refusal case, your entire response MUST be exactly: "Error: Destination Not Found" (without any extra formatting, introduction, or other characters).`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
     });
 
-    return { text: response.text || "Sorry, I couldn't generate the plan." };
+    const text = response.text || "Sorry, I couldn't generate the plan.";
+    if (text.includes("Error: Destination Not Found")) {
+      throw new Error("Destination Not Found: The provided location could not be verified as a valid geographical entity.");
+    }
+
+    return { text };
   } catch (error: any) {
     console.warn("Client-side generateItinerary fallback warning. Triggering high-fidelity local generator:", error.message || error);
     const fallbackText = generateLocalItineraryClient(request);

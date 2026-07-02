@@ -2935,9 +2935,10 @@ function AppContent({ isLoaded }: { isLoaded: boolean }) {
         time: "Calculating...",
         mode: "Multiple Options"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to generate itinerary. Please try again.");
+      const errMsg = error?.message || "Failed to generate itinerary. Please try again.";
+      alert(errMsg);
     } finally {
       setLoading(false);
     }
